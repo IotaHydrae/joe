@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 # We assum you're using bash
 
 OMZ_INSTALL_DIR=~/.oh-my-zsh
@@ -38,10 +38,10 @@ else
 fi
 
 git clone https://github.com/zsh-users/zsh-autosuggestions ~/.zsh-autosuggestions
-echo "source ${(q-)PWD}/.zsh-autosuggestions/zsh-autosuggestions.zsh" >> ${ZDOTDIR:-$HOME}/.zshrc
+echo "source ~/.zsh-autosuggestions/zsh-autosuggestions.zsh" >> ~/.zshrc
 
 git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ~/.zsh-syntax-highlighting
-echo "source ${(q-)PWD}/.zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> ${ZDOTDIR:-$HOME}/.zshrc
+echo "source ~/.zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> ~/.zshrc
 
 
 exit $?
