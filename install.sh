@@ -34,10 +34,10 @@ log() {
     shift
     local message="$*"
     local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
-    
+
     # Log to file
     echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
-    
+
     # Print to console with colors
     case "$level" in
         INFO)
@@ -152,30 +152,60 @@ detect_package_manager() {
     fi
 }
 
-# Install zsh using detected package manager
-install_zsh() {
+# Install package using detected package manager
+install_package() {
+    local package="$1"
     local pkg_manager=$(detect_package_manager)
-    log INFO "Installing zsh using $pkg_manager..."
+    log INFO "Installing $package using $pkg_manager..."
     case "$pkg_manager" in
         apt)
             run_cmd sudo apt update
-            run_cmd sudo apt install -y zsh
+            run_cmd sudo apt install -y "$package"
             ;;
         pacman)
-            run_cmd sudo pacman -Syu --noconfirm zsh
+            run_cmd sudo pacman -Syu --noconfirm "$package"
             ;;
         dnf)
-            run_cmd sudo dnf install -y zsh
+            run_cmd sudo dnf install -y "$package"
             ;;
         zypper)
-            run_cmd sudo zypper install -y zsh
+            run_cmd sudo zypper install -y "$package"
             ;;
         *)
-            log ERROR "Unsupported package manager $pkg_manager. Please install zsh manually."
-            exit 1
+            log ERROR "Unsupported package manager $pkg_manager. Please install $package manually."
+            return 1
             ;;
     esac
-    log SUCCESS "zsh installed successfully"
+    log SUCCESS "$package installed successfully"
+}
+
+# Try to install package without failing
+try_install_package() {
+    local package="$1"
+    local pkg_manager=$(detect_package_manager)
+    case "$pkg_manager" in
+        apt)
+            run_cmd sudo apt update -y || true
+            run_cmd sudo apt install -y "$package" || true
+            ;;
+        pacman)
+            run_cmd sudo pacman -Syu --noconfirm "$package" || true
+            ;;
+        dnf)
+            run_cmd sudo dnf install -y "$package" || true
+            ;;
+        zypper)
+            run_cmd sudo zypper install -y "$package" || true
+            ;;
+        *)
+            log WARNING "Unsupported package manager, skipping $package installation"
+            ;;
+    esac
+}
+
+# Install zsh
+install_zsh() {
+    install_package zsh
 }
 
 # Try to install fastfetch without failing the script
@@ -184,46 +214,28 @@ try_install_fastfetch() {
         log INFO "Skipping fastfetch installation (--no-fastfetch)"
         return
     fi
-    
+
     log INFO "Attempting to install fastfetch..."
-    local pkg_manager=$(detect_package_manager)
-    case "$pkg_manager" in
-        apt)
-            run_cmd sudo apt update -y || true
-            run_cmd sudo apt install -y fastfetch || true
-            ;;
-        pacman)
-            run_cmd sudo pacman -Syu --noconfirm fastfetch || true
-            ;;
-        dnf)
-            run_cmd sudo dnf install -y fastfetch || true
-            ;;
-        zypper)
-            run_cmd sudo zypper install -y fastfetch || true
-            ;;
-        *)
-            log WARNING "Unsupported package manager, skipping fastfetch installation"
-            ;;
-    esac
+    try_install_package fastfetch
 }
 
 # Copy files/directories with backup
 copy_with_backup() {
     local src="$1"
     local dest="$2"
-    
+
     if [ -e "$dest" ]; then
         local backup="${dest}.bak.$(date +%Y%m%d%H%M%S)"
         log INFO "Backing up existing $dest to $backup"
         run_cmd mv "$dest" "$backup"
     fi
-    
+
     local dest_dir=$(dirname "$dest")
     if [ ! -d "$dest_dir" ]; then
         log INFO "Creating directory $dest_dir"
         run_cmd mkdir -p "$dest_dir"
     fi
-    
+
     log INFO "Copying $src to $dest"
     run_cmd cp -r "$src" "$dest"
 }
@@ -239,64 +251,66 @@ add_source_line() {
     fi
 }
 
+# Clean up old backup files in a directory
+clean_backups_in_dir() {
+    local dir="$1"
+    if [ -d "$dir" ]; then
+        find "$dir" -name "*.bak.*" -type f -printf '%T+ %p\n' | sort -r | tail -n +$((BACKUP_RETENTION + 1)) | cut -d' ' -f2- | while read -r file; do
+            log INFO "Removing old backup: $file"
+            run_cmd rm "$file"
+        done
+    fi
+}
+
 # Clean up old backup files
 clean_backups() {
     log INFO "Cleaning up old backup files (keeping last $BACKUP_RETENTION)..."
-    
-    # Clean up backups in ~/.config
-    if [ -d ~/.config ]; then
-        find ~/.config -name "*.bak.*" -type f -printf '%T+ %p\n' | sort -r | tail -n +$((BACKUP_RETENTION + 1)) | cut -d' ' -f2- | while read -r file; do
-            log INFO "Removing old backup: $file"
-            run_cmd rm "$file"
-        done
-    fi
-    
-    # Clean up backups in ~/.local/share/fonts
-    if [ -d ~/.local/share/fonts ]; then
-        find ~/.local/share/fonts -name "*.bak.*" -type f -printf '%T+ %p\n' | sort -r | tail -n +$((BACKUP_RETENTION + 1)) | cut -d' ' -f2- | while read -r file; do
-            log INFO "Removing old backup: $file"
-            run_cmd rm "$file"
-        done
-    fi
-    
+
+    clean_backups_in_dir ~/.config
+    clean_backups_in_dir ~/.local/share/fonts
+
     log SUCCESS "Backup cleanup complete"
+}
+
+# Clone git repo if not exists
+git_clone_shallow() {
+    local repo_url="$1"
+    local target_dir="$2"
+    local name="$3"
+
+    if [ ! -d "$target_dir" ]; then
+        log INFO "Installing $name..."
+        run_cmd git clone --depth=1 "$repo_url" "$target_dir"
+    else
+        log INFO "$name is already installed"
+    fi
+}
+
+# Update git repo
+git_update_repo() {
+    local repo_dir="$1"
+    local name="$2"
+    local extra_cmd="$3"
+
+    if [ -d "$repo_dir" ]; then
+        log INFO "Updating $name..."
+        run_cmd git -C "$repo_dir" pull || true
+        if [ -n "$extra_cmd" ]; then
+            run_cmd $extra_cmd || true
+        fi
+    fi
 }
 
 # Update installed components
 update_components() {
     log INFO "Updating installed components..."
-    
-    # Update Oh My Zsh
-    if [ -d "$OMZ_INSTALL_DIR" ]; then
-        log INFO "Updating Oh My Zsh..."
-        run_cmd git -C "$OMZ_INSTALL_DIR" pull --rebase --stat origin master || true
-    fi
-    
-    # Update powerlevel10k
-    if [ -d "$PL10K_INSTALL_DIR" ]; then
-        log INFO "Updating powerlevel10k..."
-        run_cmd git -C "$PL10K_INSTALL_DIR" pull || true
-    fi
-    
-    # Update zsh-autosuggestions
-    if [ -d "$ZSH_AUTOSUGGESTIONS_DIR" ]; then
-        log INFO "Updating zsh-autosuggestions..."
-        run_cmd git -C "$ZSH_AUTOSUGGESTIONS_DIR" pull || true
-    fi
-    
-    # Update zsh-syntax-highlighting
-    if [ -d "$ZSH_SYNTAX_HIGHLIGHTING_DIR" ]; then
-        log INFO "Updating zsh-syntax-highlighting..."
-        run_cmd git -C "$ZSH_SYNTAX_HIGHLIGHTING_DIR" pull || true
-    fi
-    
-    # Update fzf
-    if [ -d ~/.fzf ]; then
-        log INFO "Updating fzf..."
-        run_cmd git -C ~/.fzf pull || true
-        run_cmd ~/.fzf/install --bin || true
-    fi
-    
+
+    git_update_repo "$OMZ_INSTALL_DIR" "Oh My Zsh" "git -C $OMZ_INSTALL_DIR pull --rebase --stat origin master"
+    git_update_repo "$PL10K_INSTALL_DIR" "powerlevel10k"
+    git_update_repo "$ZSH_AUTOSUGGESTIONS_DIR" "zsh-autosuggestions"
+    git_update_repo "$ZSH_SYNTAX_HIGHLIGHTING_DIR" "zsh-syntax-highlighting"
+    git_update_repo ~/.fzf "fzf" "~/.fzf/install --bin"
+
     log SUCCESS "Components update complete"
 }
 
@@ -304,44 +318,44 @@ update_components() {
 main() {
     # Initialize log file
     echo "=== Installation started at $(date) ===" > "$LOG_FILE"
-    
+
     parse_args "$@"
-    
+
     if $SHOW_HELP; then
         show_help
         exit 0
     fi
-    
+
     if $CLEAN_BACKUPS; then
         clean_backups
         exit 0
     fi
-    
+
     if $UPDATE_MODE; then
         update_components
         exit 0
     fi
-    
+
     log INFO "Starting installation..."
-    
+
     # Check dependencies
     log INFO "Checking dependencies..."
     check_dependency git
     check_dependency curl
     log SUCCESS "All dependencies satisfied"
-    
+
     # Create ~/.zshrc if it doesn't exist
     if [ ! -f ~/.zshrc ]; then
         log INFO "Creating ~/.zshrc..."
         run_cmd touch ~/.zshrc
     fi
-    
+
     # Copy powerlevel10k config if available
     if [ ! -f ~/.p10k.zsh ] && [ -f ./.p10k.zsh ] && ! $NO_P10K; then
         log INFO "Copying .p10k.zsh to ~/.p10k.zsh..."
         run_cmd cp ./.p10k.zsh ~/.p10k.zsh
     fi
-    
+
     # Copy .config directory contents
     if [ -d ./.config ] && ! $NO_CONFIG; then
         log INFO "Processing .config directory..."
@@ -352,7 +366,7 @@ main() {
             fi
         done
     fi
-    
+
     # Install fonts
     if [ -d ./fonts ] && ! $NO_FONTS; then
         log INFO "Processing fonts directory..."
@@ -370,14 +384,14 @@ main() {
         log INFO "Updating font cache..."
         run_cmd fc-cache -fv
     fi
-    
+
     # Install zsh if not present
     if ! command -v zsh &> /dev/null; then
         install_zsh
     else
         log INFO "zsh is already installed"
     fi
-    
+
     # Install Oh My Zsh if not present
     if [ -d "$OMZ_INSTALL_DIR" ]; then
         log INFO "Oh My Zsh is already installed"
@@ -388,54 +402,36 @@ main() {
         run_cmd sudo chsh "$USER" -s "$(command -v zsh)"
         log SUCCESS "Oh My Zsh installed successfully"
     fi
-    
+
     # Install powerlevel10k
-    if [ ! -d "$PL10K_INSTALL_DIR" ]; then
-        log INFO "Installing powerlevel10k theme..."
-        run_cmd git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$PL10K_INSTALL_DIR"
-    else
-        log INFO "powerlevel10k is already installed"
-    fi
-    
+    git_clone_shallow https://github.com/romkatv/powerlevel10k.git "$PL10K_INSTALL_DIR" "powerlevel10k theme"
+
     if ! $NO_P10K; then
         add_source_line "source $PL10K_INSTALL_DIR/powerlevel10k.zsh-theme"
         add_source_line "[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh"
     fi
-    
+
     # Install fzf
-    if [ ! -d ~/.fzf ]; then
-        log INFO "Installing fzf..."
-        run_cmd git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+    git_clone_shallow https://github.com/junegunn/fzf.git ~/.fzf "fzf"
+    if [ ! -f ~/.fzf/bin/fzf ]; then
         run_cmd bash -c "yes | ~/.fzf/install"
-    else
-        log INFO "fzf is already installed"
     fi
-    
+
     # Install zsh-autosuggestions
-    if [ ! -d "$ZSH_AUTOSUGGESTIONS_DIR" ]; then
-        log INFO "Installing zsh-autosuggestions..."
-        run_cmd git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_AUTOSUGGESTIONS_DIR"
-    else
-        log INFO "zsh-autosuggestions is already installed"
-    fi
+    git_clone_shallow https://github.com/zsh-users/zsh-autosuggestions "$ZSH_AUTOSUGGESTIONS_DIR" "zsh-autosuggestions"
     add_source_line "source $ZSH_AUTOSUGGESTIONS_DIR/zsh-autosuggestions.zsh"
-    
+
     # Install zsh-syntax-highlighting
-    if [ ! -d "$ZSH_SYNTAX_HIGHLIGHTING_DIR" ]; then
-        log INFO "Installing zsh-syntax-highlighting..."
-        run_cmd git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_SYNTAX_HIGHLIGHTING_DIR"
-    else
-        log INFO "zsh-syntax-highlighting is already installed"
-    fi
+    git_clone_shallow https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_SYNTAX_HIGHLIGHTING_DIR" "zsh-syntax-highlighting"
     add_source_line "source $ZSH_SYNTAX_HIGHLIGHTING_DIR/zsh-syntax-highlighting.zsh"
-    
+
     # Try to install fastfetch
     if ! command -v fastfetch &> /dev/null && ! $NO_FASTFETCH; then
         try_install_fastfetch
     fi
-    
+
     log SUCCESS "Installation complete! Please restart your terminal or log out and log back in for changes to take effect."
-    
+
     # Run fastfetch if available
     if command -v fastfetch &> /dev/null && ! $NO_FASTFETCH; then
         echo -e "\n${BLUE}Here's your system info:${NC}"
