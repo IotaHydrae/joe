@@ -344,12 +344,6 @@ main() {
     check_dependency curl
     log SUCCESS "All dependencies satisfied"
 
-    # Create ~/.zshrc if it doesn't exist
-    if [ ! -f ~/.zshrc ]; then
-        log INFO "Creating ~/.zshrc..."
-        run_cmd touch ~/.zshrc
-    fi
-
     # Copy powerlevel10k config if available
     if [ ! -f ~/.p10k.zsh ] && [ -f ./.p10k.zsh ] && ! $NO_P10K; then
         log INFO "Copying .p10k.zsh to ~/.p10k.zsh..."
@@ -401,6 +395,12 @@ main() {
         log INFO "Changing default shell to zsh..."
         run_cmd sudo chsh "$USER" -s "$(command -v zsh)"
         log SUCCESS "Oh My Zsh installed successfully"
+    fi
+
+    # Create ~/.zshrc as fallback if OMZ didn't create one
+    if [ ! -f ~/.zshrc ]; then
+        log INFO "Creating ~/.zshrc (OMZ template was not generated)..."
+        run_cmd touch ~/.zshrc
     fi
 
     # Install powerlevel10k
