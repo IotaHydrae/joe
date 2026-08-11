@@ -354,7 +354,7 @@ enable_default_plugins() {
         return
     fi
 
-    local -a default_plugins=(git sudo extract colored-man-pages colorize z history aliases dirhistory web-search command-not-found)
+    local -a default_plugins=(git sudo extract colored-man-pages colorize z history aliases dirhistory web-search command-not-found you-should-use)
     log INFO "Enabling default Oh My Zsh plugins: ${default_plugins[*]}"
 
     local plugin
