@@ -13,6 +13,26 @@ if [ -f "${BASH_SOURCE[0]:-}" ]; then
     cd "$SCRIPT_DIR"
 fi
 
+# When the script is piped through `curl ... | bash`, there is no script
+# file: clone this repository and re-execute from the clone so that
+# repo-local assets (.config, fonts, .p10k.zsh) are included as well.
+if [ ! -f "${BASH_SOURCE[0]:-}" ]; then
+    JOE_INSTALL_DIR="${JOE_INSTALL_DIR:-$HOME/.joe}"
+    if [ ! -d "$JOE_INSTALL_DIR/.git" ]; then
+        if [ -e "$JOE_INSTALL_DIR" ]; then
+            echo "ERROR: $JOE_INSTALL_DIR exists but is not a joe git repository; remove it or set JOE_INSTALL_DIR to another location" >&2
+            exit 1
+        fi
+        if ! command -v git >/dev/null 2>&1; then
+            echo "ERROR: git is required for one-line installation" >&2
+            exit 1
+        fi
+        echo "Cloning joe repository to $JOE_INSTALL_DIR..."
+        git clone --depth=1 https://github.com/IotaHydrae/joe.git "$JOE_INSTALL_DIR"
+    fi
+    exec bash "$JOE_INSTALL_DIR/install.sh" "$@"
+fi
+
 # Configuration and constants
 OMZ_INSTALL_DIR=~/.oh-my-zsh
 PL10K_INSTALL_DIR=~/.powerlevel10k

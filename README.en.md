@@ -10,7 +10,7 @@ An automated zsh environment setup script, including Oh My Zsh, the powerlevel10
 curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | bash
 ```
 
-> Note: The one-liner executes the script directly from the remote repo, so repo-local assets such as `.config`, `fonts`, and `.p10k.zsh` are not included. To install those as well, clone the repository and run `./install.sh` from inside it.
+> Note: The one-liner first clones the repository to `~/.joe` and then runs install.sh from inside it, so repo-local assets such as `.config`, `fonts`, and `.p10k.zsh` are installed as well. An existing `~/.joe` clone is reused (override the location with the `JOE_INSTALL_DIR` environment variable).
 
 ## Features
 

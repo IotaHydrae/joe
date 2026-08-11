@@ -10,7 +10,7 @@
 curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | bash
 ```
 
-> 提示：一行式安装会直接执行远端脚本，仓库自带的 `.config`、`fonts`、`.p10k.zsh` 等资源不会包含在内；如需安装这些配置，请克隆仓库后在仓库目录内运行 `./install.sh`。
+> 提示：一行式安装会先把仓库克隆到 `~/.joe`，再从仓库内继续执行，因此 `.config`、`fonts`、`.p10k.zsh` 等资源同样会被安装；`~/.joe` 已存在时直接复用（可用 `JOE_INSTALL_DIR` 环境变量改目录）。
 
 ## 功能特性
 
