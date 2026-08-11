@@ -3,13 +3,24 @@
 
 set -euo pipefail
 
+# Resolve the script's own directory so it works no matter where it is invoked from
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Configuration and constants
 OMZ_INSTALL_DIR=~/.oh-my-zsh
 PL10K_INSTALL_DIR=~/.powerlevel10k
 ZSH_AUTOSUGGESTIONS_DIR=~/.zsh-autosuggestions
 ZSH_SYNTAX_HIGHLIGHTING_DIR=~/.zsh-syntax-highlighting
-LOG_FILE="install.log"
+LOG_FILE="$SCRIPT_DIR/install.log"
 BACKUP_RETENTION=5
+
+# Use sudo for privileged commands unless we are already root
+if [ "$EUID" -eq 0 ]; then
+    SUDO_CMD=""
+else
+    SUDO_CMD="sudo"
+fi
 
 # ANSI color codes
 RED='\033[0;31m'
@@ -159,17 +170,17 @@ install_package() {
     log INFO "Installing $package using $pkg_manager..."
     case "$pkg_manager" in
         apt)
-            run_cmd sudo apt update
-            run_cmd sudo apt install -y "$package"
+            run_cmd $SUDO_CMD apt update
+            run_cmd $SUDO_CMD apt install -y "$package"
             ;;
         pacman)
-            run_cmd sudo pacman -Syu --noconfirm "$package"
+            run_cmd $SUDO_CMD pacman -S --needed --noconfirm "$package"
             ;;
         dnf)
-            run_cmd sudo dnf install -y "$package"
+            run_cmd $SUDO_CMD dnf install -y "$package"
             ;;
         zypper)
-            run_cmd sudo zypper install -y "$package"
+            run_cmd $SUDO_CMD zypper install -y "$package"
             ;;
         *)
             log ERROR "Unsupported package manager $pkg_manager. Please install $package manually."
@@ -185,17 +196,17 @@ try_install_package() {
     local pkg_manager=$(detect_package_manager)
     case "$pkg_manager" in
         apt)
-            run_cmd sudo apt update -y || true
-            run_cmd sudo apt install -y "$package" || true
+            run_cmd $SUDO_CMD apt update -y || true
+            run_cmd $SUDO_CMD apt install -y "$package" || true
             ;;
         pacman)
-            run_cmd sudo pacman -Syu --noconfirm "$package" || true
+            run_cmd $SUDO_CMD pacman -S --needed --noconfirm "$package" || true
             ;;
         dnf)
-            run_cmd sudo dnf install -y "$package" || true
+            run_cmd $SUDO_CMD dnf install -y "$package" || true
             ;;
         zypper)
-            run_cmd sudo zypper install -y "$package" || true
+            run_cmd $SUDO_CMD zypper install -y "$package" || true
             ;;
         *)
             log WARNING "Unsupported package manager, skipping $package installation"
@@ -224,20 +235,28 @@ copy_with_backup() {
     local src="$1"
     local dest="$2"
 
-    if [ -e "$dest" ]; then
-        local backup="${dest}.bak.$(date +%Y%m%d%H%M%S)"
-        log INFO "Backing up existing $dest to $backup"
-        run_cmd mv "$dest" "$backup"
-    fi
-
     local dest_dir=$(dirname "$dest")
     if [ ! -d "$dest_dir" ]; then
         log INFO "Creating directory $dest_dir"
         run_cmd mkdir -p "$dest_dir"
     fi
 
+    if [ -e "$dest" ]; then
+        local backup="${dest}.bak.$(date +%Y%m%d%H%M%S)"
+        local n=0
+        while [ -e "$backup" ]; do
+            n=$((n + 1))
+            backup="${dest}.bak.$(date +%Y%m%d%H%M%S).${n}"
+        done
+        log INFO "Backing up existing $dest to $backup"
+        # Copy to the backup first; only remove the original once the backup exists,
+        # so a failed backup never leaves the current config missing.
+        run_cmd cp -r -- "$dest" "$backup"
+        run_cmd rm -rf -- "$dest"
+    fi
+
     log INFO "Copying $src to $dest"
-    run_cmd cp -r "$src" "$dest"
+    run_cmd cp -r -- "$src" "$dest"
 }
 
 # Add a line to ~/.zshrc if it doesn't already exist
@@ -245,7 +264,11 @@ add_source_line() {
     local line="$1"
     if ! grep -qxF "$line" ~/.zshrc 2>/dev/null; then
         log INFO "Adding '$line' to ~/.zshrc"
-        run_cmd bash -c "echo '$line' >> ~/.zshrc"
+        if $DRY_RUN; then
+            log INFO "Dry run: Would execute: printf '%s\\n' \"$line\" >> ~/.zshrc"
+        else
+            printf '%s\n' "$line" >> ~/.zshrc
+        fi
     else
         log INFO "'$line' already exists in ~/.zshrc"
     fi
@@ -255,9 +278,9 @@ add_source_line() {
 clean_backups_in_dir() {
     local dir="$1"
     if [ -d "$dir" ]; then
-        find "$dir" -name "*.bak.*" -type f -printf '%T+ %p\n' | sort -r | tail -n +$((BACKUP_RETENTION + 1)) | cut -d' ' -f2- | while read -r file; do
+        find "$dir" -mindepth 1 -maxdepth 1 \( -type f -o -type d -o -type l \) -name '*.bak.[0-9]*' -printf '%T+ %p\n' | sort -r | tail -n +$((BACKUP_RETENTION + 1)) | cut -d' ' -f2- | while read -r file; do
             log INFO "Removing old backup: $file"
-            run_cmd rm "$file"
+            run_cmd rm -rf -- "$file"
         done
     fi
 }
@@ -281,6 +304,8 @@ git_clone_shallow() {
     if [ ! -d "$target_dir" ]; then
         log INFO "Installing $name..."
         run_cmd git clone --depth=1 "$repo_url" "$target_dir"
+    elif [ ! -d "$target_dir/.git" ]; then
+        log WARNING "$target_dir exists but is not a git repository; remove it to reinstall $name"
     else
         log INFO "$name is already installed"
     fi
@@ -290,13 +315,14 @@ git_clone_shallow() {
 git_update_repo() {
     local repo_dir="$1"
     local name="$2"
-    local extra_cmd="$3"
+    shift 2
+    local -a extra_cmd=("$@")
 
     if [ -d "$repo_dir" ]; then
         log INFO "Updating $name..."
         run_cmd git -C "$repo_dir" pull || true
-        if [ -n "$extra_cmd" ]; then
-            run_cmd $extra_cmd || true
+        if [ ${#extra_cmd[@]} -gt 0 ]; then
+            run_cmd "${extra_cmd[@]}" || true
         fi
     fi
 }
@@ -305,11 +331,11 @@ git_update_repo() {
 update_components() {
     log INFO "Updating installed components..."
 
-    git_update_repo "$OMZ_INSTALL_DIR" "Oh My Zsh" "git -C $OMZ_INSTALL_DIR pull --rebase --stat origin master"
+    git_update_repo "$OMZ_INSTALL_DIR" "Oh My Zsh"
     git_update_repo "$PL10K_INSTALL_DIR" "powerlevel10k"
     git_update_repo "$ZSH_AUTOSUGGESTIONS_DIR" "zsh-autosuggestions"
     git_update_repo "$ZSH_SYNTAX_HIGHLIGHTING_DIR" "zsh-syntax-highlighting"
-    git_update_repo ~/.fzf "fzf" "~/.fzf/install --bin"
+    git_update_repo ~/.fzf "fzf" "$HOME/.fzf/install" --bin
 
     log SUCCESS "Components update complete"
 }
@@ -342,6 +368,9 @@ main() {
     log INFO "Checking dependencies..."
     check_dependency git
     check_dependency curl
+    if [ "$EUID" -ne 0 ]; then
+        check_dependency sudo
+    fi
     log SUCCESS "All dependencies satisfied"
 
     # Copy powerlevel10k config if available
@@ -375,8 +404,12 @@ main() {
                 copy_with_backup "$font_file" "$FONTS_DEST/$font_name"
             fi
         done
-        log INFO "Updating font cache..."
-        run_cmd fc-cache -fv
+        if command -v fc-cache &> /dev/null; then
+            log INFO "Updating font cache..."
+            run_cmd fc-cache -fv
+        else
+            log WARNING "fc-cache not found, skipping font cache update"
+        fi
     fi
 
     # Install zsh if not present
@@ -388,13 +421,20 @@ main() {
 
     # Install Oh My Zsh if not present
     if [ -d "$OMZ_INSTALL_DIR" ]; then
+        if [ ! -d "$OMZ_INSTALL_DIR/.git" ]; then
+            log WARNING "~/.oh-my-zsh exists but is not a git repository; consider removing it for a clean install"
+        fi
         log INFO "Oh My Zsh is already installed"
     else
         log INFO "Installing Oh My Zsh..."
         run_cmd bash -c "CHSH=no RUNZSH=no KEEP_ZSHRC=yes sh -c \"\$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)\""
-        log INFO "Changing default shell to zsh..."
-        run_cmd sudo chsh "$USER" -s "$(command -v zsh)"
         log SUCCESS "Oh My Zsh installed successfully"
+    fi
+
+    # Ensure zsh is the default shell (also covers the case where Oh My Zsh was already installed)
+    if command -v zsh &> /dev/null && [ "${SHELL:-}" != "$(command -v zsh)" ]; then
+        log INFO "Changing default shell to zsh..."
+        run_cmd $SUDO_CMD chsh "$(id -un)" -s "$(command -v zsh)"
     fi
 
     # Create ~/.zshrc as fallback if OMZ didn't create one

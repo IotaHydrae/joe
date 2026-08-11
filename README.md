@@ -59,8 +59,8 @@
 
 ### 依赖要求
 
-- git
-- curl
+- git、curl（非 root 用户还需要 sudo）
+- fc-cache（可选，缺失时自动跳过字体缓存更新）
 
 ### 安装的组件
 
