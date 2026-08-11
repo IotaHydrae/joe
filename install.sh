@@ -3,9 +3,15 @@
 
 set -euo pipefail
 
-# Resolve the script's own directory so it works no matter where it is invoked from
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-cd "$SCRIPT_DIR"
+# Resolve the script's own directory when executed from a file, so relative
+# assets (.config, fonts, .p10k.zsh) work regardless of the invocation cwd.
+# When piped via `curl ... | bash` there is no script file: repo-local assets
+# are skipped and the log is written to the current directory.
+SCRIPT_DIR="$(pwd)"
+if [ -f "${BASH_SOURCE[0]:-}" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+    cd "$SCRIPT_DIR"
+fi
 
 # Configuration and constants
 OMZ_INSTALL_DIR=~/.oh-my-zsh
