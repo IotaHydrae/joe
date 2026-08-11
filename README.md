@@ -1,6 +1,16 @@
 # Joe
 
+> **中文** | [English](README.en.md)
+
 一个自动化的 zsh 环境配置安装脚本，包含 Oh My Zsh、powerlevel10k 主题和常用插件。
+
+## 快速安装
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | bash
+```
+
+> 提示：一行式安装会直接执行远端脚本，仓库自带的 `.config`、`fonts`、`.p10k.zsh` 等资源不会包含在内；如需安装这些配置，请克隆仓库后在仓库目录内运行 `./install.sh`。
 
 ## 功能特性
 
@@ -15,7 +25,6 @@
 - 可选安装 fastfetch（系统信息展示工具）
 - 安装自定义字体
 - 复制 .config 目录配置（如 ghostty 终端配置）
-- 复制 SSH 配置
 - 自动备份现有配置文件
 - 支持组件更新模式
 - 支持清理旧备份文件
@@ -76,7 +85,6 @@
 7. **fastfetch** - 系统信息展示工具（可选）
 8. **自定义字体** - Fixedsys 等字体（可选）
 9. **配置文件** - .config 目录下的配置（如 ghostty 终端）
-10. **SSH 配置** - .ssh 目录配置
 
 ## 注意事项
 
