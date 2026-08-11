@@ -9,6 +9,8 @@
 - 安装 powerlevel10k 主题并预置配置
 - 安装 zsh-autosuggestions（命令自动建议）
 - 安装 zsh-syntax-highlighting（语法高亮）
+- 自动识别 Oh My Zsh 已内置的插件：若插件已存在于 oh-my-zsh/plugins（或 custom/plugins）目录，则跳过单独拉取，直接在 .zshrc 的 plugins=() 中启用
+- 启用一组内置推荐插件（git、sudo、extract、colored-man-pages、colorize、z、history、aliases、dirhistory、web-search、command-not-found），只追加不覆盖已有 plugins=()
 - 安装 fzf（命令行模糊查找器）
 - 可选安装 fastfetch（系统信息展示工具）
 - 安装自定义字体
@@ -36,6 +38,7 @@
 | `--no-config` | 跳过 .config 目录复制 |
 | `--no-p10k` | 跳过 powerlevel10k 配置 |
 | `--no-fastfetch` | 跳过 fastfetch 安装 |
+| `--no-default-plugins` | 跳过默认插件配置 |
 | `--clean-backups` | 清理旧备份文件（保留最近 5 个） |
 | `-u, --update` | 更新已安装的组件 |
 

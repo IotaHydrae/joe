@@ -35,6 +35,7 @@ NO_FONTS=false
 NO_CONFIG=false
 NO_P10K=false
 NO_FASTFETCH=false
+NO_DEFAULT_PLUGINS=false
 CLEAN_BACKUPS=false
 UPDATE_MODE=false
 SHOW_HELP=false
@@ -80,6 +81,7 @@ Options:
     --no-config             Skip .config directory copying
     --no-p10k               Skip powerlevel10k configuration
     --no-fastfetch          Skip fastfetch installation and execution
+    --no-default-plugins    Skip enabling default Oh My Zsh plugins
     --clean-backups         Clean up old backup files (keeps last $BACKUP_RETENTION)
     -u, --update            Update installed components instead of installing
 EOF
@@ -112,6 +114,10 @@ parse_args() {
                 ;;
             --no-fastfetch)
                 NO_FASTFETCH=true
+                shift
+                ;;
+            --no-default-plugins)
+                NO_DEFAULT_PLUGINS=true
                 shift
                 ;;
             --clean-backups)
@@ -274,6 +280,93 @@ add_source_line() {
     fi
 }
 
+# Enable a plugin bundled with Oh My Zsh by adding it to plugins=() in ~/.zshrc
+enable_omz_plugin() {
+    local plugin="$1"
+    local zshrc=~/.zshrc
+
+    if [ ! -f "$zshrc" ]; then
+        log WARNING "~/.zshrc not found, cannot enable plugin '$plugin'"
+        return 1
+    fi
+
+    if ! grep -q "plugins=(" "$zshrc"; then
+        log WARNING "No plugins=(...) line found in ~/.zshrc, cannot enable plugin '$plugin'"
+        return 1
+    fi
+
+    if $DRY_RUN; then
+        log INFO "Dry run: Would ensure '$plugin' is enabled in plugins=() in ~/.zshrc"
+        return 0
+    fi
+
+    log INFO "Ensuring '$plugin' is enabled in plugins=() in ~/.zshrc"
+    OMZ_PLUGIN="$plugin" perl -i -e '
+        my $plugin = $ENV{"OMZ_PLUGIN"};
+        my $in_block = 0;
+        my $block_indent = "";
+        my $block_has_plugin = 0;
+        my $changed = 0;
+
+        while (my $line = <>) {
+            if (!$in_block) {
+                if ($line =~ /^(\s*)plugins=\(/) {
+                    $in_block = 1;
+                    $block_indent = $1;
+                    $block_has_plugin = ($line =~ /\b\Q$plugin\E\b/);
+                    if ($line =~ /\)/) {
+                        # Single-line plugins=(...): insert the plugin before the closing paren
+                        if (!$block_has_plugin) {
+                            $line =~ s/\)(\s*)$/ $plugin)$1/;
+                            $changed = 1;
+                        }
+                        $in_block = 0;
+                    }
+                }
+                print $line;
+                next;
+            }
+            # Inside a multi-line plugins=(...) block
+            if ($line =~ /\)/) {
+                if (!$block_has_plugin) {
+                    print "${block_indent}  $plugin\n";
+                    $changed = 1;
+                }
+                $in_block = 0;
+            } else {
+                $block_has_plugin = 1 if $line =~ /\b\Q$plugin\E\b/;
+            }
+            print $line;
+        }
+        exit 0;
+    ' "$zshrc"
+}
+
+# Enable a curated set of plugins that ship with Oh My Zsh
+enable_default_plugins() {
+    if $NO_DEFAULT_PLUGINS; then
+        log INFO "Skipping default plugins (--no-default-plugins)"
+        return
+    fi
+
+    if [ ! -d "$OMZ_INSTALL_DIR" ]; then
+        log WARNING "Oh My Zsh is not installed, skipping default plugins"
+        return
+    fi
+
+    local -a default_plugins=(git sudo extract colored-man-pages colorize z history aliases dirhistory web-search command-not-found)
+    log INFO "Enabling default Oh My Zsh plugins: ${default_plugins[*]}"
+
+    local plugin
+    for plugin in "${default_plugins[@]}"; do
+        if [ -d "$OMZ_INSTALL_DIR/plugins/$plugin" ]; then
+            enable_omz_plugin "$plugin" || true
+        else
+            log WARNING "Plugin '$plugin' is not bundled with Oh My Zsh, skipping"
+        fi
+    done
+}
+
 # Clean up old backup files in a directory
 clean_backups_in_dir() {
     local dir="$1"
@@ -309,6 +402,24 @@ git_clone_shallow() {
     else
         log INFO "$name is already installed"
     fi
+}
+
+# Install a zsh plugin, preferring an Oh My Zsh bundled copy when available
+install_zsh_plugin() {
+    local repo_url="$1"
+    local target_dir="$2"
+    local plugin="$3"
+
+    if [ -d "$OMZ_INSTALL_DIR/plugins/$plugin" ] || [ -d "$OMZ_INSTALL_DIR/custom/plugins/$plugin" ]; then
+        log INFO "$plugin is bundled with Oh My Zsh; enabling it via plugins=()"
+        if enable_omz_plugin "$plugin"; then
+            return 0
+        fi
+        log WARNING "Could not enable $plugin via plugins=(); falling back to standalone install"
+    fi
+
+    git_clone_shallow "$repo_url" "$target_dir" "$plugin"
+    add_source_line "source $target_dir/$plugin.zsh"
 }
 
 # Update git repo
@@ -443,6 +554,9 @@ main() {
         run_cmd touch ~/.zshrc
     fi
 
+    # Enable a curated set of plugins that ship with Oh My Zsh
+    enable_default_plugins
+
     # Install powerlevel10k
     git_clone_shallow https://github.com/romkatv/powerlevel10k.git "$PL10K_INSTALL_DIR" "powerlevel10k theme"
 
@@ -457,13 +571,11 @@ main() {
         run_cmd bash -c "yes | ~/.fzf/install"
     fi
 
-    # Install zsh-autosuggestions
-    git_clone_shallow https://github.com/zsh-users/zsh-autosuggestions "$ZSH_AUTOSUGGESTIONS_DIR" "zsh-autosuggestions"
-    add_source_line "source $ZSH_AUTOSUGGESTIONS_DIR/zsh-autosuggestions.zsh"
+    # Install zsh-autosuggestions (skips clone if already bundled with Oh My Zsh)
+    install_zsh_plugin https://github.com/zsh-users/zsh-autosuggestions "$ZSH_AUTOSUGGESTIONS_DIR" "zsh-autosuggestions"
 
-    # Install zsh-syntax-highlighting
-    git_clone_shallow https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_SYNTAX_HIGHLIGHTING_DIR" "zsh-syntax-highlighting"
-    add_source_line "source $ZSH_SYNTAX_HIGHLIGHTING_DIR/zsh-syntax-highlighting.zsh"
+    # Install zsh-syntax-highlighting (skips clone if already bundled with Oh My Zsh)
+    install_zsh_plugin https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_SYNTAX_HIGHLIGHTING_DIR" "zsh-syntax-highlighting"
 
     # Try to install fastfetch
     if ! command -v fastfetch &> /dev/null && ! $NO_FASTFETCH; then
