@@ -16,6 +16,8 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 - 自动安装 zsh（支持 apt/pacman/dnf/zypper 包管理器）
 - 安装和配置 Oh My Zsh
+- 通过 git 克隆安装 Oh My Zsh（不走 `curl | sh`，避免下载失败被当成安装成功），克隆失败时明确报错并中止
+- 保证 `.zshrc` 会加载 Oh My Zsh：文件缺失时用官方模板生成，已存在但缺少 `oh-my-zsh.sh` 时自动在顶部补上引导块（先备份原文件）
 - 安装 powerlevel10k 主题并预置配置
 - 安装 zsh-autosuggestions（命令自动建议）
 - 安装 zsh-syntax-highlighting（语法高亮）
@@ -90,4 +92,6 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 - 安装脚本会自动备份现有配置文件，格式为 `.bak.时间戳`
 - 默认保留最近 5 个备份文件
+- 脚本会校验 Oh My Zsh 是否真的安装成功；失败时直接退出，不会留下只有几行 `source` 的 `.zshrc`
+- 如果 `.zshrc` 里只有 `source ...` 片段（缺少 `export ZSH=`、`plugins=()`、`source $ZSH/oh-my-zsh.sh`），重新执行一次 `./install.sh` 即可自动补齐
 - 安装完成后请重启终端或重新登录以使更改生效

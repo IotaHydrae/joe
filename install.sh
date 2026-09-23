@@ -35,6 +35,7 @@ fi
 
 # Configuration and constants
 OMZ_INSTALL_DIR=~/.oh-my-zsh
+OMZ_ZSHRC_TEMPLATE="$OMZ_INSTALL_DIR/templates/zshrc.zsh-template"
 PL10K_INSTALL_DIR=~/.powerlevel10k
 ZSH_AUTOSUGGESTIONS_DIR=~/.zsh-autosuggestions
 ZSH_SYNTAX_HIGHLIGHTING_DIR=~/.zsh-syntax-highlighting
@@ -430,6 +431,96 @@ git_clone_shallow() {
     fi
 }
 
+# Install Oh My Zsh by cloning the repository.
+#
+# The upstream `sh -c "$(curl -fsSL ...)"` one-liner hides its own failures:
+# when the download fails the command substitution expands to an empty string,
+# `sh -c ""` still exits 0, and the caller has no way to notice that nothing
+# was installed. Cloning the repository instead keeps the same network path as
+# the other components, works on hosts where raw.githubusercontent.com is
+# unreachable, and reports a non-zero status on failure.
+install_omz() {
+    if ! git_clone_shallow https://github.com/ohmyzsh/ohmyzsh.git "$OMZ_INSTALL_DIR" "Oh My Zsh"; then
+        log ERROR "Cloning Oh My Zsh failed"
+        log ERROR "Check access to https://github.com/ohmyzsh/ohmyzsh.git and re-run this script"
+        exit 1
+    fi
+}
+
+# Abort when Oh My Zsh is missing after the install step.
+#
+# Every later step (plugins=(), powerlevel10k, autosuggestions) assumes a
+# working Oh My Zsh; continuing without it is what leaves ~/.zshrc full of
+# fragments that never load the framework.
+verify_omz_installed() {
+    if $DRY_RUN; then
+        return 0
+    fi
+
+    if [ -f "$OMZ_INSTALL_DIR/oh-my-zsh.sh" ]; then
+        return 0
+    fi
+
+    log ERROR "Oh My Zsh is not installed at $OMZ_INSTALL_DIR"
+    log ERROR "Check access to https://github.com/ohmyzsh/ohmyzsh.git and re-run this script"
+    exit 1
+}
+
+# Minimal Oh My Zsh bootstrap used when the upstream template is unavailable
+omz_bootstrap_block() {
+    cat << 'EOF'
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME="robbyrussell"
+plugins=(git)
+source $ZSH/oh-my-zsh.sh
+EOF
+}
+
+# Make sure ~/.zshrc bootstraps Oh My Zsh.
+#
+# Oh My Zsh only writes its template when it creates ~/.zshrc itself, so a
+# missing file used to be replaced by an empty one that the script then filled
+# with bare `source ...` lines. An existing ~/.zshrc that never loads
+# oh-my-zsh.sh (older runs, interrupted installs) is repaired by prepending the
+# bootstrap block, keeping everything the user already had.
+ensure_zshrc() {
+    if $DRY_RUN; then
+        log INFO "Dry run: Would ensure ~/.zshrc bootstraps Oh My Zsh"
+        return 0
+    fi
+
+    if [ ! -f ~/.zshrc ]; then
+        if [ -f "$OMZ_ZSHRC_TEMPLATE" ]; then
+            log INFO "Creating ~/.zshrc from the Oh My Zsh template..."
+            cp -- "$OMZ_ZSHRC_TEMPLATE" ~/.zshrc
+        else
+            log WARNING "Oh My Zsh template not found, writing a minimal ~/.zshrc"
+            omz_bootstrap_block > ~/.zshrc
+        fi
+        return 0
+    fi
+
+    if grep -q 'oh-my-zsh\.sh' ~/.zshrc; then
+        log INFO "~/.zshrc already loads Oh My Zsh"
+        return 0
+    fi
+
+    local backup=~/.zshrc.bak.$(date +%Y%m%d%H%M%S)
+    local mode
+    local merged
+    mode=$(stat -c '%a' ~/.zshrc)
+    merged=$(mktemp)
+    log WARNING "~/.zshrc does not load Oh My Zsh; adding the bootstrap block on top (backup: $backup)"
+    cp -r -- ~/.zshrc "$backup"
+    {
+        omz_bootstrap_block
+        printf '\n'
+        cat -- ~/.zshrc
+    } > "$merged"
+    chmod "$mode" "$merged"
+    mv -- "$merged" ~/.zshrc
+}
+
 # Install a zsh plugin, preferring an Oh My Zsh bundled copy when available
 install_zsh_plugin() {
     local repo_url="$1"
@@ -563,10 +654,10 @@ main() {
         fi
         log INFO "Oh My Zsh is already installed"
     else
-        log INFO "Installing Oh My Zsh..."
-        run_cmd bash -c "CHSH=no RUNZSH=no KEEP_ZSHRC=yes sh -c \"\$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)\""
+        install_omz
         log SUCCESS "Oh My Zsh installed successfully"
     fi
+    verify_omz_installed
 
     # Ensure zsh is the default shell (also covers the case where Oh My Zsh was already installed)
     if command -v zsh &> /dev/null && [ "${SHELL:-}" != "$(command -v zsh)" ]; then
@@ -574,11 +665,8 @@ main() {
         run_cmd $SUDO_CMD chsh "$(id -un)" -s "$(command -v zsh)"
     fi
 
-    # Create ~/.zshrc as fallback if OMZ didn't create one
-    if [ ! -f ~/.zshrc ]; then
-        log INFO "Creating ~/.zshrc (OMZ template was not generated)..."
-        run_cmd touch ~/.zshrc
-    fi
+    # Make sure ~/.zshrc actually bootstraps Oh My Zsh
+    ensure_zshrc
 
     # Enable a curated set of plugins that ship with Oh My Zsh
     enable_default_plugins

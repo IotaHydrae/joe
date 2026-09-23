@@ -16,6 +16,8 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 - Automatically installs zsh (supports apt/pacman/dnf/zypper package managers)
 - Installs and configures Oh My Zsh
+- Installs Oh My Zsh by cloning the repository instead of `curl | sh`, so a failed download can no longer be mistaken for a successful install; the script reports the failure and stops
+- Guarantees `.zshrc` actually loads Oh My Zsh: the file is generated from the upstream template when missing, and an existing file without `oh-my-zsh.sh` gets the bootstrap block prepended (the original is backed up first)
 - Installs the powerlevel10k theme with a preset configuration
 - Installs zsh-autosuggestions (command autosuggestions)
 - Installs zsh-syntax-highlighting (syntax highlighting)
@@ -90,4 +92,6 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 - The script automatically backs up existing config files as `.bak.<timestamp>`
 - The last 5 backups are kept by default
+- The script verifies that Oh My Zsh really got installed and aborts otherwise, so it never leaves a `.zshrc` with only a few `source` lines behind
+- If your `.zshrc` contains only `source ...` fragments (no `export ZSH=`, `plugins=()` or `source $ZSH/oh-my-zsh.sh`), simply re-run `./install.sh` to repair it
 - Restart your terminal or log out and back in after installation for the changes to take effect
