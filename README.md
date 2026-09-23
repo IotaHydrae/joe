@@ -27,6 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 - 可选安装 fastfetch（系统信息展示工具）
 - 安装自定义字体
 - 复制 .config 目录配置（如 ghostty 终端配置）
+- 修复 Ghostty AppImage 无法输入中文的问题：在 AppImage 旁生成 `<AppImage>.env` 并设置 `GTK_PATH`，让 AppImage 自带的 GTK 加载系统的 GTK4 输入法模块（ibus/fcitx5）
 - 自动备份现有配置文件
 - 支持组件更新模式
 - 支持清理旧备份文件
@@ -50,6 +51,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 | `--no-p10k` | 跳过 powerlevel10k 配置 |
 | `--no-fastfetch` | 跳过 fastfetch 安装 |
 | `--no-default-plugins` | 跳过默认插件配置 |
+| `--no-ghostty-ime` | 跳过 Ghostty AppImage 输入法修复 |
 | `--clean-backups` | 清理旧备份文件（保留最近 5 个） |
 | `-u, --update` | 更新已安装的组件 |
 
@@ -87,6 +89,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 7. **fastfetch** - 系统信息展示工具（可选）
 8. **自定义字体** - Fixedsys 等字体（可选）
 9. **配置文件** - .config 目录下的配置（如 ghostty 终端）
+10. **Ghostty AppImage 输入法修复** - 在 `~/.local/bin`（或 `~/Applications`）找到 Ghostty AppImage 时，为其写入 `<AppImage>.env` 把 `GTK_PATH` 指向系统 GTK4 输入法模块的软链接目录（可用 `GHOSTTY_APPIMAGE` 指定路径，用 `--no-ghostty-ime` 跳过）
 
 ## 注意事项
 
@@ -94,4 +97,5 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 - 默认保留最近 5 个备份文件
 - 脚本会校验 Oh My Zsh 是否真的安装成功；失败时直接退出，不会留下只有几行 `source` 的 `.zshrc`
 - 如果 `.zshrc` 里只有 `source ...` 片段（缺少 `export ZSH=`、`plugins=()`、`source $ZSH/oh-my-zsh.sh`），重新执行一次 `./install.sh` 即可自动补齐
+- Ghostty AppImage 的输入法修复与文件名绑定（AppImage 运行时会读取同名的 `.env`）；换成新版本、文件名变化后，重新执行一次 `./install.sh` 即可重新指向，且需要完全退出已打开的 Ghostty 窗口再启动才会生效
 - 安装完成后请重启终端或重新登录以使更改生效

@@ -39,6 +39,7 @@ OMZ_ZSHRC_TEMPLATE="$OMZ_INSTALL_DIR/templates/zshrc.zsh-template"
 PL10K_INSTALL_DIR=~/.powerlevel10k
 ZSH_AUTOSUGGESTIONS_DIR=~/.zsh-autosuggestions
 ZSH_SYNTAX_HIGHLIGHTING_DIR=~/.zsh-syntax-highlighting
+GHOSTTY_IMMODULE_DIR=~/.local/share/ghostty-appimage/gtk-immodules
 LOG_FILE="$SCRIPT_DIR/install.log"
 BACKUP_RETENTION=5
 
@@ -63,6 +64,7 @@ NO_CONFIG=false
 NO_P10K=false
 NO_FASTFETCH=false
 NO_DEFAULT_PLUGINS=false
+NO_GHOSTTY_IME=false
 CLEAN_BACKUPS=false
 UPDATE_MODE=false
 SHOW_HELP=false
@@ -109,6 +111,7 @@ Options:
     --no-p10k               Skip powerlevel10k configuration
     --no-fastfetch          Skip fastfetch installation and execution
     --no-default-plugins    Skip enabling default Oh My Zsh plugins
+    --no-ghostty-ime        Skip the Ghostty AppImage input method (IME) fix
     --clean-backups         Clean up old backup files (keeps last $BACKUP_RETENTION)
     -u, --update            Update installed components instead of installing
 EOF
@@ -145,6 +148,10 @@ parse_args() {
                 ;;
             --no-default-plugins)
                 NO_DEFAULT_PLUGINS=true
+                shift
+                ;;
+            --no-ghostty-ime)
+                NO_GHOSTTY_IME=true
                 shift
                 ;;
             --clean-backups)
@@ -568,6 +575,120 @@ update_components() {
     log SUCCESS "Components update complete"
 }
 
+# ── Ghostty AppImage input method (IME) fix ─────────────────────────────────
+#
+# The official Ghostty AppImage bundles its own GTK (4.20 at the time of
+# writing) but ships no GTK input method modules, while its AppRun keeps
+# GTK_PATH confined to the AppImage itself. The bundled GTK therefore finds no
+# libim-*.so, logs
+#
+#     warning(glib): WARNING: Gtk: No IM module matching GTK_IM_MODULE=ibus found
+#
+# and opens a window that cannot be typed into with an IME (no Chinese input),
+# even though every other application on the host works.
+#
+# The AppImage runtime (uruntime) exports every entry of an optional
+# "<AppImage>.env" file that sits next to the AppImage, before AppRun runs.
+# Pointing GTK_PATH at a directory that only exposes the host's GTK4 immodules
+# lets the bundled GTK load the host's ibus/fcitx5 module again. GTK searches
+# both "<GTK_PATH>/immodules" and "<GTK_PATH>/<binary version>/immodules"; the
+# first layout is used here.
+#
+# Everything below is idempotent: re-running only refreshes the symlinks and
+# the .env file.
+
+# Locate the Ghostty AppImage, honoring an explicit $GHOSTTY_APPIMAGE override.
+find_ghostty_appimage() {
+    local candidate
+    for candidate in "${GHOSTTY_APPIMAGE:-}" \
+                     ~/.local/bin/Ghostty.AppImage \
+                     ~/.local/bin/*[Gg]hostty*.AppImage \
+                     ~/Applications/*[Gg]hostty*.AppImage; do
+        if [ -n "$candidate" ] && [ -f "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Locate the host GTK4 input method modules (ibus-gtk4, fcitx5-frontend-gtk4).
+find_gtk4_immodule_dir() {
+    local dir
+    for dir in /usr/lib/*/gtk-4.0/4.0.0/immodules \
+               /usr/lib64/gtk-4.0/4.0.0/immodules \
+               /usr/lib/gtk-4.0/4.0.0/immodules; do
+        if compgen -G "$dir/libim-*.so" > /dev/null; then
+            printf '%s\n' "$dir"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Let the Ghostty AppImage use the host's GTK input method modules.
+fix_ghostty_appimage_ime() {
+    if $NO_GHOSTTY_IME; then
+        log INFO "Skipping the Ghostty AppImage input method fix (--no-ghostty-ime)"
+        return 0
+    fi
+
+    local appimage
+    if ! appimage=$(find_ghostty_appimage); then
+        log INFO "No Ghostty AppImage found in ~/.local/bin or ~/Applications; skipping the input method fix"
+        return 0
+    fi
+
+    local immodule_src
+    if ! immodule_src=$(find_gtk4_immodule_dir); then
+        log WARNING "No GTK4 input method modules on this host (install ibus-gtk4 or fcitx5-frontend-gtk4); skipping the Ghostty input method fix"
+        return 0
+    fi
+
+    log INFO "Configuring $appimage to use the host input method modules..."
+    local immodule_dir="$GHOSTTY_IMMODULE_DIR/immodules"
+    run_cmd mkdir -p "$immodule_dir"
+
+    # Symlink instead of copying, so the modules keep matching the host packages.
+    local module
+    for module in "$immodule_src"/libim-*.so; do
+        if [ -e "$module" ]; then
+            run_cmd ln -sfn "$module" "$immodule_dir/$(basename "$module")"
+        fi
+    done
+
+    # Drop links whose target is gone (e.g. after uninstalling an IM frontend).
+    local link
+    for link in "$immodule_dir"/libim-*.so; do
+        if [ -L "$link" ] && [ ! -e "$link" ]; then
+            log WARNING "Removing stale input method link $(basename "$link")"
+            run_cmd rm -f -- "$link"
+        fi
+    done
+
+    local env_file="${appimage}.env"
+    local gtk_path_line="GTK_PATH=$GHOSTTY_IMMODULE_DIR"
+
+    if [ -f "$env_file" ] && grep -qxF "$gtk_path_line" "$env_file"; then
+        log INFO "$env_file already points GTK_PATH at the input method modules"
+    elif $DRY_RUN; then
+        log INFO "Dry run: Would write '$gtk_path_line' to $env_file"
+    else
+        # Keep any unrelated entries the file may hold, replace the GTK_PATH one.
+        local merged
+        merged=$(mktemp)
+        if [ -f "$env_file" ]; then
+            grep -v '^GTK_PATH=' -- "$env_file" > "$merged" || true
+        fi
+        printf '%s\n' "$gtk_path_line" >> "$merged"
+        chmod 644 "$merged"
+        mv -- "$merged" "$env_file"
+        log INFO "Wrote '$gtk_path_line' to $env_file"
+    fi
+
+    log SUCCESS "Ghostty AppImage input method fix applied (restart Ghostty for it to take effect)"
+}
+
 # Main installation function
 main() {
     # Initialize log file
@@ -695,6 +816,9 @@ main() {
     if ! command -v fastfetch &> /dev/null && ! $NO_FASTFETCH; then
         try_install_fastfetch
     fi
+
+    # Make the Ghostty AppImage use the host's GTK input method modules
+    fix_ghostty_appimage_ime
 
     log SUCCESS "Installation complete! Please restart your terminal or log out and log back in for changes to take effect."
 

@@ -27,6 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 - Optionally installs fastfetch (system information tool)
 - Installs custom fonts
 - Copies `.config` directory configs (e.g. ghostty terminal)
+- Fixes Chinese (and other IME) input in the Ghostty AppImage: writes a `<AppImage>.env` next to the AppImage with `GTK_PATH` pointing at a symlink directory of the host's GTK4 input method modules (ibus/fcitx5), so the bundled GTK can load them
 - Automatically backs up existing config files
 - Supports component update mode
 - Supports cleaning up old backups
@@ -50,6 +51,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 | `--no-p10k` | Skip powerlevel10k configuration |
 | `--no-fastfetch` | Skip fastfetch installation |
 | `--no-default-plugins` | Skip enabling the default plugins |
+| `--no-ghostty-ime` | Skip the Ghostty AppImage input method fix |
 | `--clean-backups` | Clean up old backup files (keeps the last 5) |
 | `-u, --update` | Update installed components instead of installing |
 
@@ -87,6 +89,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 7. **fastfetch** — system information tool (optional)
 8. **Custom fonts** — e.g. Fixedsys (optional)
 9. **Config files** — contents of the `.config` directory (e.g. ghostty terminal)
+10. **Ghostty AppImage input method fix** — when a Ghostty AppImage is found in `~/.local/bin` (or `~/Applications`), an `<AppImage>.env` is written with `GTK_PATH` pointing at a symlink directory of the host's GTK4 input method modules (override the path with `GHOSTTY_APPIMAGE`, skip with `--no-ghostty-ime`)
 
 ## Notes
 
@@ -94,4 +97,5 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 - The last 5 backups are kept by default
 - The script verifies that Oh My Zsh really got installed and aborts otherwise, so it never leaves a `.zshrc` with only a few `source` lines behind
 - If your `.zshrc` contains only `source ...` fragments (no `export ZSH=`, `plugins=()` or `source $ZSH/oh-my-zsh.sh`), simply re-run `./install.sh` to repair it
+- The Ghostty AppImage input method fix is tied to the AppImage file name (the runtime reads a `.env` file with the same name); after switching to a new version with a different file name, re-run `./install.sh` to point it at the new file, and restart any running Ghostty windows for it to take effect
 - Restart your terminal or log out and back in after installation for the changes to take effect
