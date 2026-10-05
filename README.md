@@ -71,6 +71,47 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install.sh --clean-backups
 ```
 
+
+## 开发工具套件（devtools）
+
+仓库附带 `install_devtools.sh`，用于一键安装一组常用开发工具（独立于主 install.sh，可选执行）。这些工具记录自 Fedora 44 服务器（192.168.50.179）的实际安装需求，供新机器复现。
+
+### 安装内容
+
+| 组件 | 说明 | 安装方式 |
+|---|---|---|
+| **nvm + Node LTS** | Node 版本管理器 + 默认 LTS 版 | 官方脚本，自动配置 zsh |
+| **pyenv + Python** | Python 版本管理器 + 默认 3.12.10 | 官方脚本 + 编译依赖，自动配置 zsh |
+| **pipx** | Python CLI 应用安装工具 | pip 安装 |
+| **Claude Code** | Anthropic AI CLI（`claude`） | npm 全局安装 |
+| **Codex CLI** | OpenAI AI CLI（`codex`） | npm 全局安装 |
+| **Zed 编辑器** | 高性能代码编辑器 | 官方安装脚本 + Vulkan 驱动 |
+| **JetBrains Mono 字体** | 代码字体（Zed 默认使用） | dnf/apt 系统包 |
+
+### 用法
+
+```bash
+./install_devtools.sh             # 安装全部工具
+./install_devtools.sh --node      # 只装 Node 工具链 (nvm + LTS)
+./install_devtools.sh --python    # 只装 Python 工具链 (pyenv + pipx)
+./install_devtools.sh --ai        # 只装 AI CLI (claude-code + codex)
+./install_devtools.sh --zed       # 只装 Zed 编辑器 + JetBrains Mono
+./install_devtools.sh --list      # 查看用法
+```
+
+### 环境变量
+
+- `NODE_LTS` - 指定 Node 版本（默认最新 LTS）
+- `PYTHON_VERSION` - 指定 Python 版本（默认 3.12.10）
+- `PROXY_URL` - 代理地址，如 `http://192.168.50.182:7890`（外网下载慢时使用）
+
+### 注意事项
+
+- 所有组件**幂等**：已安装的会自动跳过，可安全重复执行
+- AI CLI（Claude Code/Codex）安装后需各自登录/配置 API key 才能使用
+- Zed 依赖 Vulkan，脚本会自动安装 Mesa Vulkan 驱动
+- 安装完成后新开终端生效（或 `source ~/.zshrc`）
+
 ## 安装内容
 
 ### 依赖要求
