@@ -87,6 +87,8 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 | **Codex CLI** | OpenAI AI CLI（`codex`） | npm 全局安装 |
 | **Zed 编辑器** | 高性能代码编辑器 | 官方安装脚本 + Vulkan 驱动 |
 | **JetBrains Mono 字体** | 代码字体（Zed 默认使用） | dnf/apt 系统包 |
+| **Ghostty 终端** | 现代终端模拟器 | COPR/官方包 + xdg-terminal-exec |
+| **Ctrl+Alt+T 快捷键** | Ghostty 快速打开 | labwc rc.xml + xdg-terminal-exec |
 
 ### 用法
 
@@ -96,6 +98,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install_devtools.sh --python    # 只装 Python 工具链 (pyenv + pipx)
 ./install_devtools.sh --ai        # 只装 AI CLI (claude-code + codex)
 ./install_devtools.sh --zed       # 只装 Zed 编辑器 + JetBrains Mono
+./install_devtools.sh --ghostty   # 只装 Ghostty 终端 + Ctrl+Alt+T 快捷键
 ./install_devtools.sh --list      # 查看用法
 ```
 
@@ -110,7 +113,9 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 - 所有组件**幂等**：已安装的会自动跳过，可安全重复执行
 - AI CLI（Claude Code/Codex）安装后需各自登录/配置 API key 才能使用
 - Zed 依赖 Vulkan，脚本会自动安装 Mesa Vulkan 驱动
+- Ghostty 在 Budgie/labwc 桌面下依赖 `xdg-terminal-exec`，脚本会一并安装并配置为默认终端
 - 安装完成后新开终端生效（或 `source ~/.zshrc`）
+
 
 ## 安装内容
 
