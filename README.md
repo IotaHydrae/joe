@@ -91,6 +91,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 | **JetBrains Mono 字体** | 代码字体（Zed 默认使用） | 系统包（包名按发行版映射） |
 | **Ghostty 终端** | 现代终端模拟器 | dnf: COPR / apt: 社区deb / pacman: 官方包 |
 | **Ctrl+Alt+T 快捷键** | Ghostty 快速打开 | labwc rc.xml + xdg-terminal-exec |
+| **VS Code 编辑器** | 微软代码编辑器 | 微软官方仓库（dnf/apt/zypper）/ pacman: `code` |
 
 ### 用法
 
@@ -101,6 +102,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install_devtools.sh --ai        # 只装 AI CLI (claude-code + codex)
 ./install_devtools.sh --zed       # 只装 Zed 编辑器 + JetBrains Mono
 ./install_devtools.sh --ghostty   # 只装 Ghostty 终端 + Ctrl+Alt+T 快捷键
+./install_devtools.sh --vscode    # 只装 VS Code 编辑器
 ./install_devtools.sh --list      # 查看用法
 ```
 

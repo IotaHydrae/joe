@@ -12,6 +12,7 @@
 #   ./install_devtools.sh --ai       # 只装 AI CLI (claude-code + codex)
 #   ./install_devtools.sh --zed      # 只装 Zed 编辑器 + JetBrains Mono
 #   ./install_devtools.sh --ghostty  # 只装 Ghostty 终端 + Ctrl+Alt+T 快捷键
+#   ./install_devtools.sh --vscode   # 只装 VS Code 编辑器
 #   ./install_devtools.sh --list     # 列出可安装组件
 #
 # 依赖: git, curl, sudo (非 root 时), bash/zsh
@@ -37,6 +38,7 @@ INSTALL_PYTHON=false
 INSTALL_AI=false
 INSTALL_ZED=false
 INSTALL_GHOSTTY=false
+INSTALL_VSCODE=false
 INSTALL_ALL=true
 
 # ---------------------------------------------------------------------------
@@ -387,6 +389,45 @@ install_ghostty() {
 }
 
 # ---------------------------------------------------------------------------
+# 组件: Visual Studio Code 编辑器
+# ---------------------------------------------------------------------------
+install_vscode() {
+    info "=== 安装 Visual Studio Code ==="
+
+    if command -v code >/dev/null 2>&1; then
+        info "VS Code 已安装: $(code --version | head -1)"
+    else
+        case "$PM" in
+            dnf)
+                sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+                sudo bash -c 'echo -e "[code]\nname=VS Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
+                sudo dnf install -y code
+                ;;
+            apt)
+                sudo bash -c 'curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg'
+                sudo bash -c 'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
+                sudo apt-get update -qq
+                sudo apt-get install -y code
+                ;;
+            pacman)
+                # Arch extra 官方仓库含 VS Code
+                sudo pacman -S --needed --noconfirm code
+                ;;
+            zypper)
+                sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+                sudo zypper addrepo -f https://packages.microsoft.com/yumrepos/vscode vscode
+                sudo zypper install -y code
+                ;;
+            *)
+                warn "VS Code 安装方式未知, 请手动安装"
+                ;;
+        esac
+    fi
+
+    ok "VS Code 配置完成"
+}
+
+# ---------------------------------------------------------------------------
 # 参数解析
 # ---------------------------------------------------------------------------
 usage() {
@@ -401,6 +442,7 @@ while [[ $# -gt 0 ]]; do
         --ai)       INSTALL_AI=true; INSTALL_ALL=false; shift ;;
         --zed)      INSTALL_ZED=true; INSTALL_ALL=false; shift ;;
         --ghostty)  INSTALL_GHOSTTY=true; INSTALL_ALL=false; shift ;;
+        --vscode)   INSTALL_VSCODE=true; INSTALL_ALL=false; shift ;;
         --list)     usage ;;
         -h|--help)  usage ;;
         *)
@@ -428,5 +470,6 @@ if $INSTALL_ALL || $INSTALL_PYTHON; then install_python; fi
 if $INSTALL_ALL || $INSTALL_AI; then install_ai; fi
 if $INSTALL_ALL || $INSTALL_ZED; then install_zed; fi
 if $INSTALL_ALL || $INSTALL_GHOSTTY; then install_ghostty; fi
+if $INSTALL_ALL || $INSTALL_VSCODE; then install_vscode; fi
 
 ok "全部完成! 新开终端后生效 (或 source ~/.zshrc)"
