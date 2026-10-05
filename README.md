@@ -76,6 +76,8 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 仓库附带 `install_devtools.sh`，用于一键安装一组常用开发工具（独立于主 install.sh，可选执行）。这些工具记录自 Fedora 44 服务器（192.168.50.179）的实际安装需求，供新机器复现。
 
+> **跨发行版支持**：脚本自动探测包管理器，支持 **apt**（Debian/Ubuntu）、**dnf**（Fedora/RHEL）、**pacman**（Arch）、**zypper**（openSUSE）。系统包名按发行版自动映射（如 JetBrains Mono 在 apt 下为 `fonts-jetbrains-mono`、pacman 下为 `ttf-jetbrains-mono`、dnf 下为 `jetbrains-mono-fonts`）。
+
 ### 安装内容
 
 | 组件 | 说明 | 安装方式 |
@@ -86,8 +88,8 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 | **Claude Code** | Anthropic AI CLI（`claude`） | npm 全局安装 |
 | **Codex CLI** | OpenAI AI CLI（`codex`） | npm 全局安装 |
 | **Zed 编辑器** | 高性能代码编辑器 | 官方安装脚本 + Vulkan 驱动 |
-| **JetBrains Mono 字体** | 代码字体（Zed 默认使用） | dnf/apt 系统包 |
-| **Ghostty 终端** | 现代终端模拟器 | COPR/官方包 + xdg-terminal-exec |
+| **JetBrains Mono 字体** | 代码字体（Zed 默认使用） | 系统包（包名按发行版映射） |
+| **Ghostty 终端** | 现代终端模拟器 | dnf: COPR / apt: 社区deb / pacman: 官方包 |
 | **Ctrl+Alt+T 快捷键** | Ghostty 快速打开 | labwc rc.xml + xdg-terminal-exec |
 
 ### 用法
@@ -112,8 +114,8 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 - 所有组件**幂等**：已安装的会自动跳过，可安全重复执行
 - AI CLI（Claude Code/Codex）安装后需各自登录/配置 API key 才能使用
-- Zed 依赖 Vulkan，脚本会自动安装 Mesa Vulkan 驱动
-- Ghostty 在 Budgie/labwc 桌面下依赖 `xdg-terminal-exec`，脚本会一并安装并配置为默认终端
+- Zed 依赖 Vulkan，脚本按发行版自动安装对应驱动（pacman 下为 `vulkan-radeon`+`vulkan-intel`）
+- Ghostty 在 Budgie/labwc 桌面下依赖 `xdg-terminal-exec`（AUR/zypper 无此包时会提示跳过）
 - 安装完成后新开终端生效（或 `source ~/.zshrc`）
 
 

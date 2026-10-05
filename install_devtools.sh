@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
-# joe devtools — 开发工具套件安装脚本
+# joe devtools — 开发工具套件安装脚本 (跨发行版)
 # =============================================================================
 # 记录在服务器 (Fedora 44) 上安装过的一组开发工具，供新机器一键复现。
+# 支持 apt (Debian/Ubuntu)、dnf (Fedora/RHEL)、pacman (Arch)、zypper (openSUSE)。
 #
 # 用法:
 #   ./install_devtools.sh            # 安装全部工具
@@ -18,6 +19,7 @@
 #   - nvm 装到 ~/.nvm, 默认 Node LTS
 #   - pyenv 装到 ~/.pyenv, 默认 Python 3.12 (可改 PYTHON_VERSION)
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
+#   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
 # =============================================================================
 
 set -euo pipefail
@@ -45,25 +47,99 @@ ok()    { printf '\033[0;32m[SUCCESS]\033[0m %s\n' "$*"; }
 warn()  { printf '\033[1;33m[WARNING]\033[0m %s\n' "$*"; }
 die()   { printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
 
-# 幂等安装系统包 (支持 apt/pacman/dnf/zypper)
-install_sys_pkg() {
+# ---------------------------------------------------------------------------
+# 包管理器探测 + 包名映射 (核心跨发行版逻辑)
+# ---------------------------------------------------------------------------
+detect_pm() {
+    if command -v apt-get >/dev/null 2>&1; then echo "apt"
+    elif command -v pacman >/dev/null 2>&1; then echo "pacman"
+    elif command -v dnf >/dev/null 2>&1; then echo "dnf"
+    elif command -v zypper >/dev/null 2>&1; then echo "zypper"
+    else echo "unknown"; fi
+}
+PM=$(detect_pm)
+
+# 包是否已安装
+pkg_installed() {
     local pkg="$1"
-    if rpm -q "$pkg" &>/dev/null || pacman -Q "$pkg" &>/dev/null || dpkg -s "$pkg" &>/dev/null; then
-        info "$pkg 已安装, 跳过"
-        return 0
-    fi
-    info "安装系统包: $pkg"
-    if command -v dnf &>/dev/null; then
-        sudo dnf install -y "$pkg"
-    elif command -v apt &>/dev/null; then
-        sudo apt install -y "$pkg"
-    elif command -v pacman &>/dev/null; then
-        sudo pacman -S --needed --noconfirm "$pkg"
-    elif command -v zypper &>/dev/null; then
-        sudo zypper install -y "$pkg"
-    else
-        warn "不支持的包管理器, 请手动安装 $pkg"
-    fi
+    case "$PM" in
+        apt)    dpkg -s "$pkg" >/dev/null 2>&1 ;;
+        pacman) pacman -Q "$pkg" >/dev/null 2>&1 ;;
+        dnf|zypper) rpm -q "$pkg" >/dev/null 2>&1 ;;
+        *)      false ;;
+    esac
+}
+
+# 逻辑包名 → 发行版实际包名
+# 用 {logical} 时返回一组包名 (空格分隔)
+pkg_map() {
+    local logical="$1"
+    case "$PM" in
+        apt)
+            case "$logical" in
+                vulkan-loader)          echo "libvulkan1" ;;
+                vulkan-tools)           echo "vulkan-tools" ;;
+                mesa-vulkan-drivers)    echo "mesa-vulkan-drivers" ;;
+                jetbrains-mono)         echo "fonts-jetbrains-mono" ;;
+                xdg-terminal-exec)      echo "xdg-terminal-exec" ;;
+                *)                      echo "$logical" ;;
+            esac ;;
+        pacman)
+            case "$logical" in
+                vulkan-loader)          echo "vulkan-icd-loader" ;;
+                vulkan-tools)           echo "vulkan-tools" ;;
+                mesa-vulkan-drivers)    echo "vulkan-radeon vulkan-intel" ;;
+                jetbrains-mono)         echo "ttf-jetbrains-mono" ;;
+                xdg-terminal-exec)      echo "" ;;  # AUR, 不装
+                *)                      echo "$logical" ;;
+            esac ;;
+        zypper)
+            case "$logical" in
+                vulkan-loader)          echo "libvulkan1" ;;
+                vulkan-tools)           echo "vulkan-tools" ;;
+                mesa-vulkan-drivers)    echo "libvulkan_radeon" ;;
+                jetbrains-mono)         echo "jetbrains-mono-fonts" ;;
+                xdg-terminal-exec)      echo "" ;;
+                *)                      echo "$logical" ;;
+            esac ;;
+        *) # dnf 及默认
+            case "$logical" in
+                vulkan-loader)          echo "vulkan-loader" ;;
+                vulkan-tools)           echo "vulkan-tools" ;;
+                mesa-vulkan-drivers)    echo "mesa-vulkan-drivers" ;;
+                jetbrains-mono)         echo "jetbrains-mono-fonts" ;;
+                xdg-terminal-exec)      echo "xdg-terminal-exec" ;;
+                *)                      echo "$logical" ;;
+            esac ;;
+    esac
+}
+
+# 安装系统包 (接受多个逻辑包名)
+install_sys_pkg() {
+    local missing=()
+    local pkg
+    for logical in "$@"; do
+        local real
+        real=$(pkg_map "$logical")
+        [ -z "$real" ] && { warn "发行版 $PM 无 $logical 包, 跳过"; continue; }
+        for pkg in $real; do
+            if pkg_installed "$pkg"; then
+                info "$pkg 已安装, 跳过"
+            else
+                missing+=("$pkg")
+            fi
+        done
+    done
+    [ ${#missing[@]} -eq 0 ] && return 0
+
+    info "安装系统包: ${missing[*]}"
+    case "$PM" in
+        apt)    sudo apt-get update -qq && sudo apt-get install -y "${missing[@]}" ;;
+        pacman) sudo pacman -S --needed --noconfirm "${missing[@]}" ;;
+        dnf)    sudo dnf install -y "${missing[@]}" ;;
+        zypper) sudo zypper install -y "${missing[@]}" ;;
+        *)      warn "不支持的包管理器, 请手动安装: ${missing[*]}" ;;
+    esac
 }
 
 # 加载 nvm 到当前 shell
@@ -76,7 +152,7 @@ load_nvm() {
 load_pyenv() {
     export PYENV_ROOT="${PYENV_ROOT:-$HOME/.pyenv}"
     [ -d "$PYENV_ROOT/bin" ] && export PATH="$PYENV_ROOT/bin:$PATH"
-    command -v pyenv &>/dev/null && eval "$(pyenv init - bash)" 2>/dev/null || true
+    command -v pyenv >/dev/null 2>&1 && eval "$(pyenv init - bash)" 2>/dev/null || true
 }
 
 # 写 shell 配置片段 (zsh 优先, 幂等)
@@ -107,7 +183,7 @@ install_node() {
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"'
 
-    if ! command -v node &>/dev/null; then
+    if ! command -v node >/dev/null 2>&1; then
         info "安装 Node (LTS)..."
         if [ -n "$NODE_LTS" ]; then
             nvm install "$NODE_LTS"
@@ -127,24 +203,27 @@ install_node() {
 install_python() {
     info "=== 安装 pyenv + Python 编译依赖 ==="
 
-    # 编译依赖
-    case "$(command -v dnf apt pacman zypper 2>/dev/null | head -1)" in
-        *dnf)
+    case "$PM" in
+        apt)
+            sudo apt-get update -qq
+            sudo apt-get install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
+                libreadline-dev libsqlite3-dev curl libncursesw5-dev xz-utils \
+                tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+            ;;
+        pacman)
+            sudo pacman -S --needed --noconfirm base-devel openssl zlib xz tk
+            ;;
+        dnf)
             sudo dnf install -y gcc make patch bzip2-devel readline-devel \
                 sqlite-devel openssl-devel tk-devel libffi-devel xz-devel \
                 zlib-ng-compat-devel
             ;;
-        *apt)
-            sudo apt install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
-                libreadline-dev libsqlite3-dev curl libncursesw5-dev xz-utils \
-                tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
-            ;;
-        *pacman)
-            sudo pacman -S --needed --noconfirm base-devel openssl zlib xz tk
-            ;;
-        *zypper)
+        zypper)
             sudo zypper install -y gcc make patch bzip2-devel readline-devel \
                 sqlite3-devel libopenssl-devel tk-devel libffi-devel xz-devel
+            ;;
+        *)
+            warn "不支持的包管理器, 请手动安装 Python 编译依赖"
             ;;
     esac
 
@@ -174,7 +253,7 @@ eval "$(pyenv virtualenv-init -)"'
 
     # pipx
     info "=== 安装 pipx ==="
-    if ! command -v pipx &>/dev/null; then
+    if ! command -v pipx >/dev/null 2>&1; then
         python -m pip install --user pipx 2>/dev/null || python -m pip install pipx
         python -m pipx ensurepath
     fi
@@ -187,7 +266,7 @@ eval "$(pyenv virtualenv-init -)"'
 install_ai() {
     info "=== 安装 AI CLI 工具 ==="
     load_nvm
-    command -v node &>/dev/null || die "需要 Node (先运行 --node)"
+    command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node)"
 
     info "安装 Claude Code (@anthropic-ai/claude-code)..."
     npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code
@@ -203,16 +282,14 @@ install_ai() {
 install_zed() {
     info "=== 安装 Zed 编辑器 ==="
 
-    # Vulkan (Zed 依赖 GPU 渲染)
-    if ! command -v vulkaninfo &>/dev/null; then
-        install_sys_pkg vulkan-loader
-        install_sys_pkg vulkan-tools
-        install_sys_pkg mesa-vulkan-drivers
+    # Vulkan (Zed 依赖 GPU 渲染) - 按发行版自动映射包名
+    if ! command -v vulkaninfo >/dev/null 2>&1; then
+        install_sys_pkg vulkan-loader vulkan-tools mesa-vulkan-drivers
     fi
 
     # JetBrains Mono 字体
     if ! fc-list 2>/dev/null | grep -qi "jetbrains mono"; then
-        install_sys_pkg jetbrains-mono-fonts
+        install_sys_pkg jetbrains-mono
     fi
 
     # Zed 本体 (官方安装脚本)
@@ -251,32 +328,42 @@ EOF
 install_ghostty() {
     info "=== 安装 Ghostty 终端 ==="
 
-    # Fedora: 启用 COPR scottames/ghostty 并安装
-    if ! command -v ghostty &>/dev/null; then
-        if command -v dnf &>/dev/null; then
-            sudo dnf copr enable -y scottames/ghostty
-            sudo dnf install -y ghostty
-        elif command -v apt &>/dev/null; then
-            # Debian/Ubuntu: 使用社区 .deb 脚本
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh)"
-        elif command -v pacman &>/dev/null; then
-            sudo pacman -S --needed --noconfirm ghostty
-        fi
+    if ! command -v ghostty >/dev/null 2>&1; then
+        case "$PM" in
+            dnf)
+                sudo dnf copr enable -y scottames/ghostty
+                sudo dnf install -y ghostty
+                ;;
+            apt)
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh)"
+                ;;
+            pacman)
+                sudo pacman -S --needed --noconfirm ghostty
+                ;;
+            zypper)
+                sudo zypper install -y ghostty
+                ;;
+            *)
+                warn "Ghostty 安装方式未知, 请手动安装"
+                ;;
+        esac
     else
         info "Ghostty 已安装: $(ghostty --version | head -1)"
     fi
 
     # xdg-terminal-exec (默认终端执行器, Budgie/labwc 的 C-A-t 依赖它)
-    if ! command -v xdg-terminal-exec &>/dev/null; then
-        if command -v dnf &>/dev/null; then
-            sudo dnf install -y xdg-terminal-exec
-        elif command -v apt &>/dev/null; then
-            sudo apt install -y xdg-terminal-exec
+    if ! command -v xdg-terminal-exec >/dev/null 2>&1; then
+        local real
+        real=$(pkg_map xdg-terminal-exec)
+        if [ -n "$real" ]; then
+            install_sys_pkg xdg-terminal-exec
+        else
+            warn "发行版 $PM 没有 xdg-terminal-exec 包, 跳过 (Ctrl+Alt+T 可能不生效)"
         fi
     fi
 
     # 配置 Ghostty 为默认终端 (xdg-terminal-exec 首选)
-    if command -v xdg-terminal-exec &>/dev/null; then
+    if command -v xdg-terminal-exec >/dev/null 2>&1; then
         mkdir -p "$HOME/.config"
         if [ -f /usr/share/applications/com.mitchellh.ghostty.desktop ]; then
             printf 'com.mitchellh.ghostty.desktop\n' > "$HOME/.config/xdg-terminals.list"
@@ -291,8 +378,7 @@ install_ghostty() {
         cp "$rc" "$rc.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
         sed -i 's|command="xfce4-terminal"|command="xdg-terminal-exec"|g; s|command="ghostty"|command="xdg-terminal-exec"|g' "$rc"
         info "labwc rc.xml: Ctrl+Alt+T 已绑定 xdg-terminal-exec"
-        # 尝试热重载 (非致命)
-        if pgrep labwc &>/dev/null; then
+        if pgrep labwc >/dev/null 2>&1; then
             pkill -USR1 labwc 2>/dev/null || true
         fi
     fi
@@ -304,7 +390,7 @@ install_ghostty() {
 # 参数解析
 # ---------------------------------------------------------------------------
 usage() {
-    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
     exit 0
 }
 
@@ -335,7 +421,7 @@ fi
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
-info "joe devtools 安装开始 $(date)"
+info "joe devtools 安装开始 $(date) [包管理器: $PM]"
 
 if $INSTALL_ALL || $INSTALL_NODE; then install_node; fi
 if $INSTALL_ALL || $INSTALL_PYTHON; then install_python; fi
