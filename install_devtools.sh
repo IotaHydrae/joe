@@ -13,6 +13,7 @@
 #   ./install_devtools.sh --zed      # 只装 Zed 编辑器 + JetBrains Mono
 #   ./install_devtools.sh --ghostty  # 只装 Ghostty 终端 + Ctrl+Alt+T 快捷键
 #   ./install_devtools.sh --vscode   # 只装 VS Code 编辑器
+#   ./install_devtools.sh --mimo     # 只装 MiMo Code (小米 AI 编程助手)
 #   ./install_devtools.sh --list     # 列出可安装组件
 #
 # 依赖: git, curl, sudo (非 root 时), bash/zsh
@@ -39,6 +40,7 @@ INSTALL_AI=false
 INSTALL_ZED=false
 INSTALL_GHOSTTY=false
 INSTALL_VSCODE=false
+INSTALL_MIMO=false
 INSTALL_ALL=true
 
 # ---------------------------------------------------------------------------
@@ -428,6 +430,29 @@ install_vscode() {
 }
 
 # ---------------------------------------------------------------------------
+# 组件: MiMo Code (小米 AI 编程助手)
+# ---------------------------------------------------------------------------
+install_mimo() {
+    info "=== 安装 MiMo Code (小米 AI 编程助手) ==="
+
+    load_nvm
+    command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node)"
+
+    if command -v mimo >/dev/null 2>&1; then
+        info "MiMo Code 已安装: $(mimo --version 2>/dev/null | head -1)"
+    else
+        info "安装 @mimo-ai/cli..."
+        npm install -g --allow-scripts=@mimo-ai/cli @mimo-ai/cli
+    fi
+
+    if ! command -v mimo >/dev/null 2>&1; then
+        die "MiMo Code 安装失败, 请检查 npm 和网络"
+    fi
+
+    ok "MiMo Code 配置完成: $(mimo --version 2>/dev/null | head -1)"
+}
+
+# ---------------------------------------------------------------------------
 # 参数解析
 # ---------------------------------------------------------------------------
 usage() {
@@ -443,6 +468,7 @@ while [[ $# -gt 0 ]]; do
         --zed)      INSTALL_ZED=true; INSTALL_ALL=false; shift ;;
         --ghostty)  INSTALL_GHOSTTY=true; INSTALL_ALL=false; shift ;;
         --vscode)   INSTALL_VSCODE=true; INSTALL_ALL=false; shift ;;
+        --mimo)      INSTALL_MIMO=true; INSTALL_ALL=false; shift ;;
         --list)     usage ;;
         -h|--help)  usage ;;
         *)
@@ -471,5 +497,6 @@ if $INSTALL_ALL || $INSTALL_AI; then install_ai; fi
 if $INSTALL_ALL || $INSTALL_ZED; then install_zed; fi
 if $INSTALL_ALL || $INSTALL_GHOSTTY; then install_ghostty; fi
 if $INSTALL_ALL || $INSTALL_VSCODE; then install_vscode; fi
+if $INSTALL_ALL || $INSTALL_MIMO; then install_mimo; fi
 
 ok "全部完成! 新开终端后生效 (或 source ~/.zshrc)"

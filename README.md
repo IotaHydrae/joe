@@ -92,6 +92,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 | **Ghostty 终端** | 现代终端模拟器 | dnf: COPR / apt: 社区deb / pacman: 官方包 |
 | **Ctrl+Alt+T 快捷键** | Ghostty 快速打开 | labwc rc.xml + xdg-terminal-exec |
 | **VS Code 编辑器** | 微软代码编辑器 | 微软官方仓库（dnf/apt/zypper）/ pacman: `code` |
+| **MiMo Code** | 小米 AI 编程助手 | npm 全局安装（`@mimo-ai/cli`） |
 
 ### 用法
 
@@ -103,6 +104,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install_devtools.sh --zed       # 只装 Zed 编辑器 + JetBrains Mono
 ./install_devtools.sh --ghostty   # 只装 Ghostty 终端 + Ctrl+Alt+T 快捷键
 ./install_devtools.sh --vscode    # 只装 VS Code 编辑器
+./install_devtools.sh --mimo      # 只装 MiMo Code (小米 AI 编程助手)
 ./install_devtools.sh --list      # 查看用法
 ```
 
