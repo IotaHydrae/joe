@@ -14,6 +14,8 @@
 #   ./install_devtools.sh --ghostty  # 只装 Ghostty 终端 + Ctrl+Alt+T 快捷键
 #   ./install_devtools.sh --vscode   # 只装 VS Code 编辑器
 #   ./install_devtools.sh --mimo     # 只装 MiMo Code (小米 AI 编程助手)
+#   ./install_devtools.sh --chatgpt  # 只装 ChatGPT / Codex 桌面版
+#   ./install_devtools.sh --ccswitch # 只装 CC Switch (AI CLI 配置切换器)
 #   ./install_devtools.sh --list     # 列出可安装组件
 #
 # 依赖: git, curl, sudo (非 root 时), bash/zsh
@@ -41,6 +43,8 @@ INSTALL_ZED=false
 INSTALL_GHOSTTY=false
 INSTALL_VSCODE=false
 INSTALL_MIMO=false
+INSTALL_CHATGPT=false
+INSTALL_CCSWITCH=false
 INSTALL_ALL=true
 
 # ---------------------------------------------------------------------------
@@ -453,6 +457,143 @@ install_mimo() {
 }
 
 # ---------------------------------------------------------------------------
+# 组件: ChatGPT / Codex 桌面版 (OpenAI 官方 Linux 预览版)
+# ---------------------------------------------------------------------------
+install_chatgpt() {
+    info "=== 安装 ChatGPT / Codex 桌面版 ==="
+
+    if command -v chatgpt >/dev/null 2>&1; then
+        info "ChatGPT 已安装: $(chatgpt --version 2>/dev/null | head -1)"
+        return 0
+    fi
+
+    local arch
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64)  ARCH_SUFFIX="x86_64" ;;
+        aarch64|arm64) ARCH_SUFFIX="aarch64" ;;
+        *) die "不支持的架构: $arch" ;;
+    esac
+
+    case "$PM" in
+        dnf|zypper)
+            local rpm_url
+            if [ "$ARCH_SUFFIX" = "x86_64" ]; then
+                rpm_url="https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.x86_64.rpm"
+            else
+                rpm_url="https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.aarch64.rpm"
+            fi
+            info "下载 ChatGPT rpm (约 530MB)..."
+            curl -fsSL --connect-timeout 15 -o /tmp/chatgpt.rpm "$rpm_url"
+            if [ "$PM" = "dnf" ]; then
+                sudo dnf install -y /tmp/chatgpt.rpm
+            else
+                sudo zypper install -y /tmp/chatgpt.rpm
+            fi
+            rm -f /tmp/chatgpt.rpm
+            ;;
+        apt)
+            local deb_url
+            if [ "$ARCH_SUFFIX" = "x86_64" ]; then
+                deb_url="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb"
+            else
+                deb_url="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb"
+            fi
+            info "下载 ChatGPT deb (约 530MB)..."
+            curl -fsSL --connect-timeout 15 -o /tmp/chatgpt.deb "$deb_url"
+            sudo apt-get update -qq
+            sudo apt-get install -y /tmp/chatgpt.deb
+            rm -f /tmp/chatgpt.deb
+            ;;
+        pacman)
+            local script_url="https://persistent.oaistatic.com/codex-app-prod/linux/install-arch.sh"
+            curl --proto '=https' --tlsv1.2 -fL -o /tmp/install-chatgpt-arch.sh "$script_url"
+            sudo bash /tmp/install-chatgpt-arch.sh
+            rm -f /tmp/install-chatgpt-arch.sh
+            ;;
+        *)
+            warn "不支持的包管理器, 请手动安装 ChatGPT 桌面版"
+            ;;
+    esac
+
+    if command -v chatgpt >/dev/null 2>&1; then
+        ok "ChatGPT 桌面版安装完成: $(chatgpt --version 2>/dev/null | head -1)"
+    else
+        warn "ChatGPT 安装可能未成功, 请检查"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# 组件: CC Switch (AI CLI 配置切换器, 桌面版)
+# ---------------------------------------------------------------------------
+install_ccswitch() {
+    info "=== 安装 CC Switch (AI CLI 配置切换器) ==="
+
+    if command -v cc-switch >/dev/null 2>&1; then
+        info "CC Switch 已安装"
+        return 0
+    fi
+
+    local arch
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64)  ARCH_ID="x86_64" ;;
+        aarch64|arm64) ARCH_ID="arm64" ;;
+        *) die "不支持的架构: $arch" ;;
+    esac
+
+    # GitHub 官方 release 直链 + 镜像前缀 (GitHub CDN 走代理不稳定时用镜像)
+    local gh_url="https://github.com/farion1231/cc-switch/releases/download/v3.20.4/CC-Switch-v3.20.4-Linux-${ARCH_ID}"
+    local mirrors=("" "https://ghfast.top/" "https://gh-proxy.com/" "https://ghproxy.net/")
+    local dl=""
+    local src=""
+
+    case "$PM" in
+        dnf|zypper) src="${gh_url}.rpm" ;;
+        apt)        src="${gh_url}.deb" ;;
+        pacman)     src="${gh_url}.AppImage" ;;
+        *)          src="${gh_url}.AppImage" ;;
+    esac
+
+    for m in "${mirrors[@]}"; do
+        info "尝试下载 CC Switch: ${m}${src}"
+        if curl -fsSL --connect-timeout 15 -o /tmp/ccswitch.bin "${m}${src}" 2>/dev/null; then
+            dl="${m}${src}"
+            break
+        fi
+    done
+
+    if [ -z "$dl" ]; then
+        die "CC Switch 下载失败, 请手动从 https://github.com/farion1231/cc-switch/releases 安装"
+    fi
+
+    case "$PM" in
+        dnf)
+            sudo dnf install -y /tmp/ccswitch.bin
+            ;;
+        zypper)
+            sudo zypper install -y /tmp/ccswitch.bin
+            ;;
+        apt)
+            sudo apt-get update -qq
+            sudo apt-get install -y /tmp/ccswitch.bin
+            ;;
+        pacman|*)
+            mkdir -p "$HOME/.local/bin"
+            chmod +x /tmp/ccswitch.bin
+            install -m755 /tmp/ccswitch.bin "$HOME/.local/bin/cc-switch"
+            ;;
+    esac
+    rm -f /tmp/ccswitch.bin
+
+    if command -v cc-switch >/dev/null 2>&1; then
+        ok "CC Switch 安装完成"
+    else
+        warn "CC Switch 安装可能未成功 (AppImage 方式已放入 ~/.local/bin)"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # 参数解析
 # ---------------------------------------------------------------------------
 usage() {
@@ -469,6 +610,8 @@ while [[ $# -gt 0 ]]; do
         --ghostty)  INSTALL_GHOSTTY=true; INSTALL_ALL=false; shift ;;
         --vscode)   INSTALL_VSCODE=true; INSTALL_ALL=false; shift ;;
         --mimo)      INSTALL_MIMO=true; INSTALL_ALL=false; shift ;;
+        --chatgpt)   INSTALL_CHATGPT=true; INSTALL_ALL=false; shift ;;
+        --ccswitch)  INSTALL_CCSWITCH=true; INSTALL_ALL=false; shift ;;
         --list)     usage ;;
         -h|--help)  usage ;;
         *)
@@ -498,5 +641,7 @@ if $INSTALL_ALL || $INSTALL_ZED; then install_zed; fi
 if $INSTALL_ALL || $INSTALL_GHOSTTY; then install_ghostty; fi
 if $INSTALL_ALL || $INSTALL_VSCODE; then install_vscode; fi
 if $INSTALL_ALL || $INSTALL_MIMO; then install_mimo; fi
+if $INSTALL_ALL || $INSTALL_CHATGPT; then install_chatgpt; fi
+if $INSTALL_ALL || $INSTALL_CCSWITCH; then install_ccswitch; fi
 
 ok "全部完成! 新开终端后生效 (或 source ~/.zshrc)"
