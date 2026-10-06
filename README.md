@@ -109,6 +109,20 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install_devtools.sh --mimo      # 只装 MiMo Code (小米 AI 编程助手)
 ./install_devtools.sh --chatgpt   # 只装 ChatGPT / Codex 桌面版
 ./install_devtools.sh --ccswitch  # 只装 CC Switch (AI CLI 配置切换器)
+./install_devtools.sh --tui       # 交互式勾选界面 (可多选组件)
+```
+
+### TUI 交互式选择 (`--tui`)
+
+运行 `./install_devtools.sh --tui` 打开终端交互界面，用键盘勾选要安装的组件：
+
+- **↑/↓** 移动光标，**空格** 勾选/取消
+- **a** 全选未安装，**n** 全不选，**i** 仅选未安装
+- **回车** 开始安装，**q** 退出
+- 已安装的组件自动检测并显示 `[✓装]`，默认跳过
+
+```bash
+./install_devtools.sh --tui
 ./install_devtools.sh --list      # 查看用法
 ```
 

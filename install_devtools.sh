@@ -16,6 +16,7 @@
 #   ./install_devtools.sh --mimo     # 只装 MiMo Code (小米 AI 编程助手)
 #   ./install_devtools.sh --chatgpt  # 只装 ChatGPT / Codex 桌面版
 #   ./install_devtools.sh --ccswitch # 只装 CC Switch (AI CLI 配置切换器)
+#   ./install_devtools.sh --tui      # 交互式勾选界面 (TUI)
 #   ./install_devtools.sh --list     # 列出可安装组件
 #
 # 依赖: git, curl, sudo (非 root 时), bash/zsh
@@ -46,6 +47,7 @@ INSTALL_MIMO=false
 INSTALL_CHATGPT=false
 INSTALL_CCSWITCH=false
 INSTALL_ALL=true
+TUI_MODE=false
 
 # ---------------------------------------------------------------------------
 # 小工具函数
@@ -612,6 +614,7 @@ while [[ $# -gt 0 ]]; do
         --mimo)      INSTALL_MIMO=true; INSTALL_ALL=false; shift ;;
         --chatgpt)   INSTALL_CHATGPT=true; INSTALL_ALL=false; shift ;;
         --ccswitch)  INSTALL_CCSWITCH=true; INSTALL_ALL=false; shift ;;
+        --tui)       TUI_MODE=true; INSTALL_ALL=false; shift ;;
         --list)     usage ;;
         -h|--help)  usage ;;
         *)
@@ -627,6 +630,51 @@ done
 if [ -n "$PROXY_URL" ]; then
     export https_proxy="$PROXY_URL" http_proxy="$PROXY_URL"
     info "使用代理: $PROXY_URL"
+fi
+
+# ---------------------------------------------------------------------------
+# TUI 交互选择 (--tui)
+# ---------------------------------------------------------------------------
+if $TUI_MODE; then
+    # 加载 TUI 模块 (与脚本同目录)
+    TUI_MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "$TUI_MODULE_DIR/tui_module.sh" ]; then
+        # shellcheck disable=SC1091
+        . "$TUI_MODULE_DIR/tui_module.sh"
+        if tui_available; then
+            info "启动 TUI 选择界面 (已安装组件自动跳过)..."
+            run_tui
+            if [ -n "$TUI_SELECTED" ]; then
+                INSTALL_ALL=false
+                INSTALL_NODE=false; INSTALL_PYTHON=false; INSTALL_AI=false
+                INSTALL_ZED=false; INSTALL_GHOSTTY=false; INSTALL_VSCODE=false
+                INSTALL_MIMO=false; INSTALL_CHATGPT=false; INSTALL_CCSWITCH=false
+                for comp in $TUI_SELECTED; do
+                    case "$comp" in
+                        node)     INSTALL_NODE=true ;;
+                        python)   INSTALL_PYTHON=true ;;
+                        ai)       INSTALL_AI=true ;;
+                        zed)      INSTALL_ZED=true ;;
+                        ghostty)  INSTALL_GHOSTTY=true ;;
+                        vscode)   INSTALL_VSCODE=true ;;
+                        mimo)     INSTALL_MIMO=true ;;
+                        chatgpt)  INSTALL_CHATGPT=true ;;
+                        ccswitch) INSTALL_CCSWITCH=true ;;
+                    esac
+                done
+                info "已选择:${TUI_SELECTED}"
+            else
+                info "TUI 未选择任何组件 (或退出), 跳过安装"
+                exit 0
+            fi
+        else
+            warn "当前不是交互式终端, 跳过 TUI, 使用 --help 查看选项"
+            exit 0
+        fi
+    else
+        warn "未找到 tui_module.sh, 跳过 TUI"
+        exit 0
+    fi
 fi
 
 # ---------------------------------------------------------------------------
