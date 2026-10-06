@@ -6,7 +6,7 @@
 # 支持 apt (Debian/Ubuntu)、dnf (Fedora/RHEL)、pacman (Arch)、zypper (openSUSE)。
 #
 # 用法:
-#   ./install_devtools.sh            # 安装全部工具
+#   ./install_devtools.sh            # 默认进入 TUI 交互选择界面 (非交互式终端改为安装全部)
 #   ./install_devtools.sh --node     # 只装 Node 工具链 (nvm)
 #   ./install_devtools.sh --python   # 只装 Python 工具链 (pyenv + pipx)
 #   ./install_devtools.sh --ai       # 只装 AI CLI (claude-code + codex)
@@ -56,6 +56,29 @@ info()  { printf '\033[0;34m[INFO]\033[0m %s\n' "$*"; }
 ok()    { printf '\033[0;32m[SUCCESS]\033[0m %s\n' "$*"; }
 warn()  { printf '\033[1;33m[WARNING]\033[0m %s\n' "$*"; }
 die()   { printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
+
+# 临时文件登记 + 退出清理 (下载中途失败不残留 /tmp/chatgpt.rpm 之类文件)
+TMP_FILES=()
+cleanup_tmp() {
+    if [ ${#TMP_FILES[@]} -gt 0 ]; then
+        rm -f -- "${TMP_FILES[@]}"
+    fi
+}
+trap cleanup_tmp EXIT
+
+# make_tmp 变量名 [后缀] — 创建临时文件, 路径写入调用方变量并登记到 TMP_FILES。
+# 注意不能用 `f=$(make_tmp ...)` 的命令替换形式: 那样在子 shell 里登记, 父进程的
+# TMP_FILES 拿不到, EXIT trap 就清不掉了。
+make_tmp() {
+    local __var="$1" __suffix="${2:-}" __f
+    if [ -n "$__suffix" ]; then
+        __f=$(mktemp --suffix="$__suffix")
+    else
+        __f=$(mktemp)
+    fi
+    TMP_FILES+=("$__f")
+    printf -v "$__var" '%s' "$__f"
+}
 
 # ---------------------------------------------------------------------------
 # 包管理器探测 + 包名映射 (核心跨发行版逻辑)
@@ -127,9 +150,8 @@ pkg_map() {
 # 安装系统包 (接受多个逻辑包名)
 install_sys_pkg() {
     local missing=()
-    local pkg
+    local logical real pkg
     for logical in "$@"; do
-        local real
         real=$(pkg_map "$logical")
         [ -z "$real" ] && { warn "发行版 $PM 无 $logical 包, 跳过"; continue; }
         for pkg in $real; do
@@ -165,11 +187,20 @@ load_pyenv() {
     command -v pyenv >/dev/null 2>&1 && eval "$(pyenv init - bash)" 2>/dev/null || true
 }
 
-# 写 shell 配置片段 (zsh 优先, 幂等)
+# 选择要写入的 shell 配置文件 (zsh 优先, 都没有时用 .bashrc)
+pick_shell_rc() {
+    if [ -f "$HOME/.zshrc" ]; then
+        printf '%s\n' "$HOME/.zshrc"
+    else
+        printf '%s\n' "$HOME/.bashrc"
+    fi
+}
+
+# 写 shell 配置片段 (幂等)
 append_shell_cfg() {
     local block="$1"
-    local f="$HOME/.zshrc"
-    [ -f "$f" ] || f="$HOME/.bashrc"
+    local f
+    f=$(pick_shell_rc)
     if ! grep -qF "${block%%$'\n'*}" "$f" 2>/dev/null; then
         printf '\n%s\n' "$block" >> "$f"
         info "已追加配置到 $f"
@@ -246,10 +277,17 @@ install_python() {
         load_pyenv
     fi
 
-    append_shell_cfg 'export PYENV_ROOT="$HOME/.pyenv"
-[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init - zsh)"
-eval "$(pyenv virtualenv-init -)"'
+    # 片段要匹配实际写入的配置文件: 写进 .bashrc 就用 bash 初始化, 否则 zsh
+    local rc shell_name=zsh
+    rc=$(pick_shell_rc)
+    case "$rc" in
+        */.bashrc|*/.bash_profile) shell_name=bash ;;
+    esac
+    append_shell_cfg "$(printf '%s\n' \
+        'export PYENV_ROOT="$HOME/.pyenv"' \
+        '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' \
+        "eval \"\$(pyenv init - $shell_name)\"" \
+        'eval "$(pyenv virtualenv-init -)"')"
 
     # 安装默认 Python
     if ! pyenv versions --bare 2>/dev/null | grep -qx "$PYTHON_VERSION"; then
@@ -278,12 +316,21 @@ install_ai() {
     load_nvm
     command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node)"
 
-    info "安装 Claude Code (@anthropic-ai/claude-code)..."
-    npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code
-    info "安装 Codex CLI (@openai/codex)..."
-    npm install -g @openai/codex
+    if command -v claude >/dev/null 2>&1; then
+        info "Claude Code 已安装: $(claude --version 2>/dev/null | head -1), 跳过"
+    else
+        info "安装 Claude Code (@anthropic-ai/claude-code)..."
+        npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code
+    fi
 
-    ok "AI CLI 安装完成: $(claude --version 2>/dev/null | head -1 || true), $(codex --version 2>/dev/null | head -1 || true)"
+    if command -v codex >/dev/null 2>&1; then
+        info "Codex CLI 已安装: $(codex --version 2>/dev/null | head -1), 跳过"
+    else
+        info "安装 Codex CLI (@openai/codex)..."
+        npm install -g @openai/codex
+    fi
+
+    ok "AI CLI 就绪: $(claude --version 2>/dev/null | head -1 || true), $(codex --version 2>/dev/null | head -1 || true)"
 }
 
 # ---------------------------------------------------------------------------
@@ -310,14 +357,19 @@ install_zed() {
     fi
 
     # PATH 配置
-    if ! grep -q '\.local/bin' "$HOME/.zshrc" 2>/dev/null; then
-        echo 'export PATH=$HOME/.local/bin:$PATH' >> "$HOME/.zshrc"
-        info ".zshrc 已追加 ~/.local/bin 到 PATH"
+    local rc_file
+    rc_file=$(pick_shell_rc)
+    if ! grep -q '\.local/bin' "$rc_file" 2>/dev/null; then
+        printf '%s\n' 'export PATH=$HOME/.local/bin:$PATH' >> "$rc_file"
+        info "$rc_file 已追加 ~/.local/bin 到 PATH"
     fi
 
-    # Zed 默认字体配置
-    mkdir -p "$HOME/.config/zed"
-    cat > "$HOME/.config/zed/settings.json" << 'EOF'
+    # Zed 默认字体配置; 已有配置时保留, 不覆盖用户设置
+    if [ -f "$HOME/.config/zed/settings.json" ]; then
+        info "Zed settings.json 已存在, 保留用户配置不覆盖"
+    else
+        mkdir -p "$HOME/.config/zed"
+        cat > "$HOME/.config/zed/settings.json" << 'EOF'
 {
   "ui_font_family": "JetBrains Mono",
   "ui_font_size": 14,
@@ -329,7 +381,9 @@ install_zed() {
   }
 }
 EOF
-    ok "Zed 配置完成 (JetBrains Mono)"
+        info "已写入 Zed 默认字体配置 (JetBrains Mono)"
+    fi
+    ok "Zed 配置完成"
 }
 
 # ---------------------------------------------------------------------------
@@ -469,49 +523,53 @@ install_chatgpt() {
         return 0
     fi
 
-    local arch
+    local arch arch_suffix
     arch=$(uname -m)
     case "$arch" in
-        x86_64)  ARCH_SUFFIX="x86_64" ;;
-        aarch64|arm64) ARCH_SUFFIX="aarch64" ;;
+        x86_64)  arch_suffix="x86_64" ;;
+        aarch64|arm64) arch_suffix="aarch64" ;;
         *) die "不支持的架构: $arch" ;;
     esac
 
+    local tmp_pkg
     case "$PM" in
         dnf|zypper)
             local rpm_url
-            if [ "$ARCH_SUFFIX" = "x86_64" ]; then
+            if [ "$arch_suffix" = "x86_64" ]; then
                 rpm_url="https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.x86_64.rpm"
             else
                 rpm_url="https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.aarch64.rpm"
             fi
             info "下载 ChatGPT rpm (约 530MB)..."
-            curl -fsSL --connect-timeout 15 -o /tmp/chatgpt.rpm "$rpm_url"
+            make_tmp tmp_pkg .rpm
+            curl -fsSL --connect-timeout 15 -o "$tmp_pkg" "$rpm_url"
             if [ "$PM" = "dnf" ]; then
-                sudo dnf install -y /tmp/chatgpt.rpm
+                sudo dnf install -y "$tmp_pkg"
             else
-                sudo zypper install -y /tmp/chatgpt.rpm
+                sudo zypper install -y "$tmp_pkg"
             fi
-            rm -f /tmp/chatgpt.rpm
+            rm -f -- "$tmp_pkg"
             ;;
         apt)
             local deb_url
-            if [ "$ARCH_SUFFIX" = "x86_64" ]; then
+            if [ "$arch_suffix" = "x86_64" ]; then
                 deb_url="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb"
             else
                 deb_url="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb"
             fi
             info "下载 ChatGPT deb (约 530MB)..."
-            curl -fsSL --connect-timeout 15 -o /tmp/chatgpt.deb "$deb_url"
+            make_tmp tmp_pkg .deb
+            curl -fsSL --connect-timeout 15 -o "$tmp_pkg" "$deb_url"
             sudo apt-get update -qq
-            sudo apt-get install -y /tmp/chatgpt.deb
-            rm -f /tmp/chatgpt.deb
+            sudo apt-get install -y "$tmp_pkg"
+            rm -f -- "$tmp_pkg"
             ;;
         pacman)
             local script_url="https://persistent.oaistatic.com/codex-app-prod/linux/install-arch.sh"
-            curl --proto '=https' --tlsv1.2 -fL -o /tmp/install-chatgpt-arch.sh "$script_url"
-            sudo bash /tmp/install-chatgpt-arch.sh
-            rm -f /tmp/install-chatgpt-arch.sh
+            make_tmp tmp_pkg .sh
+            curl --proto '=https' --tlsv1.2 -fL -o "$tmp_pkg" "$script_url"
+            sudo bash "$tmp_pkg"
+            rm -f -- "$tmp_pkg"
             ;;
         *)
             warn "不支持的包管理器, 请手动安装 ChatGPT 桌面版"
@@ -536,31 +594,32 @@ install_ccswitch() {
         return 0
     fi
 
-    local arch
+    local arch arch_id
     arch=$(uname -m)
     case "$arch" in
-        x86_64)  ARCH_ID="x86_64" ;;
-        aarch64|arm64) ARCH_ID="arm64" ;;
+        x86_64)  arch_id="x86_64" ;;
+        aarch64|arm64) arch_id="arm64" ;;
         *) die "不支持的架构: $arch" ;;
     esac
 
     # GitHub 官方 release 直链 + 镜像前缀 (GitHub CDN 走代理不稳定时用镜像)
-    local gh_url="https://github.com/farion1231/cc-switch/releases/download/v3.20.4/CC-Switch-v3.20.4-Linux-${ARCH_ID}"
+    local gh_url="https://github.com/farion1231/cc-switch/releases/download/v3.20.4/CC-Switch-v3.20.4-Linux-${arch_id}"
     local mirrors=("" "https://ghfast.top/" "https://gh-proxy.com/" "https://ghproxy.net/")
     local dl=""
-    local src=""
+    local pkg_suffix=".AppImage"
+    local tmp_pkg
 
     case "$PM" in
-        dnf|zypper) src="${gh_url}.rpm" ;;
-        apt)        src="${gh_url}.deb" ;;
-        pacman)     src="${gh_url}.AppImage" ;;
-        *)          src="${gh_url}.AppImage" ;;
+        dnf|zypper) pkg_suffix=".rpm" ;;
+        apt)        pkg_suffix=".deb" ;;
     esac
+    # 后缀要与 release 资产一致, 也便于包管理器识别本地文件类型
+    make_tmp tmp_pkg "$pkg_suffix"
 
     for m in "${mirrors[@]}"; do
-        info "尝试下载 CC Switch: ${m}${src}"
-        if curl -fsSL --connect-timeout 15 -o /tmp/ccswitch.bin "${m}${src}" 2>/dev/null; then
-            dl="${m}${src}"
+        info "尝试下载 CC Switch: ${m}${gh_url}${pkg_suffix}"
+        if curl -fsSL --connect-timeout 15 -o "$tmp_pkg" "${m}${gh_url}${pkg_suffix}" 2>/dev/null; then
+            dl="${m}${gh_url}${pkg_suffix}"
             break
         fi
     done
@@ -571,22 +630,21 @@ install_ccswitch() {
 
     case "$PM" in
         dnf)
-            sudo dnf install -y /tmp/ccswitch.bin
+            sudo dnf install -y "$tmp_pkg"
             ;;
         zypper)
-            sudo zypper install -y /tmp/ccswitch.bin
+            sudo zypper install -y "$tmp_pkg"
             ;;
         apt)
             sudo apt-get update -qq
-            sudo apt-get install -y /tmp/ccswitch.bin
+            sudo apt-get install -y "$tmp_pkg"
             ;;
         pacman|*)
             mkdir -p "$HOME/.local/bin"
-            chmod +x /tmp/ccswitch.bin
-            install -m755 /tmp/ccswitch.bin "$HOME/.local/bin/cc-switch"
+            install -m755 "$tmp_pkg" "$HOME/.local/bin/cc-switch"
             ;;
     esac
-    rm -f /tmp/ccswitch.bin
+    rm -f -- "$tmp_pkg"
 
     if command -v cc-switch >/dev/null 2>&1; then
         ok "CC Switch 安装完成"
@@ -598,12 +656,43 @@ install_ccswitch() {
 # ---------------------------------------------------------------------------
 # 参数解析
 # ---------------------------------------------------------------------------
+# 打印文件头部注释块 (去掉 # 前缀); 按注释边界截取, 不依赖硬编码行号,
+# 以后增删注释不会再把「依赖」「说明」两节截掉
 usage() {
-    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
-    exit 0
+    awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"
 }
 
+# 加载 TUI 模块 (--tui 与 --list 共用); 成功时可直接调用其函数
+load_tui_module() {
+    local module
+    module="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/tui_module.sh"
+    if [ ! -f "$module" ]; then
+        return 1
+    fi
+    # shellcheck disable=SC1091
+    . "$module"
+}
+
+# --list: 列出可安装组件及当前安装状态
+list_components() {
+    local id status
+    if ! load_tui_module; then
+        die "未找到 tui_module.sh, 无法列出组件"
+    fi
+    printf '可安装组件:\n'
+    for id in "${TUI_IDS[@]}"; do
+        if tui_component_installed "$id"; then
+            status="已安装"
+        else
+            status="未安装"
+        fi
+        printf '  %-9s %-4s %s\n' "$id" "$status" "$(tui_component_name "$id")"
+    done
+}
+
+HAS_ARGS=false
 while [[ $# -gt 0 ]]; do
+    HAS_ARGS=true
     case "$1" in
         --node)     INSTALL_NODE=true; INSTALL_ALL=false; shift ;;
         --python)   INSTALL_PYTHON=true; INSTALL_ALL=false; shift ;;
@@ -615,14 +704,25 @@ while [[ $# -gt 0 ]]; do
         --chatgpt)   INSTALL_CHATGPT=true; INSTALL_ALL=false; shift ;;
         --ccswitch)  INSTALL_CCSWITCH=true; INSTALL_ALL=false; shift ;;
         --tui)       TUI_MODE=true; INSTALL_ALL=false; shift ;;
-        --list)     usage ;;
-        -h|--help)  usage ;;
+        --list)     list_components; exit 0 ;;
+        -h|--help)  usage; exit 0 ;;
         *)
-            echo "未知选项: $1" >&2
-            usage
+            printf '未知选项: %s\n\n' "$1" >&2
+            usage >&2
+            exit 1
             ;;
     esac
 done
+
+# 无参数时默认进入 TUI 交互选择 (除非是纯脚本/非交互环境)
+if [ "$HAS_ARGS" = "false" ]; then
+    if [ -t 1 ] && [ -t 0 ]; then
+        TUI_MODE=true
+        INSTALL_ALL=false
+    else
+        INSTALL_ALL=true
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # 代理设置 (可选)
@@ -636,45 +736,38 @@ fi
 # TUI 交互选择 (--tui)
 # ---------------------------------------------------------------------------
 if $TUI_MODE; then
-    # 加载 TUI 模块 (与脚本同目录)
-    TUI_MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    if [ -f "$TUI_MODULE_DIR/tui_module.sh" ]; then
-        # shellcheck disable=SC1091
-        . "$TUI_MODULE_DIR/tui_module.sh"
-        if tui_available; then
-            info "启动 TUI 选择界面 (已安装组件自动跳过)..."
-            run_tui
-            if [ -n "$TUI_SELECTED" ]; then
-                INSTALL_ALL=false
-                INSTALL_NODE=false; INSTALL_PYTHON=false; INSTALL_AI=false
-                INSTALL_ZED=false; INSTALL_GHOSTTY=false; INSTALL_VSCODE=false
-                INSTALL_MIMO=false; INSTALL_CHATGPT=false; INSTALL_CCSWITCH=false
-                for comp in $TUI_SELECTED; do
-                    case "$comp" in
-                        node)     INSTALL_NODE=true ;;
-                        python)   INSTALL_PYTHON=true ;;
-                        ai)       INSTALL_AI=true ;;
-                        zed)      INSTALL_ZED=true ;;
-                        ghostty)  INSTALL_GHOSTTY=true ;;
-                        vscode)   INSTALL_VSCODE=true ;;
-                        mimo)     INSTALL_MIMO=true ;;
-                        chatgpt)  INSTALL_CHATGPT=true ;;
-                        ccswitch) INSTALL_CCSWITCH=true ;;
-                    esac
-                done
-                info "已选择:${TUI_SELECTED}"
-            else
-                info "TUI 未选择任何组件 (或退出), 跳过安装"
-                exit 0
-            fi
-        else
-            warn "当前不是交互式终端, 跳过 TUI, 使用 --help 查看选项"
-            exit 0
-        fi
-    else
+    if ! load_tui_module; then
         warn "未找到 tui_module.sh, 跳过 TUI"
         exit 0
     fi
+    if ! tui_available; then
+        warn "当前不是交互式终端, 跳过 TUI, 使用 --help 查看选项"
+        exit 0
+    fi
+    info "启动 TUI 选择界面 (已安装组件自动跳过)..."
+    run_tui
+    if [ -z "$TUI_SELECTED" ]; then
+        info "TUI 未选择任何组件 (或退出), 跳过安装"
+        exit 0
+    fi
+    INSTALL_ALL=false
+    INSTALL_NODE=false; INSTALL_PYTHON=false; INSTALL_AI=false
+    INSTALL_ZED=false; INSTALL_GHOSTTY=false; INSTALL_VSCODE=false
+    INSTALL_MIMO=false; INSTALL_CHATGPT=false; INSTALL_CCSWITCH=false
+    for comp in $TUI_SELECTED; do
+        case "$comp" in
+            node)     INSTALL_NODE=true ;;
+            python)   INSTALL_PYTHON=true ;;
+            ai)       INSTALL_AI=true ;;
+            zed)      INSTALL_ZED=true ;;
+            ghostty)  INSTALL_GHOSTTY=true ;;
+            vscode)   INSTALL_VSCODE=true ;;
+            mimo)     INSTALL_MIMO=true ;;
+            chatgpt)  INSTALL_CHATGPT=true ;;
+            ccswitch) INSTALL_CCSWITCH=true ;;
+        esac
+    done
+    info "已选择:${TUI_SELECTED}"
 fi
 
 # ---------------------------------------------------------------------------

@@ -7,14 +7,16 @@
 #
 # 按键:
 #   ↑/↓      移动光标
-#   ←/→      快速翻页(未实现, 保留)
-#   空格      勾选 / 取消
+#   空格      勾选 / 取消 (已安装组件固定跳过)
 #   a         全选
 #   n         全不选
 #   i         仅选未安装
 #   回车      开始安装
 #   q / Esc   退出
 # =============================================================================
+
+# 可安装组件 id (顺序即显示顺序); --list 与 run_tui 共用, 避免两处维护
+TUI_IDS=(node python ai zed ghostty vscode mimo chatgpt ccswitch)
 
 # 仅在无 TTY 时返回错误 (由调用方决定是否回退)
 tui_available() {
@@ -57,7 +59,7 @@ tui_component_name() {
 
 # 运行 TUI, 通过全局变量 TUI_SELECTED (以空格分隔的选中组件 id) 返回结果
 run_tui() {
-    local ids=(node python ai zed ghostty vscode mimo chatgpt ccswitch)
+    local -a ids=("${TUI_IDS[@]}")
     local names=() inst=() sel=()
     local i
 
@@ -75,8 +77,6 @@ run_tui() {
 
     local cur=0
     local key
-    local cols
-    local -a selcount
 
     # 终端状态 (关闭 echo/规范模式/CR映射/流控, 保证 read -n1 正确读取)
     stty -echo -icanon -icrnl -ixon 2>/dev/null
@@ -118,25 +118,28 @@ run_tui() {
         printf '\033[2m↑↓移动 空格勾选 a全选 n全不选 i仅未装 回车开始 q退出\033[0m\n'
         printf '%s\n' "──────────────────────────────────────────"
         local checked=0
-        for i in "${!ids[@]}"; do
-            local box=" "
-            if [ "${sel[$i]}" = "1" ]; then box="[x]"; else box="[ ]"; fi
-            if [ "${inst[$i]}" = "1" ]; then
-                # 已安装: 显示 [装] 标记, 灰色
-                printf '\033[2m  %s %-3s  %s\033[0m\n' "$box" "✓装" "${names[$i]}"
-            else
-                if [ "$i" = "$cur" ]; then
-                    printf '\033[7m> %s %-3s  %s\033[0m\n' "$box" "   " "${names[$i]}"
-                else
-                    printf '  %s %-3s  %s\n' "$box" "   " "${names[$i]}"
-                fi
-            fi
-        done
-        printf '%s\n' "──────────────────────────────────────────"
-        checked=0
         for i in "${!sel[@]}"; do
             [ "${sel[$i]}" = "1" ] && checked=$((checked+1))
         done
+
+        for i in "${!ids[@]}"; do
+            local box="[ ]"
+            local tag="   "
+            local prefix="  "
+            local attr='\033[0m'
+            [ "${sel[$i]}" = "1" ] && box="[x]"
+            if [ "${inst[$i]}" = "1" ]; then
+                tag="✓装"
+                attr='\033[2m'
+            fi
+            # 光标行: 已安装行用 反色+暗淡, 保证移动到该行时仍能看见光标
+            if [ "$i" = "$cur" ]; then
+                prefix="> "
+                if [ "${inst[$i]}" = "1" ]; then attr='\033[7;2m'; else attr='\033[7m'; fi
+            fi
+            printf '%b%s %-3s  %s\033[0m\n' "$attr" "$prefix$box" "$tag" "${names[$i]}"
+        done
+        printf '%s\n' "──────────────────────────────────────────"
         printf '\033[1;32m已选 %d 项\033[0m  (已安装组件显示 [✓装] 将自动跳过)\n' "$checked"
     }
 
