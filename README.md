@@ -99,7 +99,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ### 用法
 
 ```bash
-./install_devtools.sh             # 安装全部工具
+./install_devtools.sh             # 交互式终端打开 TUI 勾选; 非交互式(管道/CI)安装全部
 ./install_devtools.sh --node      # 只装 Node 工具链 (nvm + LTS)
 ./install_devtools.sh --python    # 只装 Python 工具链 (pyenv + pipx)
 ./install_devtools.sh --ai        # 只装 AI CLI (claude-code + codex)
@@ -110,6 +110,8 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install_devtools.sh --chatgpt   # 只装 ChatGPT / Codex 桌面版
 ./install_devtools.sh --ccswitch  # 只装 CC Switch (AI CLI 配置切换器)
 ./install_devtools.sh --tui       # 交互式勾选界面 (可多选组件)
+./install_devtools.sh --list      # 列出可安装组件及当前安装状态
+./install_devtools.sh --help      # 查看完整用法与依赖说明
 ```
 
 ### TUI 交互式选择 (`--tui`)
@@ -123,7 +125,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 ```bash
 ./install_devtools.sh --tui
-./install_devtools.sh --list      # 查看用法
+./install_devtools.sh --list      # 列出可安装组件及当前安装状态
 ```
 
 ### 环境变量
@@ -135,6 +137,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ### 注意事项
 
 - 所有组件**幂等**：已安装的会自动跳过，可安全重复执行
+- 已存在的 `~/.config/zed/settings.json` 不会被覆盖（只在缺失时写入默认字体配置）
 - AI CLI（Claude Code/Codex）安装后需各自登录/配置 API key 才能使用
 - Zed 依赖 Vulkan，脚本按发行版自动安装对应驱动（pacman 下为 `vulkan-radeon`+`vulkan-intel`）
 - Ghostty 在 Budgie/labwc 桌面下依赖 `xdg-terminal-exec`（AUR/zypper 无此包时会提示跳过）

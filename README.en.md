@@ -71,6 +71,77 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install.sh --clean-backups
 ```
 
+## Devtools suite
+
+The repository ships `install_devtools.sh`, a one-shot installer for a set of common development tools. It is independent of the main `install.sh` and entirely optional. The component list was recorded from the actual setup of a Fedora 44 server so a new machine can reproduce it.
+
+> **Cross-distro support**: the script auto-detects the package manager — **apt** (Debian/Ubuntu), **dnf** (Fedora/RHEL), **pacman** (Arch) and **zypper** (openSUSE). System package names are mapped per distro (e.g. JetBrains Mono is `fonts-jetbrains-mono` on apt, `ttf-jetbrains-mono` on pacman and `jetbrains-mono-fonts` on dnf).
+
+### What gets installed
+
+| Component | Description | How it is installed |
+|-----------|-------------|---------------------|
+| **nvm + Node LTS** | Node version manager + default LTS | official script, configures zsh |
+| **pyenv + Python** | Python version manager + default 3.12.10 | official script + build dependencies, configures zsh |
+| **pipx** | Python CLI application installer | installed via pip |
+| **Claude Code** | Anthropic AI CLI (`claude`) | `npm install -g` |
+| **Codex CLI** | OpenAI AI CLI (`codex`) | `npm install -g` |
+| **Zed editor** | high-performance code editor | official install script + Vulkan drivers |
+| **JetBrains Mono font** | code font (used by default in Zed) | system package (mapped per distro) |
+| **Ghostty terminal** | modern terminal emulator | dnf: COPR / apt: community deb / pacman: official package |
+| **Ctrl+Alt+T shortcut** | quick-open for Ghostty | labwc rc.xml + xdg-terminal-exec |
+| **VS Code editor** | Microsoft code editor | official Microsoft repo (dnf/apt/zypper) / pacman: `code` |
+| **MiMo Code** | Xiaomi AI coding assistant | `npm install -g` (`@mimo-ai/cli`) |
+| **ChatGPT / Codex desktop** | OpenAI official Linux desktop app | official rpm/deb/install script |
+| **CC Switch** | AI CLI configuration switcher (desktop) | GitHub release rpm/deb/AppImage |
+
+### Usage
+
+```bash
+./install_devtools.sh             # interactive terminal: opens the TUI checklist; non-interactive (pipe/CI): installs everything
+./install_devtools.sh --node      # Node toolchain only (nvm + LTS)
+./install_devtools.sh --python    # Python toolchain only (pyenv + pipx)
+./install_devtools.sh --ai        # AI CLIs only (claude-code + codex)
+./install_devtools.sh --zed       # Zed editor + JetBrains Mono only
+./install_devtools.sh --ghostty   # Ghostty terminal + Ctrl+Alt+T only
+./install_devtools.sh --vscode    # VS Code editor only
+./install_devtools.sh --mimo      # MiMo Code only
+./install_devtools.sh --chatgpt   # ChatGPT / Codex desktop only
+./install_devtools.sh --ccswitch  # CC Switch only
+./install_devtools.sh --tui       # interactive checklist (multi-select)
+./install_devtools.sh --list      # list installable components and their current status
+./install_devtools.sh --help      # full usage and dependency notes
+```
+
+### TUI component selection (`--tui`)
+
+Running `./install_devtools.sh --tui` opens a terminal UI for picking components with the keyboard:
+
+- **↑/↓** move the cursor, **Space** toggle a component
+- **a** select all, **n** select none, **i** select only uninstalled
+- **Enter** start installing, **q** quit
+- Installed components are auto-detected, displayed as `[✓装]` and skipped by default
+
+```bash
+./install_devtools.sh --tui
+./install_devtools.sh --list      # list components with their install status
+```
+
+### Environment variables
+
+- `NODE_LTS` — pin the Node version (default: latest LTS)
+- `PYTHON_VERSION` — pin the Python version (default: 3.12.10)
+- `PROXY_URL` — proxy address, e.g. `http://192.168.50.182:7890` (use when external downloads are slow)
+
+### Notes
+
+- All components are **idempotent**: anything already installed is skipped, so re-running is safe
+- An existing `~/.config/zed/settings.json` is never overwritten (the default font settings are written only when the file is missing)
+- The AI CLIs (Claude Code / Codex) still need their own login / API key configuration after installation
+- Zed requires Vulkan; the script installs the matching driver per distro (`vulkan-radeon` + `vulkan-intel` on pacman)
+- Ghostty on the Budgie/labwc desktop depends on `xdg-terminal-exec` (skipped with a warning when the distro has no such package)
+- Open a new terminal afterwards (or `source ~/.zshrc`)
+
 ## What Gets Installed
 
 ### Dependencies
