@@ -73,6 +73,71 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 
 
+## 代理技能（install_skills.sh）
+
+仓库的 `skills/` 目录存放可复用的 **Agent Skills**，由 `install_skills.sh` 安装到各 AI 代理。
+
+### 技能目录结构
+
+```
+skills/
+├── README.md
+└── <skill-name>/
+    └── SKILL.md          # 必需, 含 YAML frontmatter 的 name/description
+```
+
+### 用法
+
+```bash
+./install_skills.sh                # 默认进入 TUI 交互选择（非交互则全装）
+./install_skills.sh --tui          # 强制 TUI 勾选
+./install_skills.sh --list         # 列出技能及安装状态
+./install_skills.sh joe-env        # 只装指定技能
+```
+
+与 devtools / MCP 脚本同款 TUI：`↑↓` 移动、`空格` 勾选、`a/n/i` 快捷键、`回车` 开始、`q` 退出；已安装技能显示 `[✓装]` 自动跳过。
+
+### 安装位置（按已安装的代理自动选择）
+
+| 目录 | 归属 |
+|---|---|
+| `~/.agents/skills/` | 通用（跨工具约定，总是安装） |
+| `~/.claude/skills/` | Claude Code |
+| `~/.codex/skills/` | Codex CLI |
+| `~/.config/mimocode/skills/` | MiMo Code（原生路径） |
+| `~/.copilot/skills/` | GitHub Copilot（目录存在时） |
+
+> MiMo Code 也会扫描 `~/.claude`、`~/.agents`、`~/.codex`、`~/.opencode` 下的 `skills/**/SKILL.md`，
+> 因此安装到这些目录可同时被多个代理发现。
+
+### 内置技能
+
+| 技能 | 用途 |
+|---|---|
+| **joe-env** | 说明本机装了哪些工具/MCP、三个安装脚本怎么用 |
+| **code-exploration** | 用 MCP 图谱工具探索代码（替代 grep + 逐文件读） |
+
+### 添加自己的技能
+
+```bash
+mkdir -p skills/my-skill
+cat > skills/my-skill/SKILL.md <<'EOF'
+---
+name: my-skill
+description: 何时该用我（写清触发场景, 这是代理唯一的判断依据）
+---
+
+# 标题
+技能正文...
+EOF
+./install_skills.sh --list     # 会自动发现
+./install_skills.sh --tui      # 勾选安装
+```
+
+脚本幂等：内容变化则更新，未变化跳过。
+
+---
+
 ## MCP 服务器安装器（install_mcp_servers.sh）
 
 仓库附带 `install_mcp_servers.sh`，用于安装并配置各种 MCP（Model Context Protocol）服务器，自动接入已安装的 AI CLI 工具：

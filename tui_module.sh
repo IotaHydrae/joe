@@ -24,6 +24,17 @@
 #   q / Esc   退出
 # =============================================================================
 
+# 多字节文本按"字符"处理 (POSIX locale 下 bash 按字节截断会切坏中文)
+if [ -z "${LC_ALL:-}" ]; then
+    for _loc in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+        if locale -a 2>/dev/null | grep -qix "$_loc"; then
+            export LC_ALL="$_loc"
+            break
+        fi
+    done
+    unset _loc
+fi
+
 # ---- 默认组件 (devtools); 调用方可预先覆盖 ----
 if [ -z "${TUI_IDS+x}" ]; then
     TUI_IDS=(node python ai zed ghostty vscode mimo chatgpt ccswitch)
