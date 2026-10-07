@@ -19,8 +19,15 @@ declare -F ok   >/dev/null 2>&1 || ok()   { printf '[ OK ] %s\n' "$*"; }
 # 下载安装脚本并校验 (避免把 HTML 错误页/区域限制页当脚本执行)
 # 返回 0 = 拿到合法脚本, 1 = 失败(网络/HTML/非脚本)
 download_installer() {
-    local url="$1" out="$2"
-    curl -fsSL "$url" -o "$out" 2>/dev/null || return 1
+    local url="$1" out="$2" attempt
+    rm -f "$out"
+    for attempt in 1 2 3; do
+        if curl -fsSL --retry 2 --retry-all-errors --connect-timeout 20 \
+                "$url" -o "$out" 2>/dev/null && [ -s "$out" ]; then
+            break
+        fi
+        [ "$attempt" -lt 3 ] && sleep 2
+    done
     [ -s "$out" ] || return 1
     head -c 200 "$out" | grep -qiE '<html|<!doctype|<script' && return 1
     head -1 "$out" | grep -qE '^#!' || return 1

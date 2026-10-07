@@ -73,6 +73,103 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 
 
+## 跨发行版支持
+
+脚本不绑定某一个发行版。已用容器实测的发行版：
+
+| 发行版 | 包管理器 | 实测状态 |
+|---|---|---|
+| **Ubuntu 24.04 LTS** (noble) | apt | ✅ `--check` 全部正确解析 |
+| **Linux Mint 22.3** | apt (基于 noble) | ✅ 与 Ubuntu 24.04 同一套映射 |
+| **Arch Linux / CachyOS** | pacman | ✅ `--check` 全部正确解析 |
+| **Fedora** | dnf | ✅ 本机实机验证 |
+| openSUSE | zypper | 已适配（未实测） |
+
+### 设计：按"可用性"解析包名，而非硬编码
+
+各发行版（甚至同一发行版的不同版本）包名不同。例如 Ubuntu 24.04 的 **t64 重命名**：
+
+| 逻辑名 | Ubuntu ≤22.04 | Ubuntu ≥24.04 | Arch | Fedora |
+|---|---|---|---|---|
+| `fuse2` | `libfuse2` | **`libfuse2t64`** | `fuse2` | `fuse` |
+| `ncurses-dev` | `libncursesw5-dev` | **`libncurses-dev`** | (base-devel) | `ncurses-devel` |
+| `xdg-terminal-exec` | `xdg-terminal-exec` | `xdg-terminal-exec` | `xdg-terminal-exec` | `xdg-terminal-exec` |
+| `mesa-vulkan-drivers` | `mesa-vulkan-drivers` | 同左 | `vulkan-radeon` + `vulkan-intel` | `mesa-vulkan-drivers` |
+
+`lib_distro.sh` 的做法是**声明候选**，运行时按实际情况选择：
+
+```bash
+# 组之间用空格(都要装), 组内用 | 分隔备选(选一个可用的)
+fuse2)               echo "libfuse2t64|libfuse2" ;;
+mesa-vulkan-drivers) echo "vulkan-radeon vulkan-intel" ;;
+```
+
+这样 Ubuntu 22.04/24.04/26.04、Mint、Pop!_OS 等衍生版都不需要单独判断版本。
+
+### 各发行版的组件安装方式
+
+| 组件 | apt (Ubuntu/Mint) | pacman (Arch/CachyOS) | dnf (Fedora) |
+|---|---|---|---|
+| **Ghostty** | 官方仓库(26.04+) / 社区 .deb / snap | 官方 `extra` | COPR scottames/ghostty |
+| **VS Code** | 微软 apt 源 | 官方 `extra` (`code`) | 微软 dnf 源 |
+| **ChatGPT 桌面** | 官方 .deb | 官方 `install-arch.sh` | 官方 .rpm |
+| **CC Switch** | 官方 .deb | AppImage + `fuse2` | 官方 .rpm |
+| **Node / Python / Zed / MiMo** | 发行版无关（nvm / pyenv / 官方脚本） | 同左 | 同左 |
+
+> Ghostty 在 Ubuntu 24.04 尚无官方包（26.04 起才有）。脚本的社区 .deb 回退会
+> **先把安装脚本下载下来校验**（拒绝 HTML 错误页），再在**临时目录**中执行——
+> 因为该脚本会把约 50MB 的 .deb 下到当前目录，直接在仓库里跑会污染工作区。
+
+### 查看本机适配情况
+
+```bash
+./install_devtools.sh --check
+```
+
+只报告不改动：
+
+```
+== 发行版 ==
+  发行版:      Ubuntu 24.04.5 LTS
+  ID/ID_LIKE:  ubuntu / debian
+  版本/代号:   24.04 / noble
+  家族:        debian
+  包管理器:    apt
+  Ubuntu 基线: 24.04
+
+== 系统包解析 ==
+  fuse2                  -> libfuse2t64
+  ncurses-dev            -> libncurses-dev
+  ...
+
+== 各组件安装方式 ==
+  ghostty      官方仓库(26.04+) / 社区 .deb / snap
+  vscode       微软 apt 源 (packages.microsoft.com)
+  ...
+```
+
+### 其他兼容性处理
+
+- **`sudo` 兼容**：以 root 运行（容器/WSL）或系统没有 `sudo` 时自动降级，不再直接报错
+- **Ubuntu 衍生版识别**：Mint/Zorin/Pop 等通过 `UBUNTU_CODENAME` 反查 Ubuntu 基线版本
+- **镜像回退**：GitHub 下载走多镜像 + SHA256 校验（部分网络下直连会截断）
+
+### 用容器验证
+
+仓库的跨发行版适配是通过容器实测的：
+
+```bash
+podman run --rm -v "$PWD:/joe:ro,z" docker.io/library/ubuntu:24.04 \
+    /bin/bash -c "apt-get update -qq && cd /joe && ./install_devtools.sh --check"
+
+podman run --rm -v "$PWD:/joe:ro,z" docker.io/library/archlinux \
+    /bin/bash -c "pacman -Sy --noconfirm && cd /joe && ./install_devtools.sh --check"
+```
+
+> Fedora 上挂载需要 `:z` 做 SELinux 重标，否则容器读不到文件。
+
+---
+
 ## 全流程脚本
 
 围绕"新机器 → 部署 → 体检 → 升级 → 备份"的完整闭环：

@@ -3,7 +3,8 @@
 # joe devtools — 开发工具套件安装脚本 (跨发行版)
 # =============================================================================
 # 记录在服务器 (Fedora 44) 上安装过的一组开发工具，供新机器一键复现。
-# 支持 apt (Debian/Ubuntu)、dnf (Fedora/RHEL)、pacman (Arch)、zypper (openSUSE)。
+# 支持 apt (Debian/Ubuntu/Mint)、pacman (Arch/CachyOS)、dnf (Fedora/RHEL)、zypper (openSUSE)。
+# 已实测: Ubuntu 24.04 / Linux Mint 22.3 (noble) / Arch Linux (CachyOS 基线) / Fedora。
 #
 # 用法:
 #   ./install_devtools.sh            # 默认进入 TUI 交互选择界面 (非交互式终端改为安装全部)
@@ -18,6 +19,7 @@
 #   ./install_devtools.sh --ccswitch # 只装 CC Switch (AI CLI 配置切换器)
 #   ./install_devtools.sh --tui      # 交互式勾选界面 (TUI)
 #   ./install_devtools.sh --list     # 列出可安装组件
+#   ./install_devtools.sh --check    # 只报告本机适配情况 (发行版/包名解析/安装方式), 不做改动
 #
 # 依赖: git, curl, sudo (非 root 时), bash/zsh
 # 说明:
@@ -81,98 +83,20 @@ make_tmp() {
 }
 
 # ---------------------------------------------------------------------------
-# 包管理器探测 + 包名映射 (核心跨发行版逻辑)
+# 发行版识别与包名解析 (统一由 lib_distro.sh 提供)
 # ---------------------------------------------------------------------------
-detect_pm() {
-    if command -v apt-get >/dev/null 2>&1; then echo "apt"
-    elif command -v pacman >/dev/null 2>&1; then echo "pacman"
-    elif command -v dnf >/dev/null 2>&1; then echo "dnf"
-    elif command -v zypper >/dev/null 2>&1; then echo "zypper"
-    else echo "unknown"; fi
-}
-PM=$(detect_pm)
-
-# 包是否已安装
-pkg_installed() {
-    local pkg="$1"
-    case "$PM" in
-        apt)    dpkg -s "$pkg" >/dev/null 2>&1 ;;
-        pacman) pacman -Q "$pkg" >/dev/null 2>&1 ;;
-        dnf|zypper) rpm -q "$pkg" >/dev/null 2>&1 ;;
-        *)      false ;;
-    esac
-}
-
-# 逻辑包名 → 发行版实际包名
-# 用 {logical} 时返回一组包名 (空格分隔)
-pkg_map() {
-    local logical="$1"
-    case "$PM" in
-        apt)
-            case "$logical" in
-                vulkan-loader)          echo "libvulkan1" ;;
-                vulkan-tools)           echo "vulkan-tools" ;;
-                mesa-vulkan-drivers)    echo "mesa-vulkan-drivers" ;;
-                jetbrains-mono)         echo "fonts-jetbrains-mono" ;;
-                xdg-terminal-exec)      echo "xdg-terminal-exec" ;;
-                *)                      echo "$logical" ;;
-            esac ;;
-        pacman)
-            case "$logical" in
-                vulkan-loader)          echo "vulkan-icd-loader" ;;
-                vulkan-tools)           echo "vulkan-tools" ;;
-                mesa-vulkan-drivers)    echo "vulkan-radeon vulkan-intel" ;;
-                jetbrains-mono)         echo "ttf-jetbrains-mono" ;;
-                xdg-terminal-exec)      echo "" ;;  # AUR, 不装
-                *)                      echo "$logical" ;;
-            esac ;;
-        zypper)
-            case "$logical" in
-                vulkan-loader)          echo "libvulkan1" ;;
-                vulkan-tools)           echo "vulkan-tools" ;;
-                mesa-vulkan-drivers)    echo "libvulkan_radeon" ;;
-                jetbrains-mono)         echo "jetbrains-mono-fonts" ;;
-                xdg-terminal-exec)      echo "" ;;
-                *)                      echo "$logical" ;;
-            esac ;;
-        *) # dnf 及默认
-            case "$logical" in
-                vulkan-loader)          echo "vulkan-loader" ;;
-                vulkan-tools)           echo "vulkan-tools" ;;
-                mesa-vulkan-drivers)    echo "mesa-vulkan-drivers" ;;
-                jetbrains-mono)         echo "jetbrains-mono-fonts" ;;
-                xdg-terminal-exec)      echo "xdg-terminal-exec" ;;
-                *)                      echo "$logical" ;;
-            esac ;;
-    esac
-}
-
-# 安装系统包 (接受多个逻辑包名)
-install_sys_pkg() {
-    local missing=()
-    local logical real pkg
-    for logical in "$@"; do
-        real=$(pkg_map "$logical")
-        [ -z "$real" ] && { warn "发行版 $PM 无 $logical 包, 跳过"; continue; }
-        for pkg in $real; do
-            if pkg_installed "$pkg"; then
-                info "$pkg 已安装, 跳过"
-            else
-                missing+=("$pkg")
-            fi
-        done
-    done
-    [ ${#missing[@]} -eq 0 ] && return 0
-
-    info "安装系统包: ${missing[*]}"
-    case "$PM" in
-        apt)    sudo apt-get update -qq && sudo apt-get install -y "${missing[@]}" ;;
-        pacman) sudo pacman -S --needed --noconfirm "${missing[@]}" ;;
-        dnf)    sudo dnf install -y "${missing[@]}" ;;
-        zypper) sudo zypper install -y "${missing[@]}" ;;
-        *)      warn "不支持的包管理器, 请手动安装: ${missing[*]}" ;;
-    esac
-}
+# 支持 apt (Debian/Ubuntu/Mint) / pacman (Arch/CachyOS) / dnf (Fedora) / zypper (openSUSE)
+# 并处理版本差异, 例如 Ubuntu 24.04 的 t64 重命名 (libfuse2 -> libfuse2t64)
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for _lib in lib_distro.sh lib_github.sh; do
+    if [ -f "$_LIB_DIR/$_lib" ]; then
+        # shellcheck disable=SC1090
+        . "$_LIB_DIR/$_lib"
+    else
+        die "缺少 $_lib (应与本脚本同目录)"
+    fi
+done
+unset _lib _LIB_DIR
 
 # 加载 nvm 到当前 shell
 load_nvm() {
@@ -180,16 +104,6 @@ load_nvm() {
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 }
 
-# 下载安装脚本并校验 (避免把 HTML 错误页/区域限制页当脚本执行)
-# 返回 0 = 拿到合法脚本, 1 = 失败(网络/HTML/非脚本)
-download_installer() {
-    local url="$1" out="$2"
-    curl -fsSL "$url" -o "$out" 2>/dev/null || return 1
-    [ -s "$out" ] || return 1
-    head -c 200 "$out" | grep -qiE '<html|<!doctype|<script' && return 1
-    head -1 "$out" | grep -qE '^#!' || return 1
-    return 0
-}
 
 
 # 加载 pyenv 到当前 shell
@@ -412,23 +326,86 @@ EOF
 # ---------------------------------------------------------------------------
 # 组件: Ghostty 终端 + Ctrl+Alt+T 快捷键
 # ---------------------------------------------------------------------------
+# Ghostty: Ubuntu 24.04 / Mint 22.3 无官方包 (官方仓库 26.04 起才有)
+# 回退顺序: 官方仓库 -> 社区 .deb (mkasberg, 已处理 Mint->Ubuntu 映射) -> snap
+install_ghostty_apt() {
+    # 1) 官方仓库 (Ubuntu 26.04+ / 部分衍生版)
+    if pkg_available ghostty; then
+        install_sys_pkg ghostty && command -v ghostty >/dev/null 2>&1 && return 0
+    fi
+
+    # 2) 社区 .deb: 先下载脚本并校验, 再执行 —— 不做 curl | bash
+    info "官方仓库无 ghostty ($(distro_pretty)), 改用社区 .deb..."
+    local tpl=/tmp/ghostty-ubuntu-install.sh
+    if download_installer https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh "$tpl"; then
+        # 该脚本用 curl -LO 把 .deb 下到"当前目录", 必须在可写的临时目录里执行
+        local workdir
+        workdir="$(mktemp -d)"
+        if ( cd "$workdir" && bash "$tpl" ); then
+            rm -rf "$workdir" "$tpl"
+            return 0
+        fi
+        warn "社区 .deb 安装失败"
+        rm -rf "$workdir"
+    else
+        warn "无法获取/校验社区安装脚本 (可能区域受限)"
+    fi
+    rm -f "$tpl"
+
+    # 3) snap
+    if command -v snap >/dev/null 2>&1; then
+        info "尝试 snap 安装 ghostty..."
+        sudo snap install ghostty --classic && return 0
+    fi
+
+    warn "Ghostty 未能自动安装, 请参考 https://ghostty.org/docs/install/binary"
+    return 1
+}
+
+# xdg-terminal-exec: Ubuntu/Mint/Arch/Fedora 官方仓库均有; 缺失时用上游脚本兜底
+ensure_xdg_terminal_exec() {
+    command -v xdg-terminal-exec >/dev/null 2>&1 && return 0
+
+    if install_sys_pkg xdg-terminal-exec >/dev/null 2>&1 \
+       && command -v xdg-terminal-exec >/dev/null 2>&1; then
+        return 0
+    fi
+
+    info "包不可用, 从上游安装 xdg-terminal-exec 到 ~/.local/bin..."
+    local tpl=/tmp/xdg-terminal-exec.sh
+    if curl -fsSL --connect-timeout 15 -o "$tpl" \
+            https://raw.githubusercontent.com/Vladimir-csp/xdg-terminal-exec/master/xdg-terminal-exec 2>/dev/null \
+       && [ -s "$tpl" ] && head -1 "$tpl" | grep -qE '^#!'; then
+        mkdir -p "$HOME/.local/bin"
+        install -m755 "$tpl" "$HOME/.local/bin/xdg-terminal-exec"
+        rm -f "$tpl"
+        ok "xdg-terminal-exec 已装到 ~/.local/bin"
+        return 0
+    fi
+    rm -f "$tpl"
+    warn "xdg-terminal-exec 不可用 (Ctrl+Alt+T 可能不生效)"
+    return 1
+}
+
 install_ghostty() {
     info "=== 安装 Ghostty 终端 ==="
 
     if ! command -v ghostty >/dev/null 2>&1; then
         case "$PM" in
             dnf)
-                sudo dnf copr enable -y scottames/ghostty
-                sudo dnf install -y ghostty
+                { sudo dnf copr enable -y scottames/ghostty && sudo dnf install -y ghostty; } \
+                    || warn "Ghostty dnf 安装失败"
                 ;;
             apt)
-                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh)"
+                # 失败不应中止整个脚本 (后面还要配置 xdg-terminal-exec)
+                install_ghostty_apt || true
                 ;;
             pacman)
-                sudo pacman -S --needed --noconfirm ghostty
+                sudo pacman -S --needed --noconfirm ghostty \
+                    || warn "Ghostty pacman 安装失败"
                 ;;
             zypper)
-                sudo zypper install -y ghostty
+                sudo zypper install -y ghostty || warn "Ghostty zypper 安装失败"
                 ;;
             *)
                 warn "Ghostty 安装方式未知, 请手动安装"
@@ -439,15 +416,10 @@ install_ghostty() {
     fi
 
     # xdg-terminal-exec (默认终端执行器, Budgie/labwc 的 C-A-t 依赖它)
-    if ! command -v xdg-terminal-exec >/dev/null 2>&1; then
-        local real
-        real=$(pkg_map xdg-terminal-exec)
-        if [ -n "$real" ]; then
-            install_sys_pkg xdg-terminal-exec
-        else
-            warn "发行版 $PM 没有 xdg-terminal-exec 包, 跳过 (Ctrl+Alt+T 可能不生效)"
-        fi
-    fi
+    # 发行版包缺失时自动回退到上游脚本, 不再直接放弃
+    ensure_xdg_terminal_exec >/dev/null 2>&1 || true
+    command -v xdg-terminal-exec >/dev/null 2>&1 \
+        || warn "未装上 xdg-terminal-exec, Ctrl+Alt+T 可能不生效"
 
     # 配置 Ghostty 为默认终端 (xdg-terminal-exec 首选)
     if command -v xdg-terminal-exec >/dev/null 2>&1; then
@@ -676,6 +648,8 @@ install_ccswitch() {
             sudo apt-get install -y "$tmp_pkg"
             ;;
         pacman|*)
+            # AppImage 运行需要 FUSE (Arch: fuse2 / Ubuntu: libfuse2t64)
+            install_sys_pkg fuse2 >/dev/null 2>&1 || true
             mkdir -p "$HOME/.local/bin"
             install -m755 "$tmp_pkg" "$HOME/.local/bin/cc-switch"
             ;;
@@ -687,6 +661,57 @@ install_ccswitch() {
     else
         warn "CC Switch 安装可能未成功 (AppImage 方式已放入 ~/.local/bin)"
     fi
+}
+
+# ---------------------------------------------------------------------------
+# --check: 只报告本机适配情况, 不做任何改动 (跨发行版验证用)
+# ---------------------------------------------------------------------------
+cmd_check() {
+    printf '\n%s\n' "== 发行版 =="
+    distro_report
+
+    printf '\n%s\n' "== 系统包解析 =="
+    local logical resolved mark
+    for logical in vulkan-loader vulkan-tools mesa-vulkan-drivers \
+                   jetbrains-mono xdg-terminal-exec fuse2 ncurses-dev \
+                   fontconfig unzip; do
+        resolved="$(pkg_resolve "$logical" 2>/dev/null || echo "")"
+        if [ -z "$resolved" ]; then
+            printf '  %-22s %s\n' "$logical" "$(printf '\033[1;33m%-24s\033[0m' '<本发行版无')"
+        else
+            printf '  %-22s -> %s\n' "$logical" "$resolved"
+        fi
+    done
+
+    printf '\n%s\n' "== 各组件安装方式 =="
+    case "$PM" in
+        apt)    printf '  %-12s %s\n' ghostty  "官方仓库(26.04+) / 社区 .deb / snap" ;;
+        pacman) printf '  %-12s %s\n' ghostty  "官方 extra 仓库 (pacman -S ghostty)" ;;
+        dnf)    printf '  %-12s %s\n' ghostty  "COPR scottames/ghostty" ;;
+        zypper) printf '  %-12s %s\n' ghostty  "官方 repo-oss" ;;
+    esac
+    case "$PM" in
+        apt)    printf '  %-12s %s\n' vscode   "微软 apt 源 (packages.microsoft.com)" ;;
+        pacman) printf '  %-12s %s\n' vscode   "官方 extra 仓库 (pacman -S code)" ;;
+        dnf)    printf '  %-12s %s\n' vscode   "微软 dnf 源" ;;
+        zypper) printf '  %-12s %s\n' vscode   "微软 zypper 源" ;;
+    esac
+    case "$PM" in
+        apt)    printf '  %-12s %s\n' chatgpt  "官方 .deb" ;;
+        pacman) printf '  %-12s %s\n' chatgpt  "官方 install-arch.sh" ;;
+        dnf|zypper) printf '  %-12s %s\n' chatgpt "官方 .rpm" ;;
+    esac
+    case "$PM" in
+        apt)    printf '  %-12s %s\n' ccswitch "官方 .deb" ;;
+        pacman) printf '  %-12s %s\n' ccswitch "AppImage + fuse2" ;;
+        dnf|zypper) printf '  %-12s %s\n' ccswitch "官方 .rpm" ;;
+    esac
+    printf '  %-12s %s\n' node   "nvm (发行版无关)"
+    printf '  %-12s %s\n' python "pyenv (需构建依赖)"
+    printf '  %-12s %s\n' ai     "npm 全局安装"
+    printf '  %-12s %s\n' zed    "Zed 官方安装脚本 (发行版无关)"
+    printf '  %-12s %s\n' mimo   "MiMo 官方安装脚本 (发行版无关)"
+    printf '\n'
 }
 
 # ---------------------------------------------------------------------------
@@ -741,6 +766,7 @@ while [[ $# -gt 0 ]]; do
         --ccswitch)  INSTALL_CCSWITCH=true; INSTALL_ALL=false; shift ;;
         --tui)       TUI_MODE=true; INSTALL_ALL=false; shift ;;
         --list)     list_components; exit 0 ;;
+        --check)    cmd_check; exit 0 ;;
         -h|--help)  usage; exit 0 ;;
         *)
             printf '未知选项: %s\n\n' "$1" >&2
