@@ -72,6 +72,52 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ```
 
 
+
+## MCP 服务器安装器（install_mcp_servers.sh）
+
+仓库附带 `install_mcp_servers.sh`，用于安装并配置各种 MCP（Model Context Protocol）服务器，自动接入已安装的 AI CLI 工具：
+
+| 目标工具 | 配置方式 |
+|---|---|
+| **Claude Code** | `claude mcp add -s user`（全局作用域） |
+| **Codex CLI** | `codex mcp add`（写入 ~/.codex/config.toml） |
+| **MiMo Code** | 编辑 ~/.config/mimocode/mimocode.jsonc |
+
+### 已支持 / 计划支持的 MCP 服务器
+
+| 服务器 | 说明 | 状态 |
+|---|---|---|
+| **filesystem** | 安全文件操作（官方参考服务器） | ✅ 已支持 |
+| github / git / memory 等 | 官方参考服务器 | 📋 预留（可扩展） |
+
+### 用法
+
+```bash
+./install_mcp_servers.sh                 # 安装全部 MCP 服务器（当前: filesystem）
+./install_mcp_servers.sh filesystem      # 只装 filesystem MCP
+./install_mcp_servers.sh --list          # 查看用法
+```
+
+### 自定义 filesystem 可访问目录
+
+默认允许访问 `$HOME` 和 `/tmp`，可通过环境变量覆盖：
+
+```bash
+FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
+```
+
+### 扩展新 MCP 服务器
+
+脚本结构清晰，新增服务器只需：
+
+1. 添加一个 `install_<name>_mcp()` 函数
+2. 用 `mcp_add_claude_stdio` / `mcp_add_codex_stdio` / `mcp_add_mimo_stdio` 配置到各工具
+3. 加入参数解析的 case 分支
+
+脚本幂等：已配置的服务器自动跳过，可安全重复执行。
+
+---
+
 ## 开发工具套件（devtools）
 
 仓库附带 `install_devtools.sh`，用于一键安装一组常用开发工具（独立于主 install.sh，可选执行）。这些工具记录自 Fedora 44 服务器（192.168.50.179）的实际安装需求，供新机器复现。
