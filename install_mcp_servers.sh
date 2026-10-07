@@ -234,30 +234,32 @@ install_filesystem_mcp() {
 }
 
 # Git MCP — 读取/搜索/操作 Git 仓库 (官方 PyPI 包, 用 uvx 运行)
-install_git_mcp() {
-    info "=== 安装 git MCP (Git 仓库操作) ==="
-    require_npx
-    if ! _has_bin uvx; then
-        # 优先官方独立安装器 (支持 uv self update)
-        local tpl=/tmp/uv-install.sh
-        if download_installer https://astral.sh/uv/install.sh "$tpl"; then
-            info "安装 uv (官方独立安装器)..."
-            sh "$tpl" 2>&1 | tail -2 || true
-            rm -f "$tpl"
+# 确保 uvx 可用 (官方独立安装器优先, 支持 uv self update)
+ensure_uvx() {
+    _has_bin uvx && return 0
+    local tpl=/tmp/uv-install.sh
+    if download_installer https://astral.sh/uv/install.sh "$tpl"; then
+        info "安装 uv (官方独立安装器)..."
+        sh "$tpl" 2>&1 | tail -2 || true
+        rm -f "$tpl"
+        export PATH="$HOME/.local/bin:$PATH"
+    else
+        warn "官方安装脚本不可用, 回退包管理器/pip (无自更新)"
+        if command -v brew >/dev/null 2>&1; then
+            brew install uv 2>&1 | tail -2 || true
+        elif command -v pip >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1; then
+            (command -v pip >/dev/null 2>&1 && pip install --user uv 2>&1 | tail -2) || \
+            (pip3 install --user uv 2>&1 | tail -2) || true
             export PATH="$HOME/.local/bin:$PATH"
-        else
-            warn "官方安装脚本不可用, 回退包管理器/pip (无自更新)"
-            if command -v brew >/dev/null 2>&1; then
-                brew install uv 2>&1 | tail -2 || true
-            elif command -v pip >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1; then
-                (command -v pip >/dev/null 2>&1 && pip install --user uv 2>&1 | tail -2) || \
-                (pip3 install --user uv 2>&1 | tail -2) || true
-                export PATH="$HOME/.local/bin:$PATH"
-            fi
         fi
     fi
     _has_bin uvx || die "无法安装 uvx, 请手动安装: pip install uv"
-    # 预热缓存 (避免首次连接超时)
+}
+
+install_git_mcp() {
+    info "=== 安装 git MCP (Git 仓库操作) ==="
+    require_npx
+    ensure_uvx
     info "预热 uvx 缓存..."
     uvx mcp-server-git --help >/dev/null 2>&1 || true
     local cmd=(uvx mcp-server-git)
@@ -295,6 +297,127 @@ install_codebase_memory_mcp() {
     ok "codebase-memory-mcp 配置完成 ($("$bin" --version 2>/dev/null | head -1))"
 }
 
+# Context7 MCP — 实时文档/代码示例检索 (Upstash 官方)
+# 无需 API Key 即可用; 有 CONTEXT7_API_KEY 时限流更高
+install_context7_mcp() {
+    info "=== 安装 Context7 MCP (实时文档检索) ==="
+    require_npx
+    local cmd=(npx --prefer-offline -y @upstash/context7-mcp)
+    mcp_add_all context7 "${cmd[@]}"
+    ok "Context7 MCP 配置完成 (@upstash/context7-mcp)"
+}
+
+# CodeGraph MCP — 跨语言代码图谱 (42 工具 / 38 语言)
+# 官方为全局安装: npm install -g @astudioplus/codegraph-mcp
+# 引擎由 postinstall 从 GitHub release 下载, npm 11 默认拦截脚本 -> 需 --allow-scripts
+install_codegraph_mcp() {
+    info "=== 安装 CodeGraph MCP (跨语言代码图谱) ==="
+    require_npx
+    local bin
+    bin="$(_resolve_codegraph_bin)"
+    if [ -z "$bin" ]; then
+        info "全局安装 @astudioplus/codegraph-mcp (含引擎下载)..."
+        npm install -g --allow-scripts=@astudioplus/codegraph-mcp \
+            @astudioplus/codegraph-mcp 2>&1 | tail -3 || true
+        bin="$(_resolve_codegraph_bin)"
+    fi
+    [ -n "$bin" ] || die "CodeGraph 安装失败 (npm 全局)"
+    # 引擎缺失时先试官方补拉命令
+    if ! "$bin" --help >/dev/null 2>&1; then
+        info "引擎缺失, 用官方命令补拉..."
+        npx --prefer-offline -y codegraph-mcp-fetch-engine 2>&1 | tail -3 || true
+    fi
+    # 官方补拉失败(如 GitHub CDN 不稳)时, 改用镜像下载并校验 SHA256
+    if ! "$bin" --help >/dev/null 2>&1; then
+        _codegraph_fetch_engine_mirror || warn "镜像补拉也失败, CodeGraph 可能不可用"
+    fi
+    mcp_add_all codegraph "$bin"
+    ok "CodeGraph MCP 配置完成 ($bin)"
+}
+
+# 通过镜像下载 CodeGraph 引擎并校验 SHA256
+# (官方 fetch-engine 直连 GitHub releases, 在部分网络下会中途截断)
+_codegraph_fetch_engine_mirror() {
+    local pkgdir engine_ver asset plat arch
+    pkgdir="$(npm root -g 2>/dev/null)/@astudioplus/codegraph-mcp"
+    [ -d "$pkgdir" ] || return 1
+
+    case "$(uname -s)" in Darwin) plat=darwin ;; *) plat=linux ;; esac
+    case "$(uname -m)" in
+        x86_64|amd64) arch=x64 ;;
+        aarch64|arm64) arch=arm64 ;;
+        *) return 1 ;;
+    esac
+    asset="codegraph-server-${plat}-${arch}"
+
+    # 从包内读取引擎版本 (与客户端版本独立)
+    engine_ver="$(grep -oE 'ENGINE_VERSION = "[^"]+"' "$pkgdir/bin/fetch-engine.js" 2>/dev/null \
+        | head -1 | sed 's/.*"\(.*\)"/\1/')"
+    [ -n "$engine_ver" ] || engine_ver="$(cat "$pkgdir/bin/.engine-version" 2>/dev/null)"
+    [ -n "$engine_ver" ] || { warn "无法确定引擎版本"; return 1; }
+
+    local base="https://github.com/codegraph-ai/CodeGraph/releases/download/v${engine_ver}"
+    local mirror
+    for mirror in "https://ghfast.top/" "https://gh-proxy.com/" ""; do
+        info "镜像补拉引擎: ${mirror:-直连} (v${engine_ver}/${asset})"
+        if curl -fsSL --retry 3 --retry-all-errors --connect-timeout 20 \
+                -o /tmp/cbm-engine "${mirror}${base}/${asset}" 2>/dev/null; then
+            break
+        fi
+    done
+    [ -s /tmp/cbm-engine ] || return 1
+
+    # 校验 SHA256 (失败则拒绝安装)
+    if curl -fsSL --connect-timeout 15 -o /tmp/cbm-engine.sha256 "${base}/${asset}.sha256" 2>/dev/null; then
+        local want got
+        want="$(awk '{print $1}' /tmp/cbm-engine.sha256)"
+        got="$(sha256sum /tmp/cbm-engine | awk '{print $1}')"
+        if [ -n "$want" ] && [ "$want" != "$got" ]; then
+            warn "引擎 SHA256 校验失败 (want=$want got=$got), 拒绝安装"
+            return 1
+        fi
+        info "引擎 SHA256 校验通过"
+    else
+        warn "未能获取 .sha256, 跳过校验"
+    fi
+
+    install -m 755 /tmp/cbm-engine "$pkgdir/bin/$asset" || return 1
+    printf '%s\n' "$engine_ver" > "$pkgdir/bin/.engine-version"
+    rm -f /tmp/cbm-engine /tmp/cbm-engine.sha256 "$pkgdir/bin/"*.partial 2>/dev/null || true
+    ok "引擎已安装: $pkgdir/bin/$asset"
+    return 0
+}
+
+# 定位 codegraph-mcp 可执行文件
+_resolve_codegraph_bin() {
+    if command -v codegraph-mcp >/dev/null 2>&1; then
+        command -v codegraph-mcp; return 0
+    fi
+    local f
+    for f in "$HOME"/.nvm/versions/node/*/bin/codegraph-mcp; do
+        [ -x "$f" ] && { echo "$f"; return 0; }
+    done
+    return 1
+}
+
+# Serena MCP — 语义代码检索/编辑 (oraios 官方, PyPI serena-agent, uvx 运行)
+# 按客户端传入对应 --context, 使 Serena 的工具集与提示词适配该代理
+install_serena_mcp() {
+    info "=== 安装 Serena MCP (语义代码检索/编辑) ==="
+    require_npx
+    ensure_uvx
+    info "预热 uvx 缓存 (首次会下载依赖, 可能较慢)..."
+    uvx --from serena-agent serena --help >/dev/null 2>&1 || true
+
+    mcp_add_claude_stdio serena uvx --from serena-agent serena start-mcp-server \
+        --context claude-code --project-from-cwd
+    mcp_add_codex_stdio serena uvx --from serena-agent serena start-mcp-server \
+        --context codex --project-from-cwd
+    mcp_add_mimo_stdio serena uvx --from serena-agent serena start-mcp-server \
+        --context agent --project-from-cwd
+    ok "Serena MCP 配置完成 (uvx --from serena-agent serena)"
+}
+
 # ---------------------------------------------------------------------------
 # TUI 相关 (复用 tui_module.sh 通用库)
 # ---------------------------------------------------------------------------
@@ -306,7 +429,7 @@ load_tui_module() {
 }
 
 # MCP 组件定义 (覆盖 tui_module.sh 默认)
-MCP_IDS_AVAILABLE=(filesystem git memory codebase-memory-mcp)
+MCP_IDS_AVAILABLE=(filesystem git memory codebase-memory-mcp context7 codegraph serena)
 
 claude_has_mcp() {
     claude_user_has_mcp "$1"
@@ -333,6 +456,9 @@ tui_component_name() {
         git)                 echo "git MCP (Git 仓库操作)" ;;
         memory)              echo "memory MCP (持久记忆)" ;;
         codebase-memory-mcp) echo "codebase-memory MCP (代码知识图谱)" ;;
+        context7)            echo "Context7 MCP (实时文档检索)" ;;
+        codegraph)           echo "CodeGraph MCP (跨语言代码图谱)" ;;
+        serena)              echo "Serena MCP (语义检索/编辑)" ;;
         *)                   echo "$1" ;;
     esac
 }
@@ -360,6 +486,9 @@ usage() {
     echo "  git                  - Git 仓库操作"
     echo "  memory               - 知识图谱持久记忆"
     echo "  codebase-memory-mcp  - 代码库知识图谱 (158 语言, 子毫秒查询)"
+    echo "  context7             - 实时文档/代码示例检索 (Upstash)"
+    echo "  codegraph            - 跨语言代码图谱 (42 工具 / 38 语言)"
+    echo "  serena               - 语义代码检索与编辑 (oraios)"
     echo
     echo "环境变量:"
     echo "  FILESYSTEM_DIRS  自定义 filesystem 可访问目录 (空格分隔)"
@@ -398,7 +527,7 @@ while [[ $# -gt 0 ]]; do
         -h|--help)   usage ;;
         *)
             case "$1" in
-                filesystem|git|memory|codebase-memory-mcp) TARGETS+=("$1"); shift ;;
+                filesystem|git|memory|codebase-memory-mcp|context7|codegraph|serena) TARGETS+=("$1"); shift ;;
                 *) die "未知 MCP 服务器: $1 (可用: ${MCP_IDS_AVAILABLE[*]})" ;;
             esac
             ;;
@@ -441,6 +570,9 @@ for t in "${TARGETS[@]}"; do
         git)                 install_git_mcp ;;
         memory)              install_memory_mcp ;;
         codebase-memory-mcp) install_codebase_memory_mcp ;;
+        context7)            install_context7_mcp ;;
+        codegraph)           install_codegraph_mcp ;;
+        serena)              install_serena_mcp ;;
     esac
 done
 ok "全部 MCP 服务器安装完成!"

@@ -91,6 +91,9 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 | **git** | Git 仓库读取/搜索/操作 | `uvx mcp-server-git`（PyPI 官方包） |
 | **memory** | 知识图谱持久记忆 | `npx @modelcontextprotocol/server-memory` |
 | **codebase-memory-mcp** | 代码库知识图谱（158 语言，子毫秒查询） | 官方静态二进制 `codebase-memory-mcp` |
+| **context7** | 实时文档/代码示例检索（Upstash） | `npx @upstash/context7-mcp` |
+| **codegraph** | 跨语言代码图谱（42 工具 / 38 语言） | `npm i -g @astudioplus/codegraph-mcp` + 引擎 |
+| **serena** | 语义代码检索与编辑（oraios） | `uvx --from serena-agent serena start-mcp-server` |
 
 ### 用法
 
@@ -101,6 +104,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install_mcp_servers.sh filesystem      # 只装 filesystem MCP
 ./install_mcp_servers.sh git memory      # 装多个 MCP
 ./install_mcp_servers.sh codebase-memory-mcp   # 代码知识图谱
+./install_mcp_servers.sh context7 codegraph serena  # 文档检索 + 代码图谱 + 语义检索
 ```
 
 ### TUI 交互式选择
