@@ -133,6 +133,23 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 ---
 
 
+### 安装路径原则
+
+脚本**优先使用官方安装路径**（官方维护，支持自助升级），官方不可用时回退备用方式：
+
+| 工具 | 首选（官方） | 回退 | 说明 |
+|---|---|---|---|
+| **Claude Code** | `claude.ai/install.sh` | npm | npm 方式官方已标记 deprecated；官方脚本在部分区域被封锁时会自动回退 |
+| **Codex CLI** | npm `@openai/codex` | — | 官方推荐即 npm / Homebrew / 二进制 |
+| **MiMo Code** | `mimo.xiaomi.com/install` | npm | 官方脚本装到 `~/.mimocode/bin`，支持 `mimo upgrade` |
+| **uv / uvx** | `astral.sh/uv/install.sh` | pip / brew | 官方独立安装器支持 `uv self update`；pip 方式会禁用自更新 |
+| **codebase-memory-mcp** | 官方 `install.sh` | — | 支持 `codebase-memory-mcp update` |
+| **nvm / pyenv / Zed / VS Code / Ghostty / ChatGPT** | 各自官方脚本或仓库 | — | — |
+
+> 安全细节：所有 `curl ... | bash` 类安装器都会先下载到临时文件并**校验是否为合法脚本**（拒绝 HTML 错误页/区域限制页），再执行。
+
+---
+
 ## 开发工具套件（devtools）
 
 仓库附带 `install_devtools.sh`，用于一键安装一组常用开发工具（独立于主 install.sh，可选执行）。这些工具记录自 Fedora 44 服务器（192.168.50.179）的实际安装需求，供新机器复现。

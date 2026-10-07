@@ -180,6 +180,18 @@ load_nvm() {
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 }
 
+# 下载安装脚本并校验 (避免把 HTML 错误页/区域限制页当脚本执行)
+# 返回 0 = 拿到合法脚本, 1 = 失败(网络/HTML/非脚本)
+download_installer() {
+    local url="$1" out="$2"
+    curl -fsSL "$url" -o "$out" 2>/dev/null || return 1
+    [ -s "$out" ] || return 1
+    head -c 200 "$out" | grep -qiE '<html|<!doctype|<script' && return 1
+    head -1 "$out" | grep -qE '^#!' || return 1
+    return 0
+}
+
+
 # 加载 pyenv 到当前 shell
 load_pyenv() {
     export PYENV_ROOT="${PYENV_ROOT:-$HOME/.pyenv}"
@@ -319,8 +331,19 @@ install_ai() {
     if command -v claude >/dev/null 2>&1; then
         info "Claude Code 已安装: $(claude --version 2>/dev/null | head -1), 跳过"
     else
-        info "安装 Claude Code (@anthropic-ai/claude-code)..."
-        npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code
+        # 优先官方安装脚本 (npm 方式已被官方标记 deprecated)
+        local tpl=/tmp/claude-install.sh
+        if download_installer https://claude.ai/install.sh "$tpl"; then
+            info "安装 Claude Code (官方脚本)..."
+            bash "$tpl" 2>&1 | tail -3 || true
+            rm -f "$tpl"
+            export PATH="$HOME/.local/bin:$PATH"
+        else
+            warn "官方安装脚本不可用 (网络/区域限制), 使用 npm (deprecated)"
+        fi
+        if ! command -v claude >/dev/null 2>&1; then
+            npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code || true
+        fi
     fi
 
     if command -v codex >/dev/null 2>&1; then
@@ -496,17 +519,30 @@ install_mimo() {
     info "=== 安装 MiMo Code (小米 AI 编程助手) ==="
 
     load_nvm
-    command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node)"
+    # 官方安装路径 (~/.mimocode/bin) 与用户级 bin
+    export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PATH"
 
     if command -v mimo >/dev/null 2>&1; then
         info "MiMo Code 已安装: $(mimo --version 2>/dev/null | head -1)"
     else
-        info "安装 @mimo-ai/cli..."
-        npm install -g --allow-scripts=@mimo-ai/cli @mimo-ai/cli
+        # 官方脚本 (macOS/Linux 推荐; Windows 官方为 npm)
+        local tpl=/tmp/mimo-install.sh
+        if download_installer https://mimo.xiaomi.com/install "$tpl"; then
+            info "安装 MiMo Code (官方脚本)..."
+            bash "$tpl" 2>&1 | tail -3 || true
+            rm -f "$tpl"
+            export PATH="$HOME/.local/bin:$PATH"
+        else
+            warn "官方安装脚本不可用, 回退 npm"
+        fi
+        if ! command -v mimo >/dev/null 2>&1; then
+            command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node) 或手动安装 MiMo Code"
+            npm install -g --allow-scripts=@mimo-ai/cli @mimo-ai/cli || true
+        fi
     fi
 
     if ! command -v mimo >/dev/null 2>&1; then
-        die "MiMo Code 安装失败, 请检查 npm 和网络"
+        die "MiMo Code 安装失败, 请检查网络"
     fi
 
     ok "MiMo Code 配置完成: $(mimo --version 2>/dev/null | head -1)"

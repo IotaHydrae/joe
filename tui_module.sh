@@ -42,6 +42,8 @@ tui_available() {
 _tui_has_bin() {
     local name="$1"
     command -v "$name" >/dev/null 2>&1 && return 0
+    [ -x "$HOME/.local/bin/$name" ] && return 0
+    [ -x "$HOME/.mimocode/bin/$name" ] && return 0   # MiMo Code 官方安装路径
     local f
     for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
         [ -x "$f" ] && return 0

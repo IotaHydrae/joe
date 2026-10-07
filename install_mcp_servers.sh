@@ -52,11 +52,24 @@ load_nvm() {
     return 0
 }
 
+# 下载安装脚本并校验 (避免把 HTML 错误页/区域限制页当脚本执行)
+# 返回 0 = 拿到合法脚本, 1 = 失败(网络/HTML/非脚本)
+download_installer() {
+    local url="$1" out="$2"
+    curl -fsSL "$url" -o "$out" 2>/dev/null || return 1
+    [ -s "$out" ] || return 1
+    head -c 200 "$out" | grep -qiE '<html|<!doctype|<script' && return 1
+    head -1 "$out" | grep -qE '^#!' || return 1
+    return 0
+}
+
+
 # 命令探测: 优先 PATH, 其次 nvm 的 node 版本目录与 ~/.local/bin
 _has_bin() {
     local name="$1"
     command -v "$name" >/dev/null 2>&1 && return 0
     [ -x "$HOME/.local/bin/$name" ] && return 0
+    [ -x "$HOME/.mimocode/bin/$name" ] && return 0   # MiMo Code 官方安装路径
     local f
     for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
         [ -x "$f" ] && return 0
@@ -225,16 +238,22 @@ install_git_mcp() {
     info "=== 安装 git MCP (Git 仓库操作) ==="
     require_npx
     if ! _has_bin uvx; then
-        info "安装 uv (提供 uvx)..."
-        if command -v pip >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1; then
-            (command -v pip >/dev/null 2>&1 && pip install --user uv 2>&1 | tail -2) || \
-            (pip3 install --user uv 2>&1 | tail -2)
+        # 优先官方独立安装器 (支持 uv self update)
+        local tpl=/tmp/uv-install.sh
+        if download_installer https://astral.sh/uv/install.sh "$tpl"; then
+            info "安装 uv (官方独立安装器)..."
+            sh "$tpl" 2>&1 | tail -2 || true
+            rm -f "$tpl"
             export PATH="$HOME/.local/bin:$PATH"
-        elif command -v brew >/dev/null 2>&1; then
-            brew install uv 2>&1 | tail -2
         else
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            export PATH="$HOME/.local/bin:$PATH"
+            warn "官方安装脚本不可用, 回退包管理器/pip (无自更新)"
+            if command -v brew >/dev/null 2>&1; then
+                brew install uv 2>&1 | tail -2 || true
+            elif command -v pip >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1; then
+                (command -v pip >/dev/null 2>&1 && pip install --user uv 2>&1 | tail -2) || \
+                (pip3 install --user uv 2>&1 | tail -2) || true
+                export PATH="$HOME/.local/bin:$PATH"
+            fi
         fi
     fi
     _has_bin uvx || die "无法安装 uvx, 请手动安装: pip install uv"
@@ -329,8 +348,8 @@ tui_select() {
 # ---------------------------------------------------------------------------
 # 参数解析 / 主流程
 # ---------------------------------------------------------------------------
-# 确保 AI CLI 在 PATH 中 (nvm 环境 + ~/.local/bin)
-export PATH="$HOME/.local/bin:$PATH"
+# 确保 AI CLI 在 PATH 中 (nvm 环境 + 官方 MiMo 路径 + ~/.local/bin)
+export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PATH"
 load_nvm
 
 usage() {
