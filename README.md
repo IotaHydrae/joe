@@ -73,6 +73,110 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 
 
+## MCP 怎么用？会不会自动调用？
+
+**结论：会自己调用，但"自动"的程度差别很大。** 而且有一个关键真相：
+**代理的内置工具通常会把 MCP 挤掉**——有内置 Read/Write/Bash 时，代理往往不去调 filesystem/git MCP。
+
+### 实测：各 MCP 暴露的工具数量
+
+| MCP | 工具数 | 自动调用程度 |
+|---|---:|---|
+| `codegraph` | 42 | 需先索引 |
+| `serena` | 23 | 需先激活项目 |
+| `codebase-memory-mcp` | 17 | 需先索引 |
+| `filesystem` | 14 | 常被内置工具挤掉 |
+| `git` | 12 | 常被内置工具挤掉 |
+| `memory` | 9 | 半自动，建议明确说"记住…" |
+| `context7` | 2 | 建议明确点名 |
+| **合计** | **119** | |
+
+### 三类触发情况
+
+**① 基本全自动**
+- `context7` — 问"XX 库最新 API"时可能用，但描述泛，代理常直接 WebFetch 绕过。**建议点名**。
+
+**② 会被内置工具挤掉**
+- `filesystem` / `git` — 代理自带的 Read/Write/Bash 更顺手，通常不会调这两个。
+  真正有用的场景是内置做不到的：`search_files`（按大小/时间筛）、`directory_tree`（整棵树）、
+  `list_allowed_directories`、`git_diff_staged`、`git_show`。
+
+**③ 必须先"准备"，否则是空壳** ⚠️
+
+| MCP | 必须先做 | 之后才能 |
+|---|---|---|
+| `codebase-memory-mcp` | `index_repository` | `trace_path` 调用链、`search_graph` 找符号、`detect_changes` 影响面 |
+| `codegraph` | `codegraph_index_directory` | `analyze_impact`、`find_circular_deps`、`find_dead_imports` |
+| `serena` | `activate_project` | `find_symbol`、`rename_symbol`、`find_referencing_symbols` |
+
+> **首次在一个项目里使用，必须主动触发一次索引**——否则图谱查询返回空。
+
+### ⚠️ 119 个工具是负担
+
+7 个 server 共 119 个工具，每次请求都要带上全部工具定义，占用可观的上下文。
+**工具一多，代理选择时反而容易"看不见"或选错。**
+
+如果发现代理老是不用 MCP，先考虑精简：
+
+```bash
+claude mcp list                       # 看当前有哪些
+claude mcp remove -s user serena      # 暂时拿掉不常用的
+```
+
+### ✅ 最有效的办法：放进项目的规则文件
+
+别指望代理"自己想起来"。用 `templates/` 里的规则文件，**每个会话都会加载**：
+
+```bash
+cd /your/project
+cp ~/iotahydrae/joe/templates/AGENTS.md .
+cp ~/iotahydrae/joe/templates/CLAUDE.md .
+```
+
+| 文件 | 谁读 |
+|---|---|
+| `AGENTS.md` | Codex、MiMo Code 原生读取；Claude Code 也支持 |
+| `CLAUDE.md` | 内容是 `@AGENTS.md`，规则只维护一份 |
+
+> ⚠️ **一个容易踩的坑**：Claude Code 虽然原生支持 `AGENTS.md`，
+> 但**项目里存在 `CLAUDE.md` 时默认会忽略 `AGENTS.md`**。所以两者都放最稳妥——
+> 或者在你已有的 `CLAUDE.md` 末尾加一行 `@AGENTS.md`（**别覆盖原文件**）。
+
+详见 [`templates/README.md`](templates/README.md)。也可以放到全局位置（`~/.claude/CLAUDE.md` 等）对所有项目生效。
+
+### 怎么确认真的调用了？
+
+在 Claude Code 会话里输入 `/mcp` 看连接状态。调用发生时会看到 `mcp__` 前缀：
+
+```
+mcp__codebase-memory-mcp__trace_path(direction="inbound", ...)
+```
+
+一直没看到 `mcp__` 前缀 = 没被调用。
+
+### 推荐起手式
+
+```bash
+cd /your/project
+
+# 1) 首次: 建立索引 (一次就够, 大改动后重建)
+> 索引这个项目
+
+# 2) 之后正常提问, 让它自己选工具
+> 这个函数被哪些地方调用了?
+> 我要改这个接口, 影响面有多大?
+> 有没有循环依赖?
+
+# 3) 需要精确控制时点名
+> 用 serena 把所有 get_user_* 重命名成 fetch_user_*
+> 用 context7 查一下 React 19 的 use() 怎么用
+```
+
+> 我们安装的 `code-exploration` 技能也在做同样的事，但它要代理判断"相关"才加载，
+> 属于第二层保险。**项目根目录的规则文件是第一层，最直接。**
+
+---
+
 ## 跨发行版支持
 
 脚本不绑定某一个发行版。已用容器实测的发行版：
