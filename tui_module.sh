@@ -37,18 +37,30 @@ tui_available() {
     [ -t 1 ] && [ -t 0 ]
 }
 
+# 命令探测: 优先 PATH, 其次 nvm 的 node 版本目录
+# (非交互 shell 下 PATH 往往不含 nvm/pyenv, 仅用 command -v 会误判)
+_tui_has_bin() {
+    local name="$1"
+    command -v "$name" >/dev/null 2>&1 && return 0
+    local f
+    for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
+        [ -x "$f" ] && return 0
+    done
+    return 1
+}
+
 # 默认已安装检测 (devtools); 调用方可预先定义覆盖
 if ! declare -F tui_component_installed >/dev/null 2>&1; then
     tui_component_installed() {
         local id="$1"
         case "$id" in
-            node)     [ -d "$HOME/.nvm" ] && command -v node >/dev/null 2>&1 ;;
-            python)   [ -d "$HOME/.pyenv" ] && command -v pyenv >/dev/null 2>&1 ;;
-            ai)       command -v claude >/dev/null 2>&1 && command -v codex >/dev/null 2>&1 ;;
+            node)     _tui_has_bin node ;;
+            python)   [ -x "$HOME/.pyenv/bin/pyenv" ] || command -v pyenv >/dev/null 2>&1 ;;
+            ai)       _tui_has_bin claude && _tui_has_bin codex ;;
             zed)      [ -x "$HOME/.local/bin/zed" ] || command -v zed >/dev/null 2>&1 ;;
             ghostty)  command -v ghostty >/dev/null 2>&1 ;;
             vscode)   command -v code >/dev/null 2>&1 ;;
-            mimo)     command -v mimo >/dev/null 2>&1 ;;
+            mimo)     _tui_has_bin mimo ;;
             chatgpt)  command -v chatgpt >/dev/null 2>&1 ;;
             ccswitch) command -v cc-switch >/dev/null 2>&1 ;;
             *)        return 1 ;;

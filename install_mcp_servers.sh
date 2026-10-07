@@ -48,10 +48,21 @@ load_nvm() {
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 }
 
+# 命令探测: 优先 PATH, 其次 nvm 的 node 版本目录
+_has_bin() {
+    local name="$1"
+    command -v "$name" >/dev/null 2>&1 && return 0
+    local f
+    for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
+        [ -x "$f" ] && return 0
+    done
+    return 1
+}
+
 # 检测已安装的 AI CLI
-has_claude() { command -v claude >/dev/null 2>&1; }
-has_codex()  { command -v codex  >/dev/null 2>&1; }
-has_mimo()   { command -v mimo   >/dev/null 2>&1; }
+has_claude() { _has_bin claude; }
+has_codex()  { _has_bin codex; }
+has_mimo()   { _has_bin mimo; }
 
 # npx 是否可用 (需要 Node)
 require_npx() {
