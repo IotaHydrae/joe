@@ -16,13 +16,14 @@
 #
 # 新增 MCP 服务器:
 #   1. 添加 install_<name>_mcp() 函数
-#   2. 加入 TUI_IDS / tui_component_installed / tui_component_name
+#   2. 把 id 加入 MCP_IDS_AVAILABLE, 并在 tui_component_installed / _name 中登记
 #   3. 加入参数解析 case 与主流程 case
 #
 # 依赖: git, curl, npx (Node 18+), 已装的 AI CLI (claude/codex/mimo)
 # 说明:
 #   - 幂等: 已配置的服务器自动跳过
 #   - 所有外网下载尊重 https_proxy/http_proxy 环境变量
+#   - npx 一律带 --prefer-offline, 避免无代理时联网检查超时
 # =============================================================================
 
 set -euo pipefail
@@ -31,8 +32,8 @@ set -euo pipefail
 # 配置
 # ---------------------------------------------------------------------------
 PROXY_URL="${PROXY_URL:-}"
+CBM_VARIANT="${CBM_VARIANT:-}"          # 设为 ui 时安装带图谱可视化的版本
 
-# 本脚本目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ---------------------------------------------------------------------------
@@ -45,13 +46,17 @@ die()   { printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
 
 load_nvm() {
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    if [ -s "$NVM_DIR/nvm.sh" ]; then
+        \. "$NVM_DIR/nvm.sh"
+    fi
+    return 0
 }
 
-# 命令探测: 优先 PATH, 其次 nvm 的 node 版本目录
+# 命令探测: 优先 PATH, 其次 nvm 的 node 版本目录与 ~/.local/bin
 _has_bin() {
     local name="$1"
     command -v "$name" >/dev/null 2>&1 && return 0
+    [ -x "$HOME/.local/bin/$name" ] && return 0
     local f
     for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
         [ -x "$f" ] && return 0
@@ -59,25 +64,37 @@ _has_bin() {
     return 1
 }
 
-# 检测已安装的 AI CLI
 has_claude() { _has_bin claude; }
 has_codex()  { _has_bin codex; }
 has_mimo()   { _has_bin mimo; }
 
-# npx 是否可用 (需要 Node)
 require_npx() {
     load_nvm
-    command -v npx >/dev/null 2>&1 || die "需要 Node/npx (请先运行 install_devtools.sh --node)"
+    _has_bin npx || die "需要 Node/npx (请先运行 install_devtools.sh --node)"
 }
 
 # ---------------------------------------------------------------------------
 # 配置目标: Claude Code (user 全局作用域)
 # ---------------------------------------------------------------------------
+# 只看 user 作用域 (~/.claude.json 顶层 mcpServers), 不依赖 `claude mcp list`
+# ——后者会混入 project/local 作用域, 导致误判"已配置"而漏加全局配置
+claude_user_has_mcp() {
+    local name="$1"
+    [ -f "$HOME/.claude.json" ] || return 1
+    python3 - "$HOME/.claude.json" "$name" << 'PYEOF'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    sys.exit(1)
+sys.exit(0 if sys.argv[2] in (d.get("mcpServers") or {}) else 1)
+PYEOF
+}
+
 mcp_add_claude_stdio() {
     local name="$1"; shift
     has_claude || { warn "未安装 claude, 跳过 Claude Code 配置"; return 0; }
-    # claude mcp list 默认含 user 作用域 (不传 -s, 该参数不支持)
-    if claude mcp list 2>/dev/null | grep -q "^${name}:"; then
+    if claude_user_has_mcp "$name"; then
         info "Claude Code(user): ${name} 已配置, 跳过"
     else
         claude mcp add -s user "$name" -- "$@" 2>&1 | tail -2 || true
@@ -106,37 +123,75 @@ mcp_add_mimo_stdio() {
     local name="$1"; shift
     has_mimo || { warn "未安装 mimo, 跳过 MiMo Code 配置"; return 0; }
     local cfg="${MIMO_CONFIG:-$HOME/.config/mimocode/mimocode.jsonc}"
-    if [ -f "$cfg" ] && grep -q "\"$name\"" "$cfg" 2>/dev/null; then
-        info "MiMo Code: ${name} 已配置, 跳过"
-        return 0
-    fi
     mkdir -p "$(dirname "$cfg")"
     if [ ! -f "$cfg" ]; then
         printf '{\n  "$schema": "https://mimo.xiaomi.com/mimocode/config.json"\n}\n' > "$cfg"
     fi
-    # 用 python 注入 MCP 配置 (保证 JSONC 合法)
-    python3 - "$cfg" "$name" "$@" << 'PYEOF'
-import json, sys, os
+    # 用 python 注入 (先严格 JSON, 失败再用字符串感知的 jsonc 解析)
+    local result
+    result=$(python3 - "$cfg" "$name" "$@" << 'PYEOF'
+import json, re, sys
+
+def strip_jsonc(text):
+    """去 // 与 /* */ 注释, 正确跳过字符串内部 (避免误伤 https://)。"""
+    out, i, n, in_str = [], 0, len(text), False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == '\\' and i + 1 < n:
+                out.append(text[i + 1]); i += 2; continue
+            if c == '"':
+                in_str = False
+            i += 1; continue
+        if c == '"':
+            in_str = True; out.append(c); i += 1; continue
+        if c == '/' and i + 1 < n and text[i + 1] == '/':
+            j = text.find('\n', i)
+            i = n if j == -1 else j
+            continue
+        if c == '/' and i + 1 < n and text[i + 1] == '*':
+            j = text.find('*/', i + 2)
+            i = n if j == -1 else j + 2
+            continue
+        out.append(c); i += 1
+    return ''.join(out)
+
 cfg, name = sys.argv[1], sys.argv[2]
 cmd = sys.argv[3:]
-s = open(cfg, encoding="utf-8").read()
-if f'"{name}"' in s:
+raw = open(cfg, encoding="utf-8").read()
+data = None
+if raw.strip():
+    try:
+        data = json.loads(raw)                      # 严格 JSON 优先
+    except Exception:
+        txt = strip_jsonc(raw)
+        txt = re.sub(r',(\s*[}\]])', r'\1', txt)    # 去尾随逗号
+        try:
+            data = json.loads(txt)
+        except Exception:
+            sys.stderr.write("warning: 无法解析 %s, 将重建配置\n" % cfg)
+            data = None
+if not isinstance(data, dict):
+    data = {}
+data.setdefault("$schema", "https://mimo.xiaomi.com/mimocode/config.json")
+mcp = data.get("mcp")
+if not isinstance(mcp, dict):
+    mcp = {}
+    data["mcp"] = mcp
+if name in mcp:
     print("already present")
     sys.exit(0)
-import re
-# 简单解析: 检查是否有 mcp 字段
-if '"mcp"' not in s:
-    entry = '\n  "mcp": {\n    "%s": {\n      "type": "local",\n      "command": %s,\n      "enabled": true\n    }\n  },' % (name, json.dumps(cmd))
-    s = s.replace('{', '{\n' + entry, 1)
-else:
-    # 在 mcp 对象中追加 (简化处理: 在最后一个 } 前插入)
-    entry = '    "%s": {\n      "type": "local",\n      "command": %s,\n      "enabled": true\n    },\n' % (name, json.dumps(cmd))
-    idx = s.rindex('}')
-    s = s[:idx] + entry + s[idx:]
-open(cfg, "w", encoding="utf-8").write(s)
+mcp[name] = {"type": "local", "command": cmd, "enabled": True}
+open(cfg, "w", encoding="utf-8").write(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 print("added")
 PYEOF
-    ok "MiMo Code: ${name} MCP 已添加 (${cfg})"
+)
+    if [ "$result" = "added" ]; then
+        ok "MiMo Code: ${name} MCP 已添加 (${cfg})"
+    else
+        info "MiMo Code: ${name} 已配置, 跳过"
+    fi
 }
 
 # 统一入口: 添加到所有已安装的 AI CLI
@@ -160,7 +215,7 @@ install_filesystem_mcp() {
     else
         dirs=("$HOME" "/tmp")
     fi
-    local cmd=(npx -y @modelcontextprotocol/server-filesystem "${dirs[@]}")
+    local cmd=(npx --prefer-offline -y @modelcontextprotocol/server-filesystem "${dirs[@]}")
     mcp_add_all filesystem "${cmd[@]}"
     ok "filesystem MCP 配置完成 (可访问: ${dirs[*]})"
 }
@@ -169,8 +224,7 @@ install_filesystem_mcp() {
 install_git_mcp() {
     info "=== 安装 git MCP (Git 仓库操作) ==="
     require_npx
-    # 需要 uvx (uv 的 Runner)
-    if ! command -v uvx >/dev/null 2>&1; then
+    if ! _has_bin uvx; then
         info "安装 uv (提供 uvx)..."
         if command -v pip >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1; then
             (command -v pip >/dev/null 2>&1 && pip install --user uv 2>&1 | tail -2) || \
@@ -179,12 +233,14 @@ install_git_mcp() {
         elif command -v brew >/dev/null 2>&1; then
             brew install uv 2>&1 | tail -2
         else
-            # 官方安装脚本
             curl -LsSf https://astral.sh/uv/install.sh | sh
             export PATH="$HOME/.local/bin:$PATH"
         fi
     fi
-    command -v uvx >/dev/null 2>&1 || die "无法安装 uvx, 请手动安装: pip install uv"
+    _has_bin uvx || die "无法安装 uvx, 请手动安装: pip install uv"
+    # 预热缓存 (避免首次连接超时)
+    info "预热 uvx 缓存..."
+    uvx mcp-server-git --help >/dev/null 2>&1 || true
     local cmd=(uvx mcp-server-git)
     mcp_add_all git "${cmd[@]}"
     ok "git MCP 配置完成 (uvx mcp-server-git)"
@@ -194,9 +250,30 @@ install_git_mcp() {
 install_memory_mcp() {
     info "=== 安装 memory MCP (持久记忆) ==="
     require_npx
-    local cmd=(npx -y @modelcontextprotocol/server-memory)
+    local cmd=(npx --prefer-offline -y @modelcontextprotocol/server-memory)
     mcp_add_all memory "${cmd[@]}"
     ok "memory MCP 配置完成"
+}
+
+# codebase-memory-mcp — 代码库知识图谱 (DeusData, 纯 C 静态二进制)
+# 官方安装器会自动配置 claude/codex/zed/vscode 等; MiMo 需手动补
+install_codebase_memory_mcp() {
+    info "=== 安装 codebase-memory-mcp (代码知识图谱) ==="
+    local bin="$HOME/.local/bin/codebase-memory-mcp"
+    if [ -x "$bin" ]; then
+        info "codebase-memory-mcp 已安装: $("$bin" --version 2>/dev/null | head -1)"
+    else
+        info "运行官方安装脚本 (自动配置已支持的 AI 代理)..."
+        local args=""
+        [ "$CBM_VARIANT" = "ui" ] && args="--ui"
+        curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh \
+            | bash -s -- $args
+    fi
+    [ -x "$bin" ] || die "codebase-memory-mcp 安装失败"
+
+    # 官方安装器已配置 claude/codex; 这里统一确保三个工具都有 (幂等)
+    mcp_add_all codebase-memory-mcp "$bin"
+    ok "codebase-memory-mcp 配置完成 ($("$bin" --version 2>/dev/null | head -1))"
 }
 
 # ---------------------------------------------------------------------------
@@ -204,54 +281,43 @@ install_memory_mcp() {
 # ---------------------------------------------------------------------------
 load_tui_module() {
     local module="$SCRIPT_DIR/tui_module.sh"
-    if [ ! -f "$module" ]; then
-        return 1
-    fi
+    [ -f "$module" ] || return 1
     # shellcheck disable=SC1091
     . "$module"
 }
 
 # MCP 组件定义 (覆盖 tui_module.sh 默认)
-MCP_IDS_AVAILABLE=(filesystem git memory)
+MCP_IDS_AVAILABLE=(filesystem git memory codebase-memory-mcp)
 
-# 检测 claude 是否已配置某 MCP (claude mcp list 默认含 user 作用域)
 claude_has_mcp() {
-    has_claude || return 1
-    claude mcp list 2>/dev/null | grep -q "^$1:"
+    claude_user_has_mcp "$1"
+}
+
+codex_has_mcp() {
+    has_codex || return 1
+    codex mcp list 2>/dev/null | grep -qE "^\s*$1\s"
+}
+
+mimo_has_mcp() {
+    has_mimo || return 1
+    grep -q "\"$1\"" "${MIMO_CONFIG:-$HOME/.config/mimocode/mimocode.jsonc}" 2>/dev/null
 }
 
 tui_component_installed() {
     local id="$1"
-    case "$id" in
-        filesystem)
-            claude_has_mcp filesystem || \
-            ( has_codex && codex mcp list 2>/dev/null | grep -qE "^\s*filesystem\s" ) || \
-            ( has_mimo && grep -q '"filesystem"' "$HOME/.config/mimocode/mimocode.jsonc" 2>/dev/null )
-            ;;
-        git)
-            claude_has_mcp git || \
-            ( has_codex && codex mcp list 2>/dev/null | grep -qE "^\s*git\s" ) || \
-            ( has_mimo && grep -q '"git"' "$HOME/.config/mimocode/mimocode.jsonc" 2>/dev/null )
-            ;;
-        memory)
-            claude_has_mcp memory || \
-            ( has_codex && codex mcp list 2>/dev/null | grep -qE "^\s*memory\s" ) || \
-            ( has_mimo && grep -q '"memory"' "$HOME/.config/mimocode/mimocode.jsonc" 2>/dev/null )
-            ;;
-        *) return 1 ;;
-    esac
+    claude_has_mcp "$id" || codex_has_mcp "$id" || mimo_has_mcp "$id"
 }
 
 tui_component_name() {
     case "$1" in
-        filesystem) echo "filesystem MCP (安全文件操作)" ;;
-        git)        echo "git MCP (Git 仓库操作)" ;;
-        memory)     echo "memory MCP (持久记忆)" ;;
-        *)          echo "$1" ;;
+        filesystem)          echo "filesystem MCP (安全文件操作)" ;;
+        git)                 echo "git MCP (Git 仓库操作)" ;;
+        memory)              echo "memory MCP (持久记忆)" ;;
+        codebase-memory-mcp) echo "codebase-memory MCP (代码知识图谱)" ;;
+        *)                   echo "$1" ;;
     esac
 }
 
-# 运行 TUI, 通过全局变量 TUI_SELECTED 返回选中 id 列表
 tui_select() {
     TUI_IDS=("${MCP_IDS_AVAILABLE[@]}")
     TUI_TITLE="joe MCP 服务器安装选择"
@@ -263,22 +329,28 @@ tui_select() {
 # ---------------------------------------------------------------------------
 # 参数解析 / 主流程
 # ---------------------------------------------------------------------------
-# 确保 AI CLI 在 PATH 中 (nvm 环境)
-load_nvm || true
+# 确保 AI CLI 在 PATH 中 (nvm 环境 + ~/.local/bin)
+export PATH="$HOME/.local/bin:$PATH"
+load_nvm
 
 usage() {
-    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
     echo
     echo "可用 MCP 服务器:"
-    echo "  filesystem   - 安全文件操作 (默认)"
-    echo "  git          - Git 仓库操作"
-    echo "  memory       - 知识图谱持久记忆"
+    echo "  filesystem           - 安全文件操作"
+    echo "  git                  - Git 仓库操作"
+    echo "  memory               - 知识图谱持久记忆"
+    echo "  codebase-memory-mcp  - 代码库知识图谱 (158 语言, 子毫秒查询)"
     echo
-    echo "filesystem 可通过 FILESYSTEM_DIRS 环境变量自定义可访问目录"
+    echo "环境变量:"
+    echo "  FILESYSTEM_DIRS  自定义 filesystem 可访问目录 (空格分隔)"
+    echo "  CBM_VARIANT=ui   安装带图谱可视化的 codebase-memory-mcp"
+    echo "  PROXY_URL        代理地址, 如 http://host:7890"
+    echo
     echo "示例:"
-    echo "  ./install_mcp_servers.sh filesystem"
-    echo "  ./install_mcp_servers.sh git memory"
+    echo "  ./install_mcp_servers.sh"
     echo "  ./install_mcp_servers.sh --tui"
+    echo "  ./install_mcp_servers.sh filesystem git memory codebase-memory-mcp"
     exit 0
 }
 
@@ -291,12 +363,11 @@ list_mcps() {
         else
             status="未配置"
         fi
-        printf '  %-10s %-4s %s\n' "$id" "$status" "$(tui_component_name "$id")"
+        printf '  %-22s %-4s %s\n' "$id" "$status" "$(tui_component_name "$id")"
     done
     exit 0
 }
 
-# 解析参数
 TARGETS=()
 TUI_MODE=false
 HAS_ARGS=false
@@ -308,7 +379,7 @@ while [[ $# -gt 0 ]]; do
         -h|--help)   usage ;;
         *)
             case "$1" in
-                filesystem|git|memory) TARGETS+=("$1"); shift ;;
+                filesystem|git|memory|codebase-memory-mcp) TARGETS+=("$1"); shift ;;
                 *) die "未知 MCP 服务器: $1 (可用: ${MCP_IDS_AVAILABLE[*]})" ;;
             esac
             ;;
@@ -324,7 +395,6 @@ if [ "$HAS_ARGS" = "false" ]; then
     fi
 fi
 
-# TUI 模式
 if $TUI_MODE; then
     if tui_select; then
         if [ -n "$TUI_SELECTED" ]; then
@@ -340,7 +410,6 @@ if $TUI_MODE; then
     fi
 fi
 
-# 代理
 if [ -n "$PROXY_URL" ]; then
     export https_proxy="$PROXY_URL" http_proxy="$PROXY_URL"
     info "使用代理: $PROXY_URL"
@@ -349,9 +418,10 @@ fi
 info "joe MCP 安装器开始 $(date)"
 for t in "${TARGETS[@]}"; do
     case "$t" in
-        filesystem) install_filesystem_mcp ;;
-        git)        install_git_mcp ;;
-        memory)     install_memory_mcp ;;
+        filesystem)          install_filesystem_mcp ;;
+        git)                 install_git_mcp ;;
+        memory)              install_memory_mcp ;;
+        codebase-memory-mcp) install_codebase_memory_mcp ;;
     esac
 done
 ok "全部 MCP 服务器安装完成!"

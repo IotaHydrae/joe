@@ -90,6 +90,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 | **filesystem** | 安全文件操作（官方参考服务器） | `npx @modelcontextprotocol/server-filesystem` |
 | **git** | Git 仓库读取/搜索/操作 | `uvx mcp-server-git`（PyPI 官方包） |
 | **memory** | 知识图谱持久记忆 | `npx @modelcontextprotocol/server-memory` |
+| **codebase-memory-mcp** | 代码库知识图谱（158 语言，子毫秒查询） | 官方静态二进制 `codebase-memory-mcp` |
 
 ### 用法
 
@@ -99,6 +100,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install_mcp_servers.sh --list          # 列出可用 MCP 及当前配置状态
 ./install_mcp_servers.sh filesystem      # 只装 filesystem MCP
 ./install_mcp_servers.sh git memory      # 装多个 MCP
+./install_mcp_servers.sh codebase-memory-mcp   # 代码知识图谱
 ```
 
 ### TUI 交互式选择
