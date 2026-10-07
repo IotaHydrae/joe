@@ -83,20 +83,32 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 | **Codex CLI** | `codex mcp add`（写入 ~/.codex/config.toml） |
 | **MiMo Code** | 编辑 ~/.config/mimocode/mimocode.jsonc |
 
-### 已支持 / 计划支持的 MCP 服务器
+### 支持的 MCP 服务器
 
-| 服务器 | 说明 | 状态 |
+| 服务器 | 说明 | 运行方式 |
 |---|---|---|
-| **filesystem** | 安全文件操作（官方参考服务器） | ✅ 已支持 |
-| github / git / memory 等 | 官方参考服务器 | 📋 预留（可扩展） |
+| **filesystem** | 安全文件操作（官方参考服务器） | `npx @modelcontextprotocol/server-filesystem` |
+| **git** | Git 仓库读取/搜索/操作 | `uvx mcp-server-git`（PyPI 官方包） |
+| **memory** | 知识图谱持久记忆 | `npx @modelcontextprotocol/server-memory` |
 
 ### 用法
 
 ```bash
-./install_mcp_servers.sh                 # 安装全部 MCP 服务器（当前: filesystem）
+./install_mcp_servers.sh                 # 默认进入 TUI 交互选择（非交互终端则全装）
+./install_mcp_servers.sh --tui           # 强制进入 TUI 勾选界面
+./install_mcp_servers.sh --list          # 列出可用 MCP 及当前配置状态
 ./install_mcp_servers.sh filesystem      # 只装 filesystem MCP
-./install_mcp_servers.sh --list          # 查看用法
+./install_mcp_servers.sh git memory      # 装多个 MCP
 ```
+
+### TUI 交互式选择
+
+与 `install_devtools.sh --tui` 同款界面（共用 `tui_module.sh` 通用库）：
+
+- **↑/↓** 移动光标，**空格** 勾选/取消
+- **a** 全选，**n** 全不选，**i** 仅选未配置
+- **回车** 开始安装，**q** 退出
+- 已配置的 MCP 显示 `[✓装]`，默认自动跳过
 
 ### 自定义 filesystem 可访问目录
 
@@ -110,13 +122,14 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 
 脚本结构清晰，新增服务器只需：
 
-1. 添加一个 `install_<name>_mcp()` 函数
-2. 用 `mcp_add_claude_stdio` / `mcp_add_codex_stdio` / `mcp_add_mimo_stdio` 配置到各工具
-3. 加入参数解析的 case 分支
+1. 添加一个 `install_<name>_mcp()` 函数（用 `mcp_add_all <name> <command...>` 写入三个工具）
+2. 把 id 加入 `MCP_IDS_AVAILABLE`，并在 `tui_component_installed` / `tui_component_name` 中登记
+3. 加入参数解析与主流程的 case 分支
 
 脚本幂等：已配置的服务器自动跳过，可安全重复执行。
 
 ---
+
 
 ## 开发工具套件（devtools）
 
