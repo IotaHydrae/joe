@@ -154,6 +154,82 @@ mcp__codebase-memory-mcp__trace_path(direction="inbound", ...)
 
 一直没看到 `mcp__` 前缀 = 没被调用。
 
+### 代码索引 MCP 怎么选？（实测）
+
+三个代码智能 MCP 不是"随便挑一个"——**选型取决于①语言有没有 LSP ②仓库规模**。
+
+#### 实测数据
+
+在三个量级的仓库上用 JSON-RPC 实测（`mode` 取默认）：
+
+| 仓库 | 文件 | MCP | 索引耗时 | 热查询延迟 | 单项目落盘 |
+|---|---:|---|---:|---:|---:|
+| joe (shell) | 46 | codebase-memory-mcp | 1.6s | **0.05s** | 452K |
+| | | codegraph | 21s\* | 0.35s | — |
+| | | serena | 0.1s | 0.2s | 0 |
+| ripgrep (Rust) | 266 | codebase-memory-mcp | 2.4s | **0.05s** | 2.5M |
+| | | codegraph | 0.8s | 0.45s | — |
+| | | serena | 0.1s | **❌ 报错** | 0 |
+| redis (C) | 1896 | codebase-memory-mcp | 9.3s | **0.05s** | 16M |
+| | | codegraph | 11.5s | 0.85s | — |
+| | | serena | 0.1s | 56.4s → 0.9s | 0 |
+
+\*首次运行，含一次性嵌入模型下载
+
+#### 三个关键结论
+
+**① `codebase-memory-mcp` 的查询延迟恒定。**
+46 文件 → 1896 文件（40 倍），查询始终 **0.05s**——它是预建 SQLite 图，延迟不随代码量增长。
+`codegraph`（0.35→0.85s）和 `serena`（0.2→0.9s）**都会随规模增长**。
+→ **大仓库选 cmm，理由是延迟不膨胀。**
+
+**② `serena` 的瓶颈是语言，不是项目大小。**
+实测 redis(C) 首次 `find_symbol` 56.4s，查存储发现真凶是 **LSP 自动下载**：
+
+```
+~/.serena/language_servers/static/
+  ClangdLanguageServer/   281M   ← C 语言
+  BashLanguageServer/      33M
+  RustAnalyzer/             0    ← 下载失败/空
+```
+
+Rust 项目直接**硬失败**（不是降级）：
+```
+Please install rust-analyzer via:
+  - Rustup: rustup component add rust-analyzer
+```
+→ **serena 在语言服务器缺失时不可用**，选型前必须先确认。
+
+**③ 三者都有一次性成本，只是位置不同。**
+
+| MCP | 一次性成本 | 之后 |
+|---|---|---|
+| `codebase-memory-mcp` | 无 | 每项目 452K–16M |
+| `codegraph` | **约 128M 嵌入模型**（fastembed，做语义检索） | 每项目约 12M |
+| `serena` | **每语言 33–281M LSP** | 不落盘（常驻内存） |
+
+#### 选型矩阵
+
+| 场景 | 选 | 理由 |
+|---|---|---|
+| 大仓库（>5000 文件） | `codebase-memory-mcp` | 查询延迟**恒定** |
+| 中仓库 + 语义搜索 | `codegraph` | fastembed 向量检索 |
+| 小-中仓库 + 精确重构 | `serena` | LSP 符号级，`rename_symbol` 最准 |
+| 语言冷门 / 无可用 LSP | cmm 或 codegraph | serena **直接不可用** |
+| C/C++ 项目 | 注意 serena 首次要拉 281M clangd | 首次很慢 |
+
+#### 检查语言支持
+
+```bash
+# serena 自动下载过哪些 LSP
+ls ~/.serena/language_servers/static/
+
+# 宿主已装的 LSP（serena 可复用）
+command -v rust-analyzer gopls clangd pyright-langserver typescript-language-server
+```
+
+> 详细的工具级选型（哪个需求用哪个工具）见 [`skills/code-exploration/SKILL.md`](skills/code-exploration/SKILL.md)。
+
 ### 推荐起手式
 
 ```bash
