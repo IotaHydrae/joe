@@ -1,0 +1,73 @@
+{
+  "$schema": "https://mimo.xiaomi.com/mimocode/config.json",
+  "mcp": {
+    "git": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "mcp-server-git"
+      ],
+      "enabled": true
+    },
+    "memory": {
+      "type": "local",
+      "command": [
+        "npx",
+        "--prefer-offline",
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "enabled": true
+    },
+    "codebase-memory-mcp": {
+      "type": "local",
+      "command": [
+        "/home/developer/.local/bin/codebase-memory-mcp"
+      ],
+      "enabled": true
+    },
+    "filesystem": {
+      "type": "local",
+      "command": [
+        "npx",
+        "--prefer-offline",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/developer",
+        "/tmp"
+      ],
+      "enabled": true
+    },
+    "context7": {
+      "type": "local",
+      "command": [
+        "npx",
+        "--prefer-offline",
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "enabled": true
+    },
+    "codegraph": {
+      "type": "local",
+      "command": [
+        "/home/developer/.nvm/versions/node/v24.21.0/bin/codegraph-mcp"
+      ],
+      "enabled": true
+    },
+    "serena": {
+      "type": "local",
+      "command": [
+        "uvx",
+        "--from",
+        "serena-agent",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "agent",
+        "--project-from-cwd"
+      ],
+      "enabled": true
+    }
+  }
+}

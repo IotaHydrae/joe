@@ -1,0 +1,45 @@
+[mcp_servers.git]
+command = "uvx"
+args = ["mcp-server-git"]
+
+[mcp_servers.memory]
+command = "npx"
+args = ["--prefer-offline", "-y", "@modelcontextprotocol/server-memory"]
+
+[mcp_servers.codebase-memory-mcp]
+command = "/home/developer/.local/bin/codebase-memory-mcp"
+
+[mcp_servers.filesystem]
+command = "npx"
+args = ["--prefer-offline", "-y", "@modelcontextprotocol/server-filesystem", "/home/developer", "/tmp"]
+
+[mcp_servers.context7]
+command = "npx"
+args = ["--prefer-offline", "-y", "@upstash/context7-mcp"]
+
+[mcp_servers.codegraph]
+command = "/home/developer/.nvm/versions/node/v24.21.0/bin/codegraph-mcp"
+
+[mcp_servers.serena]
+command = "uvx"
+args = ["--from", "serena-agent", "serena", "start-mcp-server", "--context", "codex", "--project-from-cwd"]
+# <<< codebase-memory-mcp MCP <<<
+# >>> codebase-memory-mcp SessionStart >>>
+[[hooks.SessionStart]]
+matcher = "startup|resume|clear|compact"
+
+[[hooks.SessionStart.hooks]]
+type = "command"
+command = "'/home/developer/.local/bin/codebase-memory-mcp' hook-augment"
+command_windows = "& '/home/developer/.local/bin/codebase-memory-mcp' hook-augment"
+timeout = 5
+
+[[hooks.SubagentStart]]
+matcher = "*"
+
+[[hooks.SubagentStart.hooks]]
+type = "command"
+command = "'/home/developer/.local/bin/codebase-memory-mcp' hook-augment"
+command_windows = "& '/home/developer/.local/bin/codebase-memory-mcp' hook-augment"
+timeout = 5
+# <<< codebase-memory-mcp SessionStart <<<

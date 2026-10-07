@@ -137,7 +137,7 @@ validate_skill() {
 # 安装单个技能
 # ---------------------------------------------------------------------------
 install_skill() {
-    local name="$1" srcdir="$SKILLS_SRC/$1" src="$SKILLS_SRC/$1/SKILL.md" dir updated=0
+    local name="$1" srcdir="$SKILLS_SRC/$1" dir updated=0
 
     validate_skill "$name" || die "技能 $name 校验失败"
     local declared

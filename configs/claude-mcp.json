@@ -1,0 +1,72 @@
+{
+  "_comment": "由 sync-configs.sh export 生成: 仅保留 mcpServers",
+  "mcpServers": {
+    "git": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-server-git"
+      ],
+      "env": {}
+    },
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "--prefer-offline",
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "env": {}
+    },
+    "codebase-memory-mcp": {
+      "type": "stdio",
+      "command": "/home/developer/.local/bin/codebase-memory-mcp",
+      "args": [],
+      "env": {}
+    },
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "--prefer-offline",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/developer",
+        "/tmp"
+      ],
+      "env": {}
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "--prefer-offline",
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "env": {}
+    },
+    "codegraph": {
+      "type": "stdio",
+      "command": "/home/developer/.nvm/versions/node/v24.21.0/bin/codegraph-mcp",
+      "args": [],
+      "env": {}
+    },
+    "serena": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "serena-agent",
+        "serena",
+        "start-mcp-server",
+        "--context",
+        "claude-code",
+        "--project-from-cwd"
+      ],
+      "env": {}
+    }
+  },
+  "installMethod": "global"
+}

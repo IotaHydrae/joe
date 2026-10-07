@@ -73,6 +73,103 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 
 
 
+## 全流程脚本
+
+围绕"新机器 → 部署 → 体检 → 升级 → 备份"的完整闭环：
+
+| 脚本 | 作用 |
+|---|---|
+| `bootstrap.sh` | 新机器一键部署（克隆 + 三个安装器 + 体检） |
+| `doctor.sh` | 环境体检：工具 / MCP / 技能是否就绪，给出修复建议 |
+| `update-all.sh` | 用各工具官方自更新机制统一升级 |
+| `sync-configs.sh` | 把本机配置（脱敏后）备份进仓库 / 从仓库恢复 |
+
+### bootstrap.sh — 新机器一键部署
+
+```bash
+./bootstrap.sh                    # 交互: 各阶段进入 TUI 勾选
+./bootstrap.sh --yes              # 非交互: 全部安装 (适合脚本/CI)
+./bootstrap.sh --only mcp,skills  # 只跑指定阶段
+./bootstrap.sh --skip devtools    # 跳过指定阶段
+./bootstrap.sh --dir ~/joe        # 指定克隆目录
+```
+
+也可直接管道运行（此时会先克隆自己）：
+
+```bash
+curl -fsSL <raw-url>/bootstrap.sh | bash
+```
+
+阶段：`devtools` | `mcp` | `skills` | `doctor`（默认全部）。
+环境变量：`JOE_DIR`、`JOE_REPO`、`PROXY_URL`。
+
+### doctor.sh — 环境体检
+
+```bash
+./doctor.sh              # 常规检查 (较快)
+./doctor.sh --mcp        # 额外实际连接每个 MCP (慢, 每个约 10-30s)
+./doctor.sh --quiet      # 只输出问题项
+./doctor.sh --json       # 机器可读输出
+```
+
+检查项：系统信息、基础工具、Node/Python 工具链、AI CLI、编辑器/终端/桌面、
+7 个 MCP 在三端的配置、7 个技能在 5 个代理目录的就位情况、技能 frontmatter 合法性。
+
+退出码 `0` = 无失败项。失败项会附带**具体的修复命令**。
+
+### update-all.sh — 统一升级
+
+```bash
+./update-all.sh             # 更新工具链 + AI CLI + MCP 引擎 + 仓库自身
+./update-all.sh --system    # 额外升级系统包 (dnf/apt/pacman/zypper)
+./update-all.sh --dry-run   # 只显示会执行什么
+```
+
+优先走**官方自更新**（这正是选择官方安装路径的原因）：
+
+| 组件 | 更新方式 |
+|---|---|
+| nvm / pyenv | `git pull` / `pyenv update` |
+| uv | `uv self update` |
+| pipx | `pip install --user -U pipx` |
+| Claude Code | `claude update` |
+| Codex CLI | `npm update -g @openai/codex` |
+| MiMo Code | `mimo upgrade` |
+| codebase-memory-mcp | `codebase-memory-mcp update -y` |
+| CodeGraph 引擎 | 镜像补拉 + SHA256 校验 |
+
+单项有 300s 超时保护（`UPDATE_TIMEOUT` 可调），失败不影响其余项。
+
+### sync-configs.sh — 配置备份
+
+```bash
+./sync-configs.sh list            # 列出映射与状态
+./sync-configs.sh export          # 导出(脱敏)到 configs/
+./sync-configs.sh export --check  # 只统计会擦除多少敏感项
+./sync-configs.sh import          # 从 configs/ 恢复 (原文件备份到 ~/.joe-config-backup/)
+./sync-configs.sh diff            # 对比本机与仓库备份
+```
+
+安全设计：
+
+- **白名单**：只处理明确列出的文件，不做目录级全量拷贝
+- **脱敏**：导出前擦除 `sk-*` / `ghp_*` / `AKIA*` / `Bearer` / 私钥 / `*token*`、`*password*` 等键值
+- **隐私**：`~/.claude.json` 只提取 `mcpServers`，丢弃 `userID` / `machineID` / `projects`
+- **不自动提交**：导出后请 `git diff configs/` 复核再提交
+
+> 脱敏是尽力而为的兜底，不保证覆盖所有密钥形式，提交前请自行确认。
+
+### 共享库与 CI
+
+- `lib_github.sh` — GitHub 下载相关共享函数：`download_installer`（拒绝 HTML 错误页）、
+  `github_mirror_download`（镜像回退）、`codegraph_fetch_engine_mirror`（带 SHA256 校验）
+- `tui_module.sh` — 通用 TUI 选择器，被三个安装器复用
+- `.shellcheckrc` — ShellCheck 排除项，本地与 CI 共用
+- `.github/workflows/ci.yml` — push/PR 时运行：`bash -n`、ShellCheck（severity=warning）、
+  可执行位检查、技能 frontmatter 校验、`references/` 链接可达性、TUI 模块完整性
+
+---
+
 ## 代理技能（install_skills.sh）
 
 仓库的 `skills/` 目录存放可复用的 **Agent Skills**，由 `install_skills.sh` 安装到各 AI 代理。

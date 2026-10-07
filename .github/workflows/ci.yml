@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Shell 脚本检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 语法检查 (bash -n)
+        run: |
+          set -e
+          fail=0
+          for f in *.sh .github/**/*.sh; do
+            [ -f "$f" ] || continue
+            echo "::group::bash -n $f"
+            if bash -n "$f"; then
+              echo "OK $f"
+            else
+              echo "::error file=$f::bash 语法错误"
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $fail
+
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: '.'
+          severity: warning
+        # 排除项集中在仓库根 .shellcheckrc (本地与 CI 共用)
+
+      - name: 可执行位检查
+        run: |
+          set -e
+          fail=0
+          for f in install_devtools.sh install_mcp_servers.sh install_skills.sh doctor.sh bootstrap.sh update-all.sh; do
+            [ -f "$f" ] || continue
+            if [ ! -x "$f" ]; then
+              echo "::error file=$f::$f 缺少可执行权限 (chmod +x)"
+              fail=1
+            fi
+          done
+          exit $fail
+
+  skills:
+    name: 技能定义校验
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 校验 SKILL.md frontmatter
+        run: |
+          set -e
+          fail=0
+          shopt -s nullglob
+          files=(skills/*/SKILL.md)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::warning::skills/ 下没有发现任何技能"
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            name="$(basename "$(dirname "$f")")"
+            echo "::group::$name"
+            # 1) 以 --- 开头
+            if ! head -1 "$f" | grep -qE '^---[[:space:]]*$'; then
+              echo "::error file=$f::缺少 YAML frontmatter (首行必须是 ---)"
+              fail=1; echo "::endgroup::"; continue
+            fi
+            # 2) 结束分隔线
+            if ! awk 'NR>1 && /^---[[:space:]]*$/{found=1; exit} END{exit !found}' "$f"; then
+              echo "::error file=$f::frontmatter 未正确闭合"
+              fail=1; echo "::endgroup::"; continue
+            fi
+            # 3) name 必填
+            if ! awk 'NR==1{next} /^---[[:space:]]*$/{exit} /^name:/{found=1} END{exit !found}' "$f"; then
+              echo "::error file=$f::frontmatter 缺少 name"
+              fail=1
+            fi
+            # 4) description 必填
+            if ! awk 'NR==1{next} /^---[[:space:]]*$/{exit} /^description:/{found=1} END{exit !found}' "$f"; then
+              echo "::error file=$f::frontmatter 缺少 description"
+              fail=1
+            fi
+            # 5) description 长度 (规范建议 <= 1024)
+            dlen="$(awk 'NR==1{next} /^---[[:space:]]*$/{exit} /^description:/{print length($0); exit}' "$f")"
+            if [ -n "$dlen" ] && [ "$dlen" -gt 1024 ]; then
+              echo "::warning file=$f::description 过长 ($dlen > 1024)"
+            fi
+            # 6) 目录名与 frontmatter name 一致性
+            fname="$(awk 'NR==1{next} /^---[[:space:]]*$/{exit} /^name:/{sub(/^name:[[:space:]]*/,""); gsub(/^["'"'"']|["'"'"']$/,""); print; exit}' "$f")"
+            if [ -n "$fname" ] && [ "$fname" != "$name" ]; then
+              echo "::warning file=$f::目录名($name) 与 frontmatter name($fname) 不一致"
+            fi
+            echo "OK $name"
+            echo "::endgroup::"
+          done
+          exit $fail
+
+      - name: 检查 references/ 引用是否存在
+        run: |
+          set -e
+          shopt -s nullglob
+          fail=0
+          for f in skills/*/SKILL.md; do
+            dir="$(dirname "$f")"
+            # 提取 markdown 链接里的相对路径, 检查文件是否存在
+            while IFS= read -r link; do
+              [ -n "$link" ] || continue
+              case "$link" in http*|"#"*) continue ;; esac
+              if [ ! -e "$dir/$link" ]; then
+                echo "::error file=$f::引用的文件不存在: $link"
+                fail=1
+              fi
+            done < <(grep -oE '\]\([^)]+\)' "$f" 2>/dev/null | sed 's/^](//; s/)$//' | sort -u)
+          done
+          exit $fail
+
+  tui:
+    name: TUI 模块完整性
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 三个安装器都加载 tui_module.sh
+        run: |
+          set -e
+          fail=0
+          for f in install_devtools.sh install_mcp_servers.sh install_skills.sh; do
+            [ -f "$f" ] || { echo "::error::$f 缺失"; fail=1; continue; }
+            if ! grep -q 'tui_module.sh' "$f"; then
+              echo "::error file=$f::未引用 tui_module.sh"
+              fail=1
+            fi
+          done
+          [ -f tui_module.sh ] || { echo "::error::tui_module.sh 缺失"; fail=1; }
+          exit $fail
+
+      - name: TUI 关键函数存在
+        run: |
+          set -e
+          for fn in run_tui tui_available; do
+            grep -q "^$fn()" tui_module.sh || { echo "::error file=tui_module.sh::缺少函数 $fn"; exit 1; }
+          done
+          echo "TUI 函数完整"

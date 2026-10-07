@@ -1,0 +1,13 @@
+{
+  "ui_font_family": "JetBrains Mono",
+  "ui_font_size": 14,
+  "buffer_font_family": "JetBrains Mono",
+  "buffer_font_size": 14,
+  "terminal": {
+    "font_family": "JetBrains Mono",
+    "font_size": 14
+  },
+  "context_servers": {
+    "codebase-memory-mcp": {"command":"/home/developer/.local/bin/codebase-memory-mcp","args":[]}
+  }
+}

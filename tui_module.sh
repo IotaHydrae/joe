@@ -68,7 +68,7 @@ if ! declare -F tui_component_installed >/dev/null 2>&1; then
         local id="$1"
         case "$id" in
             node)     _tui_has_bin node ;;
-            python)   [ -x "$HOME/.pyenv/bin/pyenv" ] || command -v pyenv >/dev/null 2>&1 ;;
+            python)   { [ -x "$HOME/.pyenv/bin/pyenv" ] || command -v pyenv >/dev/null 2>&1; } && _tui_has_bin pipx ;;
             ai)       _tui_has_bin claude && _tui_has_bin codex ;;
             zed)      [ -x "$HOME/.local/bin/zed" ] || command -v zed >/dev/null 2>&1 ;;
             ghostty)  command -v ghostty >/dev/null 2>&1 ;;

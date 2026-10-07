@@ -1,0 +1,33 @@
+# ShellCheck 配置 (CI 与本地共用)
+# https://github.com/koalaman/shellcheck/wiki/Checks
+#
+# 说明: 以下告警在本项目中属于有意为之或历史遗留, 予以排除;
+#       其余告警应视为需要修复的问题。
+
+# SC1090/SC1091: 无法静态跟随的 source (我们 source 同目录的 tui_module.sh / lib_github.sh)
+disable=SC1090,SC1091
+
+# SC2086: 未加引号的变量展开 (在明确的数字/分词场景下有意使用)
+disable=SC2086
+
+# SC2016: 单引号内出现 $ (用于生成字面量脚本片段)
+disable=SC2016
+
+# SC2207/SC2206: 数组赋值分词 (依赖词分割的行为, 出于兼容性保留)
+disable=SC2207,SC2206
+
+# SC2001: 建议用 ${var//a/b} 替代 sed (可读性取舍)
+disable=SC2001
+
+# SC2015: A && B || C 形式 (本项目中 C 仅为提示, 不会掩盖错误)
+disable=SC2015
+
+# SC2155: local x=$(cmd) 会掩盖返回码 (历史脚本风格, 不影响本仓库逻辑)
+disable=SC2155
+
+# SC2088: 引号内 ~ 不展开 (仅用于提示文本中展示路径写法)
+disable=SC2088
+
+# SC2034: 变量"看似未使用" —— TUI_IDS / TUI_TITLE 等由 source 进来的
+#         tui_module.sh 读取, shellcheck 无法跨文件跟踪
+disable=SC2034
