@@ -1,61 +1,78 @@
 #!/usr/bin/env bash
 # =============================================================================
-# joe devtools — TUI 交互式组件选择器
+# joe TUI 交互式组件选择器 (通用库)
 # =============================================================================
-# 由 install_devtools.sh --tui 调用。提供方向键/空格/回车选择的勾选界面。
-# 已安装的组件自动检测并标记为 [已安装]（灰色、默认跳过）。
+# 提供方向键/空格/回车选择的勾选界面。通用设计, 可供多个安装脚本复用:
+#
+#   install_devtools.sh --tui       (devtools 组件)
+#   install_mcp_servers.sh --tui    (MCP 服务器)
+#
+# 调用方可在 source 本文件之前定义以下内容覆盖默认值:
+#   TUI_IDS=(...)                    组件 id 列表 (顺序即显示顺序)
+#   TUI_TITLE="..."                  界面标题
+#   tui_component_installed()        已安装检测 (返回 0=已装, 1=未装)
+#   tui_component_name()             组件显示名称 (echo)
+# 未定义时使用 devtools 的默认值。
 #
 # 按键:
 #   ↑/↓      移动光标
 #   空格      勾选 / 取消 (已安装组件固定跳过)
-#   a         全选
+#   a         全选 (未安装)
 #   n         全不选
 #   i         仅选未安装
 #   回车      开始安装
 #   q / Esc   退出
 # =============================================================================
 
-# 可安装组件 id (顺序即显示顺序); --list 与 run_tui 共用, 避免两处维护
-TUI_IDS=(node python ai zed ghostty vscode mimo chatgpt ccswitch)
+# ---- 默认组件 (devtools); 调用方可预先覆盖 ----
+if [ -z "${TUI_IDS+x}" ]; then
+    TUI_IDS=(node python ai zed ghostty vscode mimo chatgpt ccswitch)
+fi
+if [ -z "${TUI_TITLE+x}" ]; then
+    TUI_TITLE="joe devtools 组件安装选择"
+fi
 
 # 仅在无 TTY 时返回错误 (由调用方决定是否回退)
 tui_available() {
     [ -t 1 ] && [ -t 0 ]
 }
 
-# 每个组件: 名称 + 检测是否已安装的函数
-# 返回 0 = 已安装, 1 = 未安装
-tui_component_installed() {
-    local id="$1"
-    case "$id" in
-        node)     [ -d "$HOME/.nvm" ] && command -v node >/dev/null 2>&1 ;;
-        python)   [ -d "$HOME/.pyenv" ] && command -v pyenv >/dev/null 2>&1 ;;
-        ai)       command -v claude >/dev/null 2>&1 && command -v codex >/dev/null 2>&1 ;;
-        zed)      [ -x "$HOME/.local/bin/zed" ] || command -v zed >/dev/null 2>&1 ;;
-        ghostty)  command -v ghostty >/dev/null 2>&1 ;;
-        vscode)   command -v code >/dev/null 2>&1 ;;
-        mimo)     command -v mimo >/dev/null 2>&1 ;;
-        chatgpt)  command -v chatgpt >/dev/null 2>&1 ;;
-        ccswitch) command -v cc-switch >/dev/null 2>&1 ;;
-        *)        return 1 ;;
-    esac
-}
+# 默认已安装检测 (devtools); 调用方可预先定义覆盖
+if ! declare -F tui_component_installed >/dev/null 2>&1; then
+    tui_component_installed() {
+        local id="$1"
+        case "$id" in
+            node)     [ -d "$HOME/.nvm" ] && command -v node >/dev/null 2>&1 ;;
+            python)   [ -d "$HOME/.pyenv" ] && command -v pyenv >/dev/null 2>&1 ;;
+            ai)       command -v claude >/dev/null 2>&1 && command -v codex >/dev/null 2>&1 ;;
+            zed)      [ -x "$HOME/.local/bin/zed" ] || command -v zed >/dev/null 2>&1 ;;
+            ghostty)  command -v ghostty >/dev/null 2>&1 ;;
+            vscode)   command -v code >/dev/null 2>&1 ;;
+            mimo)     command -v mimo >/dev/null 2>&1 ;;
+            chatgpt)  command -v chatgpt >/dev/null 2>&1 ;;
+            ccswitch) command -v cc-switch >/dev/null 2>&1 ;;
+            *)        return 1 ;;
+        esac
+    }
+fi
 
-# 组件显示名称
-tui_component_name() {
-    case "$1" in
-        node)     echo "Node 工具链 (nvm + LTS)" ;;
-        python)   echo "Python 工具链 (pyenv + pipx)" ;;
-        ai)       echo "AI CLI (Claude Code + Codex)" ;;
-        zed)      echo "Zed 编辑器 + JetBrains Mono" ;;
-        ghostty)  echo "Ghostty 终端 + Ctrl+Alt+T" ;;
-        vscode)   echo "VS Code 编辑器" ;;
-        mimo)     echo "MiMo Code (小米 AI 助手)" ;;
-        chatgpt)  echo "ChatGPT / Codex 桌面版" ;;
-        ccswitch) echo "CC Switch (AI CLI 配置切换器)" ;;
-        *)        echo "$1" ;;
-    esac
-}
+# 默认组件显示名称 (devtools); 调用方可预先定义覆盖
+if ! declare -F tui_component_name >/dev/null 2>&1; then
+    tui_component_name() {
+        case "$1" in
+            node)     echo "Node 工具链 (nvm + LTS)" ;;
+            python)   echo "Python 工具链 (pyenv + pipx)" ;;
+            ai)       echo "AI CLI (Claude Code + Codex)" ;;
+            zed)      echo "Zed 编辑器 + JetBrains Mono" ;;
+            ghostty)  echo "Ghostty 终端 + Ctrl+Alt+T" ;;
+            vscode)   echo "VS Code 编辑器" ;;
+            mimo)     echo "MiMo Code (小米 AI 助手)" ;;
+            chatgpt)  echo "ChatGPT / Codex 桌面版" ;;
+            ccswitch) echo "CC Switch (AI CLI 配置切换器)" ;;
+            *)        echo "$1" ;;
+        esac
+    }
+fi
 
 # 运行 TUI, 通过全局变量 TUI_SELECTED (以空格分隔的选中组件 id) 返回结果
 run_tui() {
@@ -78,7 +95,7 @@ run_tui() {
     local cur=0
     local key
 
-    # 终端状态 (关闭 echo/规范模式/CR映射/流控, 保证 read -n1 正确读取)
+    # 终端状态 (关闭 echo/规范模式/CR映射/流控, 保证 read 正确读取)
     stty -echo -icanon -icrnl -ixon 2>/dev/null
     printf '\033[?25l'   # 隐藏光标
 
@@ -114,7 +131,7 @@ run_tui() {
     # 渲染
     render() {
         printf '\033[2J\033[H'  # 清屏
-        printf '\033[1;36m═══ joe devtools 组件安装选择 ═══\033[0m\n'
+        printf '\033[1;36m═══ %s ═══\033[0m\n' "$TUI_TITLE"
         printf '\033[2m↑↓移动 空格勾选 a全选 n全不选 i仅未装 回车开始 q退出\033[0m\n'
         printf '%s\n' "──────────────────────────────────────────"
         local checked=0
