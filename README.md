@@ -116,6 +116,14 @@ skills/
 |---|---|
 | **joe-env** | 说明本机装了哪些工具/MCP、三个安装脚本怎么用 |
 | **code-exploration** | 用 MCP 图谱工具探索代码（替代 grep + 逐文件读） |
+| **developer-knowledge** | 从开发过程提炼高信号工程知识库（写笔记/沉淀经验/组织知识库） |
+| **developer-testing** | 设计可复用、可信赖的测试体系（oracle、基准、黄金数据、观测与预期） |
+| **developer-code-quality** | 面向长期可维护性的编码与审查准则（命名、控制流、抽象与重复权衡） |
+| **developer-repository-exploration** | 在先理解后修改：陌生仓库侦察、构建系统、调用链、数据/状态流、生命周期 |
+| **embedded-linux-boot-optimizer** | 测量驱动的嵌入式 Linux 启动优化（U-Boot、内核 initcall、DT、systemd） |
+
+> 这些技能采用**渐进式披露**结构：`SKILL.md` 精简（frontmatter + 核心准则 + 章节索引），
+> 完整原文放在 `references/full.md`，代理仅在需要细节时才读取，避免占用上下文。
 
 ### 添加自己的技能
 

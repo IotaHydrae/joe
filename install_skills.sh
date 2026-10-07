@@ -20,7 +20,8 @@
 #   ~/.copilot/skills/         GitHub Copilot (目录存在时)
 #
 # 说明:
-#   - 技能即 ./skills/<name>/SKILL.md, 需含 YAML frontmatter 的 name/description
+#   - 技能即 ./skills/<name>/, 需含 SKILL.md (YAML frontmatter 的 name/description)
+#   - 整个技能目录(含 references/ scripts/ assets/)会被一并安装
 #   - 幂等: 内容有变则更新, 无变化跳过
 #   - MiMo Code 也会扫描 ~/.claude、~/.agents、~/.codex 下的 skills, 故可复用
 # =============================================================================
@@ -108,14 +109,15 @@ skill_field() {
 
 # 技能是否已在所有目标目录中为最新
 skill_installed() {
-    local name="$1" src="$SKILLS_SRC/$1/SKILL.md" dir found_any=0
-    [ -f "$src" ] || return 1
+    local name="$1" srcdir="$SKILLS_SRC/$1" dir found_any=0
+    [ -f "$srcdir/SKILL.md" ] || return 1
     while IFS= read -r dir; do
         [ -n "$dir" ] || continue
-        if [ -f "$dir/$name/SKILL.md" ] && cmp -s "$src" "$dir/$name/SKILL.md"; then
+        # 整个技能目录(含 references/scripts/assets)必须完全一致
+        if [ -f "$dir/$name/SKILL.md" ] && diff -rq "$srcdir" "$dir/$name" >/dev/null 2>&1; then
             found_any=1
         else
-            return 1   # 任一目标缺失或过旧 -> 视为未安装(需更新)
+            return 1   # 任一目标缺失/过旧 -> 视为未安装(需更新)
         fi
     done < <(skill_targets)
     [ "$found_any" = "1" ]
@@ -135,7 +137,7 @@ validate_skill() {
 # 安装单个技能
 # ---------------------------------------------------------------------------
 install_skill() {
-    local name="$1" src="$SKILLS_SRC/$1/SKILL.md" dir updated=0
+    local name="$1" srcdir="$SKILLS_SRC/$1" src="$SKILLS_SRC/$1/SKILL.md" dir updated=0
 
     validate_skill "$name" || die "技能 $name 校验失败"
     local declared
@@ -146,11 +148,13 @@ install_skill() {
 
     while IFS= read -r dir; do
         [ -n "$dir" ] || continue
-        if [ -f "$dir/$name/SKILL.md" ] && cmp -s "$src" "$dir/$name/SKILL.md"; then
+        # 整个目录已一致 -> 跳过
+        if [ -f "$dir/$name/SKILL.md" ] && diff -rq "$srcdir" "$dir/$name" >/dev/null 2>&1; then
             continue
         fi
         mkdir -p "$dir/$name"
-        cp "$src" "$dir/$name/SKILL.md"
+        # 复制整个技能目录 (SKILL.md + references/ + scripts/ + assets/ ...)
+        cp -R "$srcdir/." "$dir/$name/"
         updated=$((updated + 1))
     done < <(skill_targets)
 
