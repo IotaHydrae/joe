@@ -80,6 +80,8 @@ record() {
 # 命令探测: PATH / ~/.local/bin / ~/.mimocode/bin / nvm 版本目录
 find_bin() {
     local name="$1" f
+    f="${NVM_DIR:-$HOME/.nvm}/current/bin/$name"
+    [ -x "$f" ] && { printf '%s\n' "$f"; return 0; }
     command -v "$name" >/dev/null 2>&1 && { command -v "$name"; return 0; }
     [ -x "$HOME/.local/bin/$name" ] && { echo "$HOME/.local/bin/$name"; return 0; }
     [ -x "$HOME/.mimocode/bin/$name" ] && { echo "$HOME/.mimocode/bin/$name"; return 0; }

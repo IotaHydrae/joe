@@ -626,7 +626,7 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 
 | 组件 | 说明 | 安装方式 |
 |---|---|---|
-| **nvm + Node LTS** | Node 版本管理器 + 默认 LTS 版 | 官方脚本，自动配置 zsh |
+| **Node LTS（通过 nvm 安装）** | 安装/切换 LTS，迁移已有全局包 | nvm 仅在安装时加载，bash/zsh 只配置固定 PATH |
 | **pyenv** | Python 版本管理器，不自动安装 Python | 官方脚本 + 编译依赖，自动配置 bash/zsh |
 | **Claude Code** | Anthropic AI CLI（`claude`） | npm 全局安装 |
 | **Codex CLI** | OpenAI AI CLI（`codex`） | npm 全局安装 |
@@ -644,7 +644,7 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 ```bash
 ./install_devtools.sh             # 默认进入 TUI，不预选；非交互须指定组件
 ./install_devtools.sh --all       # 显式安装全部组件
-./install_devtools.sh --node      # 只装 Node 工具链 (nvm + LTS)
+./install_devtools.sh --node      # 安装/切换 Node LTS，nvm 不随 shell 启动
 ./install_devtools.sh --python    # 只装 pyenv + Python 编译依赖
 ./install_devtools.sh --ai        # 只装 AI CLI (claude-code + codex)
 ./install_devtools.sh --zed       # 只装 Zed 编辑器 + JetBrains Mono
@@ -680,6 +680,7 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 ### 注意事项
 
 - 所有组件**幂等**：已安装的会自动跳过，可安全重复执行
+- `--node` 会选择最新 Node LTS，即使原来已有非 LTS 版本也会切换，并迁移原版本的全局 npm 包。日常 shell 只把 `~/.nvm/current/bin` 加入 PATH，不加载 `nvm.sh` 或其补全；重跑 `--node` 可更新 LTS 与固定链接，修改 shell 配置前会备份 `*.bak.<timestamp>`（保留最近 5 份）
 - `--python` 只配置 pyenv 和编译依赖，Python 版本及 pipx 由用户自行安装
 - 已存在的 `~/.config/zed/settings.json` 不会被覆盖（只在缺失时写入默认字体配置）
 - AI CLI（Claude Code/Codex）安装后需各自登录/配置 API key 才能使用
@@ -688,6 +689,10 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 - Ghostty 桌面入口使用 `~/.local/bin/joe-ghostty`，将调用目录作为 `--working-directory` 显式传入，避免单实例复用时打开错误目录；Cinnamon/Nemo 的默认终端也会指向此入口
 - Ghostty 在 Budgie/labwc 桌面下依赖 `xdg-terminal-exec`，发行版包不可用时尝试上游脚本
 - 安装完成后新开终端生效（或 `source ~/.zshrc`）
+
+### zsh 启动开销
+
+Node 的版本管理留在安装阶段，普通终端直接使用固定运行路径；需要手动管理版本时再执行 `source ~/.nvm/nvm.sh --no-use`。Powerlevel10k 预设不启用 `nvm` 版本提示，避免每次新开终端计算 Node 可执行文件的缓存校验值。自动建议与语法高亮通过 Oh My Zsh 的 `plugins=()` 加载一次，配置备份不再重复 source 独立副本或加载额外的 robbyrussell 主题。
 
 ### 修复已有 Ghostty
 

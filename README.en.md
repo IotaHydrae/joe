@@ -92,7 +92,7 @@ The repository ships `install_devtools.sh`, a one-shot installer for a set of co
 
 | Component | Description | How it is installed |
 |-----------|-------------|---------------------|
-| **nvm + Node LTS** | Node version manager + default LTS | official script, configures zsh |
+| **Node LTS (installed via nvm)** | Install/switch LTS and migrate existing global packages | nvm loads only during installation; bash/zsh use a fixed PATH |
 | **pyenv** | Python version manager; does not install Python automatically | official script + build dependencies, configures bash/zsh |
 | **Claude Code** | Anthropic AI CLI (`claude`) | `npm install -g` |
 | **Codex CLI** | OpenAI AI CLI (`codex`) | `npm install -g` |
@@ -110,7 +110,7 @@ The repository ships `install_devtools.sh`, a one-shot installer for a set of co
 ```bash
 ./install_devtools.sh             # interactive checklist, nothing preselected; non-interactive: specify components
 ./install_devtools.sh --all       # explicitly install every component
-./install_devtools.sh --node      # Node toolchain only (nvm + LTS)
+./install_devtools.sh --node      # install/switch Node LTS without loading nvm at shell startup
 ./install_devtools.sh --python    # pyenv and Python build dependencies only
 ./install_devtools.sh --ai        # AI CLIs only (claude-code + codex)
 ./install_devtools.sh --zed       # Zed editor + JetBrains Mono only
@@ -146,6 +146,7 @@ Running `./install_devtools.sh --tui` opens a terminal UI for picking components
 ### Notes
 
 - All components are **idempotent**: anything already installed is skipped, so re-running is safe
+- `--node` selects the latest Node LTS even when a non-LTS version is already installed, and migrates its global npm packages. Ordinary shells only add `~/.nvm/current/bin` to PATH, without loading `nvm.sh` or its completion. Re-run `--node` to update LTS and the fixed link. Changed shell configs are backed up as `*.bak.<timestamp>` (keeping the latest five)
 - `--python` configures pyenv and build dependencies; install your chosen Python version and pipx yourself
 - An existing `~/.config/zed/settings.json` is never overwritten (the default font settings are written only when the file is missing)
 - The AI CLIs (Claude Code / Codex) still need their own login / API key configuration after installation
@@ -154,6 +155,10 @@ Running `./install_devtools.sh --tui` opens a terminal UI for picking components
 - Ghostty desktop entries use `~/.local/bin/joe-ghostty`, which passes the caller's directory explicitly as `--working-directory` when reusing a running instance. Cinnamon/Nemo's default terminal points to this launcher too
 - Ghostty on Budgie/labwc uses `xdg-terminal-exec`, with an upstream-script fallback when the distro package is unavailable
 - Open a new terminal afterwards (or `source ~/.zshrc`)
+
+### zsh startup cost
+
+Node version management runs during installation; ordinary terminals use the fixed runtime path. Load nvm explicitly with `source ~/.nvm/nvm.sh --no-use` when managing versions manually. The Powerlevel10k preset omits the `nvm` segment to avoid calculating a Node executable checksum in every new terminal. Autosuggestions and syntax highlighting load once through Oh My Zsh's `plugins=()`; the saved config no longer sources separate copies or loads an additional robbyrussell theme.
 
 ### Repair an existing Ghostty installation
 

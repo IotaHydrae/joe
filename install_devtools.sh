@@ -9,7 +9,7 @@
 # 用法:
 #   ./install_devtools.sh            # 默认进入 TUI, 不预选; 非交互须指定组件
 #   ./install_devtools.sh --all      # 显式安装全部组件
-#   ./install_devtools.sh --node     # 只装 Node 工具链 (nvm)
+#   ./install_devtools.sh --node     # 安装/切换 Node LTS (nvm 仅在安装时加载)
 #   ./install_devtools.sh --python   # 只装 pyenv + Python 编译依赖
 #   ./install_devtools.sh --ai       # 只装 AI CLI (claude-code + codex)
 #   ./install_devtools.sh --zed      # 只装 Zed 编辑器 + JetBrains Mono
@@ -24,7 +24,8 @@
 #
 # 依赖: git, curl, sudo (非 root 时), bash/zsh
 # 说明:
-#   - nvm 装到 ~/.nvm, 默认 Node LTS
+#   - nvm 装到 ~/.nvm; --node 会切换到最新 LTS, 迁移已有全局包
+#   - 日常 shell 只使用 ~/.nvm/current/bin, 不加载 nvm.sh 或 nvm 补全
 #   - pyenv 装到 ~/.pyenv, Python 版本与 pipx 由用户自行安装
 #   - --ghostty 会修复已有安装的用户/系统 terminfo 与桌面入口; 系统条目缺失时需要 sudo
 #   - 单独修复用 ./repair_ghostty.sh; --user-only 不写系统 terminfo
@@ -124,7 +125,7 @@ make_tmp() {
 # 支持 apt (Debian/Ubuntu/Mint) / pacman (Arch/CachyOS) / dnf (Fedora) / zypper (openSUSE)
 # 并处理版本差异, 例如 Ubuntu 24.04 的 t64 重命名 (libfuse2 -> libfuse2t64)
 _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for _lib in lib_distro.sh lib_github.sh lib_ghostty.sh; do
+for _lib in lib_distro.sh lib_github.sh lib_ghostty.sh lib_node.sh; do
     if [ -f "$_LIB_DIR/$_lib" ]; then
         # shellcheck disable=SC1090
         . "$_LIB_DIR/$_lib"
@@ -134,10 +135,11 @@ for _lib in lib_distro.sh lib_github.sh lib_ghostty.sh; do
 done
 unset _lib _LIB_DIR
 
-# 加载 nvm 到当前 shell
+# 仅在 Node 安装阶段加载 nvm; 不自动启用旧的 default 版本。
 load_nvm() {
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/nvm.sh" ] || die "未找到 $NVM_DIR/nvm.sh, 请检查 nvm 安装"
+    \. "$NVM_DIR/nvm.sh" --no-use
 }
 
 
@@ -174,30 +176,43 @@ append_shell_cfg() {
 # ---------------------------------------------------------------------------
 install_node() {
     info "=== 安装 nvm (Node Version Manager) ==="
-    if [ -d "$HOME/.nvm" ]; then
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    if [ -d "$NVM_DIR" ]; then
         info "nvm 已存在, 跳过安装"
         load_nvm
     else
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash
+        curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | PROFILE=/dev/null bash
         load_nvm
     fi
 
-    append_shell_cfg 'export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"'
-
-    if ! command -v node >/dev/null 2>&1; then
-        info "安装 Node (LTS)..."
-        if [ -n "$NODE_LTS" ]; then
-            nvm install "$NODE_LTS"
-        else
-            nvm install --lts
-        fi
-        nvm alias default lts/* 2>/dev/null || true
+    # 非交互调用也先使用固定运行路径, 确保迁移的是当前版本的全局包。
+    load_node
+    local target previous
+    if [ -n "$NODE_LTS" ]; then
+        target="$(nvm version-remote "$NODE_LTS")" || die "无法解析 Node 版本, 请检查网络"
     else
-        info "Node 已就绪: $(node --version)"
+        target="$(nvm version-remote --lts)" || die "无法解析 Node LTS 版本, 请检查网络"
     fi
-    ok "nvm 配置完成"
+    [[ "$target" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "无法解析 Node LTS 版本, 请检查网络"
+    if [ -e "$NVM_DIR/current" ] && [ ! -L "$NVM_DIR/current" ]; then
+        die "$NVM_DIR/current 不是符号链接, 请检查后再安装"
+    fi
+    previous="$(nvm current)" || previous=none
+    case "$previous" in
+        N/A|none|'') previous="$(nvm version default)" || previous=none ;;
+    esac
+    local args=("$target")
+    case "$previous" in
+        "$target"|N/A|none|'') ;;
+        *) args+=("--reinstall-packages-from=$previous") ;;
+    esac
+    info "安装/切换 Node: $target"
+    NVM_SYMLINK_CURRENT=true nvm install "${args[@]}"
+    nvm alias default "$target"
+    [ -x "$NVM_DIR/current/bin/node" ] || die "Node current 链接未创建"
+    configure_node_shell "$(pick_shell_rc)" "$NVM_DIR"
+    load_node
+    ok "Node 已就绪: $(node --version) (shell 只设置 PATH, 不初始化 nvm)"
 }
 
 # ---------------------------------------------------------------------------
@@ -264,7 +279,7 @@ install_python() {
 # ---------------------------------------------------------------------------
 install_ai() {
     info "=== 安装 AI CLI 工具 ==="
-    load_nvm
+    load_node
     command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node)"
 
     if command -v claude >/dev/null 2>&1; then
@@ -512,7 +527,7 @@ install_vscode() {
 install_mimo() {
     info "=== 安装 MiMo Code (小米 AI 编程助手) ==="
 
-    load_nvm
+    load_node
     # 官方安装路径 (~/.mimocode/bin) 与用户级 bin
     export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PATH"
 
@@ -728,7 +743,7 @@ cmd_check() {
         pacman) printf '  %-12s %s\n' ccswitch "AppImage + fuse2" ;;
         dnf|zypper) printf '  %-12s %s\n' ccswitch "官方 .rpm" ;;
     esac
-    printf '  %-12s %s\n' node   "nvm (发行版无关)"
+    printf '  %-12s %s\n' node   "Node LTS (nvm 仅在安装时使用, 日常只设置 PATH)"
     printf '  %-12s %s\n' python "pyenv (需构建依赖)"
     printf '  %-12s %s\n' ai     "npm 全局安装"
     printf '  %-12s %s\n' zed    "Zed 官方安装脚本 (发行版无关)"

@@ -57,8 +57,9 @@ OK=0; SKIP=0; FAILED=0; FAILED_ITEMS=()
 section() { $QUIET || printf '\n%s\n' "$(c_b "── $* ──")"; }
 
 # 环境 PATH
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" >/dev/null 2>&1
+# shellcheck source=lib_node.sh
+. "$SCRIPT_DIR/lib_node.sh"
+load_node
 export PYENV_ROOT="${PYENV_ROOT:-$HOME/.pyenv}"
 export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PYENV_ROOT/bin:$PYENV_ROOT/shims:$PATH"
 
