@@ -249,23 +249,12 @@ install_python() {
         "eval \"\$(pyenv init - $shell_name)\"" \
         'eval "$(pyenv virtualenv-init -)"')"
 
-    # 安装默认 Python
-    if ! pyenv versions --bare 2>/dev/null | grep -qx "$PYTHON_VERSION"; then
-        info "pyenv 编译安装 Python $PYTHON_VERSION (需要几分钟)..."
-        pyenv install "$PYTHON_VERSION"
-    else
-        info "Python $PYTHON_VERSION 已存在"
-    fi
-    pyenv global "$PYTHON_VERSION"
-    ok "pyenv 配置完成: Python $(pyenv global)"
-
-    # pipx
-    info "=== 安装 pipx ==="
-    if ! command -v pipx >/dev/null 2>&1; then
-        python -m pip install --user pipx 2>/dev/null || python -m pip install pipx
-        python -m pipx ensurepath
-    fi
-    ok "pipx 配置完成"
+    ok "pyenv 配置完成"
+    info "注意: 使用以下命令安装 Python 版本:"
+    info "  pyenv install --list    # 列出可用版本"
+    info "  pyenv install 3.12.0    # 安装特定版本"
+    info "  pyenv global 3.12.0     # 设置全局版本"
+    info "  pyenv local 3.12.0      # 设置项目版本"
 }
 
 # ---------------------------------------------------------------------------
