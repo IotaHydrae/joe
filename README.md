@@ -403,7 +403,7 @@ curl -fsSL <raw-url>/bootstrap.sh | bash
 ```
 
 检查项：系统信息、基础工具、Node/Python 工具链、AI CLI、编辑器/终端/桌面、
-7 个 MCP 在三端的配置、7 个技能在 5 个代理目录的就位情况、技能 frontmatter 合法性。
+7 个 MCP 在三端的配置、8 个技能在 5 个代理目录的就位情况、技能 frontmatter 合法性。
 
 退出码 `0` = 无失败项。失败项会附带**具体的修复命令**。
 
@@ -481,6 +481,7 @@ skills/
 ./install_skills.sh --tui          # 强制 TUI 勾选
 ./install_skills.sh --list         # 列出技能及安装状态
 ./install_skills.sh joe-env        # 只装指定技能
+./install_skills.sh engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
 ```
 
 与 devtools / MCP 脚本同款 TUI：`↑↓` 移动、`空格` 勾选、`a/n/i` 快捷键、`回车` 开始、`q` 退出；已安装技能显示 `[✓装]` 自动跳过。
@@ -509,8 +510,11 @@ skills/
 | **developer-code-quality** | 面向长期可维护性的编码与审查准则（命名、控制流、抽象与重复权衡） |
 | **developer-repository-exploration** | 在先理解后修改：陌生仓库侦察、构建系统、调用链、数据/状态流、生命周期 |
 | **embedded-linux-boot-optimizer** | 测量驱动的嵌入式 Linux 启动优化（U-Boot、内核 initcall、DT、systemd） |
+| **engineering-embedded-linux-driver-engineer** | 嵌入式 Linux 内核驱动与 BSP 开发（设备树、Platform/I2C/SPI/USB、DMA/中断、Yocto/Buildroot） |
 
-> 这些技能采用**渐进式披露**结构：`SKILL.md` 精简（frontmatter + 核心准则 + 章节索引），
+新增驱动技能来自 [clowlove/hermes-house](https://www.skills.sh/clowlove/hermes-house/engineering-embedded-linux-driver-engineer)，保留上游 `SKILL.md` 和 `skill.json`，并随附 MIT 许可证与 [来源版本记录](skills/engineering-embedded-linux-driver-engineer/SOURCE.md)。安装时仍须按需勾选或显式指定技能名。
+
+> 较长的技能采用**渐进式披露**结构：`SKILL.md` 精简（frontmatter + 核心准则 + 章节索引），
 > 完整原文放在 `references/full.md`，代理仅在需要细节时才读取，避免占用上下文。
 
 ### 添加自己的技能

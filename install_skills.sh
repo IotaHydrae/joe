@@ -10,6 +10,7 @@
 #   ./install_skills.sh --all          # 显式安装全部技能
 #   ./install_skills.sh --list         # 列出技能及安装状态
 #   ./install_skills.sh <name> [...]   # 只装指定技能
+#   ./install_skills.sh engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
 #
 # TUI 按键: ↑/↓ 移动, 空格 勾选, a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
 #

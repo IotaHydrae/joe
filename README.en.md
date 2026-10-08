@@ -207,11 +207,14 @@ Filesystem access defaults to `$HOME` and `/tmp`; override it with `FILESYSTEM_D
 ```bash
 ./install_skills.sh          # checklist, nothing preselected
 ./install_skills.sh joe-env  # install/update only this skill
+./install_skills.sh engineering-embedded-linux-driver-engineer  # embedded Linux drivers only
 ./install_skills.sh --all    # explicitly install/update every skill
 ./install_skills.sh --list
 ```
 
 Skills and their supporting directories are copied to `~/.agents/skills` and the detected clients' skill directories. Items already current in every target are skipped. All three TUIs use arrows to move, Space to select, `a` to select all missing items, `n` to clear the selection, `i` to select only missing items, Enter to install, and `q` to quit.
+
+The bundled `engineering-embedded-linux-driver-engineer` skill covers embedded Linux kernel drivers and BSP development: Device Tree, Platform/I2C/SPI/USB, DMA/interrupts, and Yocto/Buildroot. It comes from [clowlove/hermes-house](https://www.skills.sh/clowlove/hermes-house/engineering-embedded-linux-driver-engineer), with the upstream `SKILL.md` and `skill.json` preserved, the MIT license included, and the [source revision recorded](skills/engineering-embedded-linux-driver-engineer/SOURCE.md). Select it in the TUI or specify its name explicitly to install it.
 
 ## Bootstrap and updates
 

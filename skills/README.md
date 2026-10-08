@@ -2,6 +2,18 @@
 
 存放可复用的 **Agent Skills**，通过 `../install_skills.sh` 安装到各 AI 代理。
 
+## 第三方技能
+
+`engineering-embedded-linux-driver-engineer` 提供嵌入式 Linux 内核驱动与 BSP 开发指导，包括设备树、Platform/I2C/SPI/USB、DMA/中断和 Yocto/Buildroot。来自 [clowlove/hermes-house](https://www.skills.sh/clowlove/hermes-house/engineering-embedded-linux-driver-engineer)，保留上游 `SKILL.md`、`skill.json`，随附 MIT `LICENSE`；确切版本见 [SOURCE.md](engineering-embedded-linux-driver-engineer/SOURCE.md)。
+
+在仓库根目录按需安装：
+
+```bash
+./install_skills.sh engineering-embedded-linux-driver-engineer
+```
+
+也可以运行 `./install_skills.sh --tui` 后勾选；默认不勾选任何技能。
+
 ## 目录结构
 
 ```
