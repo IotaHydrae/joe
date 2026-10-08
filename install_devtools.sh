@@ -26,7 +26,8 @@
 # 说明:
 #   - nvm 装到 ~/.nvm, 默认 Node LTS
 #   - pyenv 装到 ~/.pyenv, Python 版本与 pipx 由用户自行安装
-#   - --ghostty 会修复已有安装的 terminfo 与桌面入口; 单独修复用 ./repair_ghostty.sh
+#   - --ghostty 会修复已有安装的用户/系统 terminfo 与桌面入口; 系统条目缺失时需要 sudo
+#   - 单独修复用 ./repair_ghostty.sh; --user-only 不写系统 terminfo
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
 # =============================================================================

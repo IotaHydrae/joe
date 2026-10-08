@@ -16,6 +16,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib_ghostty.sh
+. "$SCRIPT_DIR/lib_ghostty.sh"
 
 # 多字节文本按"字符"处理
 if [ -z "${LC_ALL:-}" ]; then
@@ -247,9 +249,14 @@ chk_cmd code     "运行 ./install_devtools.sh --vscode"
 chk_cmd ghostty  "运行 ./install_devtools.sh --ghostty"
 if find_bin ghostty >/dev/null 2>&1; then
     if command -v infocmp >/dev/null 2>&1 && infocmp -x xterm-ghostty >/dev/null 2>&1; then
-        record ok "Ghostty terminfo" "xterm-ghostty 可用"
+        record ok "Ghostty terminfo" "当前用户的 xterm-ghostty 可用"
     else
         record fail "Ghostty terminfo" "运行 ./repair_ghostty.sh (minicom 等终端程序需要)"
+    fi
+    if ghostty_system_terminfo_available; then
+        record ok "Ghostty 系统 terminfo" "sudo 下的 xterm-ghostty 可用"
+    else
+        record fail "Ghostty 系统 terminfo" "运行 ./repair_ghostty.sh 并完成 sudo 认证 (仅 ~/.terminfo 无法支持 sudo minicom)"
     fi
 fi
 chk_cmd chatgpt  "运行 ./install_devtools.sh --chatgpt"

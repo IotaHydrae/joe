@@ -57,37 +57,84 @@ ghostty_write_file() (
     mv -f -- "$tmp" "$dest"
 )
 
-ghostty_install_terminfo() {
-    local bin="$1" work="$2" real prefix entry dir
-    command -v infocmp >/dev/null 2>&1 && command -v tic >/dev/null 2>&1 \
-        || { warn "需要 ncurses 的 infocmp/tic 来配置 Ghostty terminfo"; return 1; }
-    if infocmp -x xterm-ghostty >/dev/null 2>&1; then
-        info "xterm-ghostty terminfo 已可用"
+# 忽略当前用户的 ~/.terminfo 和 TERMINFO 覆盖, 只检查 ncurses 的系统搜索目录。
+ghostty_system_terminfo_available() {
+    local dir
+    command -v infocmp >/dev/null 2>&1 || return 1
+    while IFS= read -r dir; do
+        [ "$dir" = "$HOME/.terminfo" ] && continue
+        if env -u TERMINFO -u TERMINFO_DIRS infocmp -x -A "$dir" xterm-ghostty >/dev/null 2>&1; then
+            return 0
+        fi
+    done < <(env -u TERMINFO -u TERMINFO_DIRS infocmp -D 2>/dev/null)
+    return 1
+}
+
+ghostty_install_system_terminfo() {
+    local work="$1" entry dest install_bin
+    if ghostty_system_terminfo_available; then
+        info "系统 xterm-ghostty terminfo 已可用 (包括 sudo)"
         return 0
     fi
-    real="$(readlink -f "$bin")" || return 1
-    prefix="$(dirname "$(dirname "$real")")"
-    dir="$prefix/share/terminfo"
-    if ! infocmp -x -A "$dir" xterm-ghostty > "$work/ghostty.terminfo" 2>/dev/null; then
-        case "$real" in
-            *.[Aa]pp[Ii]mage)
-                info "从 Ghostty AppImage 提取 xterm-ghostty terminfo..."
-                (cd "$work" && "$real" --appimage-extract '**/terminfo/**/xterm-ghostty') \
-                    >/dev/null 2>&1 || return 1
-                entry="$(find "$work" -type f -path '*/terminfo/*/xterm-ghostty' -print -quit)"
-                [ -n "$entry" ] || { warn "AppImage 中没有找到 xterm-ghostty terminfo"; return 1; }
-                dir="$(dirname "$(dirname "$entry")")"
-                infocmp -x -A "$dir" xterm-ghostty > "$work/ghostty.terminfo" || return 1
-                ;;
-            *)
-                warn "Ghostty 安装缺少 xterm-ghostty terminfo, 请检查软件包是否完整"
-                return 1
-                ;;
-        esac
+
+    # 先用普通用户编译, 只把最终条目以明确的权限写入系统目录。
+    tic -x -o "$work/system-terminfo" "$work/ghostty.terminfo" || return 1
+    entry="$(find "$work/system-terminfo" -type f -name xterm-ghostty -print -quit)"
+    [ -n "$entry" ] || { warn "编译后未找到 xterm-ghostty terminfo"; return 1; }
+    dest="/usr/share/terminfo/${entry#"$work/system-terminfo/"}"
+    install_bin="$(type -P install)" || return 1
+    info "安装系统 terminfo, 让 sudo minicom 等程序也能使用 Ghostty..."
+    if [ "$EUID" -eq 0 ]; then
+        "$install_bin" -D -m 644 -- "$entry" "$dest" || return 1
+    else
+        command -v sudo >/dev/null 2>&1 \
+            || { warn "系统 terminfo 需要 sudo; 仅修复当前用户可使用 --user-only"; return 1; }
+        sudo -- "$install_bin" -D -m 644 -- "$entry" "$dest" \
+            || { warn "系统 terminfo 安装失败; 请在自己的终端中运行 ./repair_ghostty.sh 并完成 sudo 认证"; return 1; }
     fi
-    tic -x -o "$HOME/.terminfo" "$work/ghostty.terminfo" || return 1
-    infocmp -x xterm-ghostty >/dev/null 2>&1 || return 1
-    ok "xterm-ghostty terminfo 已安装到 ~/.terminfo"
+    ghostty_system_terminfo_available \
+        || { warn "安装后系统仍无法读取 xterm-ghostty terminfo"; return 1; }
+    ok "系统 xterm-ghostty terminfo 已安装 (包括 sudo)"
+}
+
+ghostty_install_terminfo() {
+    local bin="$1" work="$2" user_only="${3:-false}" real prefix entry dir
+    command -v infocmp >/dev/null 2>&1 && command -v tic >/dev/null 2>&1 \
+        || { warn "需要 ncurses 的 infocmp/tic 来配置 Ghostty terminfo"; return 1; }
+    if infocmp -x xterm-ghostty > "$work/ghostty.terminfo" 2>/dev/null; then
+        info "当前用户的 xterm-ghostty terminfo 已可用"
+    else
+        real="$(readlink -f "$bin")" || return 1
+        prefix="$(dirname "$(dirname "$real")")"
+        dir="$prefix/share/terminfo"
+        if ! infocmp -x -A "$dir" xterm-ghostty > "$work/ghostty.terminfo" 2>/dev/null; then
+            case "$real" in
+                *.[Aa]pp[Ii]mage)
+                    info "从 Ghostty AppImage 提取 xterm-ghostty terminfo..."
+                    (cd "$work" && "$real" --appimage-extract '**/terminfo/**/xterm-ghostty') \
+                        >/dev/null 2>&1 || return 1
+                    entry="$(find "$work" -type f -path '*/terminfo/*/xterm-ghostty' -print -quit)"
+                    [ -n "$entry" ] || { warn "AppImage 中没有找到 xterm-ghostty terminfo"; return 1; }
+                    dir="$(dirname "$(dirname "$entry")")"
+                    infocmp -x -A "$dir" xterm-ghostty > "$work/ghostty.terminfo" || return 1
+                    ;;
+                *)
+                    warn "Ghostty 安装缺少 xterm-ghostty terminfo, 请检查软件包是否完整"
+                    return 1
+                    ;;
+            esac
+        fi
+        tic -x -o "$HOME/.terminfo" "$work/ghostty.terminfo" || return 1
+        infocmp -x xterm-ghostty >/dev/null 2>&1 || return 1
+        ok "xterm-ghostty terminfo 已安装到 ~/.terminfo"
+    fi
+    if [ "$user_only" = true ]; then
+        if ! ghostty_system_terminfo_available; then
+            warn "--user-only 仅修复当前用户; sudo minicom 仍需要系统 terminfo, 运行 ./repair_ghostty.sh 补齐"
+        fi
+    else
+        ghostty_install_system_terminfo "$work" || return 1
+    fi
 }
 
 ghostty_configure_desktop() {
@@ -193,10 +240,10 @@ EOF
 # 独立于安装流程, 已安装的软件也会修复; 临时文件在成功/失败时均清理。
 repair_ghostty() (
     set -euo pipefail
-    local bin work
+    local bin work user_only="${1:-false}"
     bin="$(ghostty_binary)" || { warn "未找到 Ghostty, 请先运行 ./install_devtools.sh --ghostty"; return 1; }
     work="$(mktemp -d "${TMPDIR:-/tmp}/joe-ghostty.XXXXXX")" || return 1
     trap 'rm -rf -- "$work"' EXIT
-    ghostty_install_terminfo "$bin" "$work" || return 1
+    ghostty_install_terminfo "$bin" "$work" "$user_only" || return 1
     ghostty_configure_desktop "$bin" "$work" || return 1
 )

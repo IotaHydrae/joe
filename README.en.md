@@ -150,7 +150,7 @@ Running `./install_devtools.sh --tui` opens a terminal UI for picking components
 - An existing `~/.config/zed/settings.json` is never overwritten (the default font settings are written only when the file is missing)
 - The AI CLIs (Claude Code / Codex) still need their own login / API key configuration after installation
 - Zed requires Vulkan; the script installs the matching driver per distro (`vulkan-radeon` + `vulkan-intel` on pacman)
-- Ghostty checks the host's `xterm-ghostty` terminfo. When an AppImage keeps it only inside the image, the repair extracts it and uses `tic` to install it into `~/.terminfo`, fixing errors such as minicom's `No termcap entry for xterm-ghostty`. The ncurses tools package provides `infocmp`/`tic`: apt uses `ncurses-bin`, pacman/dnf use `ncurses`, and zypper uses `ncurses-utils`
+- Ghostty checks both user and system `xterm-ghostty` terminfo. When an AppImage keeps it only inside the image, the repair extracts and compiles it with `tic`. Besides `~/.terminfo`, a missing system entry is installed into `/usr/share/terminfo` through `sudo`, fixing `No termcap entry for xterm-ghostty` for both ordinary users and `sudo minicom`. The ncurses tools package provides `infocmp`/`tic`: apt uses `ncurses-bin`, pacman/dnf use `ncurses`, and zypper uses `ncurses-utils`
 - Ghostty desktop entries use `~/.local/bin/joe-ghostty`, which passes the caller's directory explicitly as `--working-directory` when reusing a running instance. Cinnamon/Nemo's default terminal points to this launcher too
 - Ghostty on Budgie/labwc uses `xdg-terminal-exec`, with an upstream-script fallback when the distro package is unavailable
 - Open a new terminal afterwards (or `source ~/.zshrc`)
@@ -158,12 +158,19 @@ Running `./install_devtools.sh --tui` opens a terminal UI for picking components
 ### Repair an existing Ghostty installation
 
 ```bash
-./repair_ghostty.sh                  # repair existing integration without installing packages
-infocmp -x xterm-ghostty             # verify the terminal description
-minicom -s                          # verify the minicom setup menu
+./repair_ghostty.sh                  # repair; prompts for sudo when system terminfo is missing
+infocmp -x xterm-ghostty             # verify the current user's terminal description
+sudo infocmp -x xterm-ghostty        # verify the terminal description under sudo
+sudo minicom -s                     # verify the minicom setup menu under sudo
 ```
 
-The repair preserves Ghostty font, theme and keybinding preferences. Changed launchers, desktop entries, terminal preference lists and Cinnamon settings are backed up as `*.bak.<timestamp>` (keeping the latest five). Desktop entries are found in user directories before system directories, and other terminals remain in the fallback list. Repeated repairs leave unchanged files untouched. `doctor.sh` reports missing terminfo and suggests this repair.
+| Option | Behavior |
+|---|---|
+| No option | Repair user/system terminfo and desktop integration, using `sudo` when needed |
+| `--user-only` | Repair only the current user without `sudo`; cannot install the system entry needed by `sudo minicom` |
+| `--help` | Show usage |
+
+Run the repair as your ordinary user so that only the system entry is written through `sudo`; do not run the whole script with `sudo`. It installs no packages and preserves Ghostty font, theme and keybinding preferences. Changed launchers, desktop entries, terminal preference lists and Cinnamon settings are backed up as `*.bak.<timestamp>` (keeping the latest five). Desktop entries are found in user directories before system directories, and other terminals remain in the fallback list. Repeated repairs leave unchanged files untouched. `doctor.sh` checks user and system terminfo separately, so a user-only entry does not count as a complete repair.
 
 ## MCP servers
 

@@ -684,7 +684,7 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 - 已存在的 `~/.config/zed/settings.json` 不会被覆盖（只在缺失时写入默认字体配置）
 - AI CLI（Claude Code/Codex）安装后需各自登录/配置 API key 才能使用
 - Zed 依赖 Vulkan，脚本按发行版自动安装对应驱动（pacman 下为 `vulkan-radeon`+`vulkan-intel`）
-- Ghostty 安装后会检查 `xterm-ghostty` terminfo；AppImage 缺失主机端描述时，从 AppImage 中提取并用 `tic` 安装到 `~/.terminfo`，避免 minicom 等程序报 `No termcap entry for xterm-ghostty`。`infocmp`/`tic` 由 ncurses 工具包提供（apt: `ncurses-bin`，pacman/dnf: `ncurses`，zypper: `ncurses-utils`）
+- Ghostty 安装后会检查用户和系统的 `xterm-ghostty` terminfo；AppImage 缺失主机端描述时，从 AppImage 中提取并用 `tic` 编译。除 `~/.terminfo` 外，系统条目缺失时还会通过 `sudo` 安装到 `/usr/share/terminfo`，避免普通用户和 `sudo minicom` 报 `No termcap entry for xterm-ghostty`。`infocmp`/`tic` 由 ncurses 工具包提供（apt: `ncurses-bin`，pacman/dnf: `ncurses`，zypper: `ncurses-utils`）
 - Ghostty 桌面入口使用 `~/.local/bin/joe-ghostty`，将调用目录作为 `--working-directory` 显式传入，避免单实例复用时打开错误目录；Cinnamon/Nemo 的默认终端也会指向此入口
 - Ghostty 在 Budgie/labwc 桌面下依赖 `xdg-terminal-exec`，发行版包不可用时尝试上游脚本
 - 安装完成后新开终端生效（或 `source ~/.zshrc`）
@@ -692,12 +692,19 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 ### 修复已有 Ghostty
 
 ```bash
-./repair_ghostty.sh                  # 只修复已有安装，不安装软件包
-infocmp -x xterm-ghostty             # 验证终端描述
-minicom -s                          # 验证 minicom 配置界面
+./repair_ghostty.sh                  # 修复已有安装；系统 terminfo 缺失时提示 sudo 密码
+infocmp -x xterm-ghostty             # 验证当前用户的终端描述
+sudo infocmp -x xterm-ghostty        # 验证 sudo 下的终端描述
+sudo minicom -s                     # 验证 sudo 下的 minicom 配置界面
 ```
 
-修复保留 Ghostty 的字体、主题和快捷键配置，为被修改的启动器、桌面文件、终端首选列表及 Cinnamon 设置创建 `*.bak.<timestamp>` 备份（保留最近 5 份）。桌面文件优先读取用户目录，再读取系统目录；终端首选列表保留其他终端作为回退。重复运行时内容无变化的文件保持不动。`doctor.sh` 会检测 terminfo 缺失并提示运行此修复。
+| 选项 | 行为 |
+|---|---|
+| 不带选项 | 修复用户/系统 terminfo 与桌面入口，必要时调用 `sudo` |
+| `--user-only` | 只修复当前用户，不调用 `sudo`；无法补齐 `sudo minicom` 所需的系统条目 |
+| `--help` | 显示用法 |
+
+请以普通用户运行修复脚本，让它仅对系统条目的写入调用 `sudo`；不要用 `sudo` 运行整个脚本。修复不安装软件包，保留 Ghostty 的字体、主题和快捷键配置，为被修改的启动器、桌面文件、终端首选列表及 Cinnamon 设置创建 `*.bak.<timestamp>` 备份（保留最近 5 份）。桌面文件优先读取用户目录，再读取系统目录；终端首选列表保留其他终端作为回退。重复运行时内容无变化的文件保持不动。`doctor.sh` 分别检查用户和系统 terminfo，避免把只对当前用户可用的安装报告为全部正常。
 
 
 ## 安装内容
