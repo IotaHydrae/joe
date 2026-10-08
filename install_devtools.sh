@@ -7,9 +7,10 @@
 # 已实测: Ubuntu 24.04 / Linux Mint 22.3 (noble) / Arch Linux (CachyOS 基线) / Fedora。
 #
 # 用法:
-#   ./install_devtools.sh            # 默认进入 TUI 交互选择界面 (非交互式终端改为安装全部)
+#   ./install_devtools.sh            # 默认进入 TUI, 不预选; 非交互须指定组件
+#   ./install_devtools.sh --all      # 显式安装全部组件
 #   ./install_devtools.sh --node     # 只装 Node 工具链 (nvm)
-#   ./install_devtools.sh --python   # 只装 Python 工具链 (pyenv + pipx)
+#   ./install_devtools.sh --python   # 只装 pyenv + Python 编译依赖
 #   ./install_devtools.sh --ai       # 只装 AI CLI (claude-code + codex)
 #   ./install_devtools.sh --zed      # 只装 Zed 编辑器 + JetBrains Mono
 #   ./install_devtools.sh --ghostty  # 只装 Ghostty 终端 + Ctrl+Alt+T 快捷键
@@ -24,7 +25,7 @@
 # 依赖: git, curl, sudo (非 root 时), bash/zsh
 # 说明:
 #   - nvm 装到 ~/.nvm, 默认 Node LTS
-#   - pyenv 装到 ~/.pyenv, 默认 Python 3.12 (可改 PYTHON_VERSION)
+#   - pyenv 装到 ~/.pyenv, Python 版本与 pipx 由用户自行安装
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
 # =============================================================================
@@ -35,7 +36,6 @@ set -euo pipefail
 # 配置
 # ---------------------------------------------------------------------------
 NODE_LTS="${NODE_LTS:-}"                    # 留空 = 安装时最新 LTS
-PYTHON_VERSION="${PYTHON_VERSION:-3.12.10}"
 PROXY_URL="${PROXY_URL:-}"                  # 可选: http://host:7890
 
 # 标记位
@@ -48,7 +48,7 @@ INSTALL_VSCODE=false
 INSTALL_MIMO=false
 INSTALL_CHATGPT=false
 INSTALL_CCSWITCH=false
-INSTALL_ALL=true
+INSTALL_ALL=false
 TUI_MODE=false
 
 # ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ install_node() {
 }
 
 # ---------------------------------------------------------------------------
-# 组件: Python 工具链 (pyenv + pipx)
+# 组件: Python 版本管理器 (pyenv + 编译依赖)
 # ---------------------------------------------------------------------------
 install_python() {
     info "=== 安装 pyenv + Python 编译依赖 ==="
@@ -778,16 +778,17 @@ HAS_ARGS=false
 while [[ $# -gt 0 ]]; do
     HAS_ARGS=true
     case "$1" in
-        --node)     INSTALL_NODE=true; INSTALL_ALL=false; shift ;;
-        --python)   INSTALL_PYTHON=true; INSTALL_ALL=false; shift ;;
-        --ai)       INSTALL_AI=true; INSTALL_ALL=false; shift ;;
-        --zed)      INSTALL_ZED=true; INSTALL_ALL=false; shift ;;
-        --ghostty)  INSTALL_GHOSTTY=true; INSTALL_ALL=false; shift ;;
-        --vscode)   INSTALL_VSCODE=true; INSTALL_ALL=false; shift ;;
-        --mimo)      INSTALL_MIMO=true; INSTALL_ALL=false; shift ;;
-        --chatgpt)   INSTALL_CHATGPT=true; INSTALL_ALL=false; shift ;;
-        --ccswitch)  INSTALL_CCSWITCH=true; INSTALL_ALL=false; shift ;;
-        --tui)       TUI_MODE=true; INSTALL_ALL=false; shift ;;
+        --node)     INSTALL_NODE=true; shift ;;
+        --python)   INSTALL_PYTHON=true; shift ;;
+        --ai)       INSTALL_AI=true; shift ;;
+        --zed)      INSTALL_ZED=true; shift ;;
+        --ghostty)  INSTALL_GHOSTTY=true; shift ;;
+        --vscode)   INSTALL_VSCODE=true; shift ;;
+        --mimo)     INSTALL_MIMO=true; shift ;;
+        --chatgpt)  INSTALL_CHATGPT=true; shift ;;
+        --ccswitch) INSTALL_CCSWITCH=true; shift ;;
+        --all)      INSTALL_ALL=true; shift ;;
+        --tui)      TUI_MODE=true; shift ;;
         --list)     list_components; exit 0 ;;
         --check)    cmd_check; exit 0 ;;
         -h|--help)  usage; exit 0 ;;
@@ -799,27 +800,17 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# 无参数时默认进入 TUI 交互选择 (除非是纯脚本/非交互环境)
+# 无参数只进入交互选择, 非交互调用须显式指定组件。
 if [ "$HAS_ARGS" = "false" ]; then
     if [ -t 1 ] && [ -t 0 ]; then
         TUI_MODE=true
-        INSTALL_ALL=false
     else
-        INSTALL_ALL=true
+        die "当前不是交互式终端, 请指定组件选项或使用 --all (查看 --help)"
     fi
 fi
 
-# ---------------------------------------------------------------------------
-# 前置检查
-# ---------------------------------------------------------------------------
-info "=== 开发工具安装器 ==="
-distro_report
-printf '\n'
-
-# 检查前置依赖（仅警告，不阻止）
-if ! check_prerequisites; then
-    warn "前置检查发现问题，但继续执行（部分安装可能失败）"
-    sleep 2
+if $TUI_MODE && $INSTALL_ALL; then
+    die "--all 不能与 --tui 同时使用"
 fi
 
 # ---------------------------------------------------------------------------
@@ -835,12 +826,10 @@ fi
 # ---------------------------------------------------------------------------
 if $TUI_MODE; then
     if ! load_tui_module; then
-        warn "未找到 tui_module.sh, 跳过 TUI"
-        exit 0
+        die "未找到 tui_module.sh"
     fi
     if ! tui_available; then
-        warn "当前不是交互式终端, 跳过 TUI, 使用 --help 查看选项"
-        exit 0
+        die "当前不是交互式终端, 请指定组件选项或使用 --all (查看 --help)"
     fi
     info "启动 TUI 选择界面 (已安装组件自动跳过)..."
     run_tui
@@ -866,6 +855,15 @@ if $TUI_MODE; then
         esac
     done
     info "已选择:${TUI_SELECTED}"
+fi
+
+# 前置检查放在选择之后, 只检查用户选中的组件。
+info "=== 开发工具安装器 ==="
+distro_report
+printf '\n'
+if ! check_prerequisites; then
+    warn "前置检查发现问题，但继续执行（部分安装可能失败）"
+    sleep 2
 fi
 
 # ---------------------------------------------------------------------------

@@ -19,12 +19,13 @@ declare -F ok   >/dev/null 2>&1 || ok()   { printf '[ OK ] %s\n' "$*"; }
 # 下载安装脚本并校验 (避免把 HTML 错误页/区域限制页当脚本执行)
 # 返回 0 = 拿到合法脚本, 1 = 失败(网络/HTML/非脚本)
 download_installer() {
-    local url="$1" out="$2" attempt
+    local url="$1" out="$2" attempt downloaded=false
     rm -f "$out"
     for attempt in 1 2 3; do
         info "尝试下载 ${url##*/} (第 $attempt/3 次)..."
         if curl -fsSL --retry 2 --retry-all-errors --connect-timeout 20 --max-time 300 \
                 "$url" -o "$out" 2>/dev/null && [ -s "$out" ]; then
+            downloaded=true
             break
         fi
         if [ "$attempt" -lt 3 ]; then
@@ -32,15 +33,18 @@ download_installer() {
             sleep 5
         fi
     done
-    if [ ! -s "$out" ]; then
+    if ! $downloaded; then
+        rm -f -- "$out"
         warn "下载失败: $url"
         return 1
     fi
     if head -c 200 "$out" | grep -qiE '<html|<!doctype|<script'; then
+        rm -f -- "$out"
         warn "下载的文件似乎是 HTML 错误页，而非安装脚本"
         return 1
     fi
     if ! head -1 "$out" | grep -qE '^#!'; then
+        rm -f -- "$out"
         warn "下载的文件缺少 shebang，可能不是有效脚本"
         return 1
     fi

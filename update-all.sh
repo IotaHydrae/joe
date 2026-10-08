@@ -3,7 +3,7 @@
 # joe update-all — 统一更新开发环境
 # =============================================================================
 # 利用各工具的**官方自更新机制**升级（这正是当初选官方安装路径的原因），
-# 再以幂等方式刷新 MCP / 技能配置。
+# MCP / 技能配置请运行对应安装器按需选择。
 #
 # 用法:
 #   ./update-all.sh             # 更新工具链 + AI CLI + MCP 引擎 + joe 仓库
@@ -41,7 +41,7 @@ for a in "$@"; do
         --system)  WITH_SYSTEM=true ;;
         --dry-run) DRY_RUN=true ;;
         --quiet)   QUIET=true ;;
-        -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; exit 0 ;;
         *) echo "未知选项: $a" >&2; exit 2 ;;
     esac
 done
@@ -218,28 +218,13 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5. 以幂等方式刷新 MCP / 技能配置
+# 5. 按需配置提示
 # ---------------------------------------------------------------------------
-section "配置刷新 (幂等)"
-
-refresh_script() {
-    local name="$1" script="$SCRIPT_DIR/$2"
-    if [ ! -f "$script" ]; then skip_item "$name" "脚本缺失"; return 0; fi
-    if $DRY_RUN; then
-        printf '  %s %-26s %s\n' "$(c_y '→')" "$name" "$(c_d "bash $2")"
-        return 0
-    fi
-    if ! $QUIET; then printf '  %s %-26s ' "$(c_b '↻')" "$name"; fi
-    if bash "$script" >/dev/null 2>&1; then
-        OK=$((OK + 1)); $QUIET || printf '%s\n' "$(c_g '已刷新')"
-    else
-        FAILED=$((FAILED + 1)); FAILED_ITEMS+=("$name")
-        $QUIET || printf '%s\n' "$(c_r '失败')"
-    fi
-}
-
-refresh_script "MCP 配置" install_mcp_servers.sh
-refresh_script "技能" install_skills.sh
+if ! $QUIET; then
+    section "按需配置"
+    printf '  MCP 配置: ./install_mcp_servers.sh --tui\n'
+    printf '  技能安装/更新: ./install_skills.sh --tui\n'
+fi
 
 # ---------------------------------------------------------------------------
 # 6. 系统包 (可选)

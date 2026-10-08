@@ -5,7 +5,7 @@
 # 把"克隆 joe → 装开发工具 → 配 MCP → 装技能 → 体检"串成一条命令。
 #
 # 用法:
-#   ./bootstrap.sh                    # 交互模式: 各阶段进入 TUI 勾选
+#   ./bootstrap.sh                    # 交互模式: 各阶段进入 TUI, 不预选任何项
 #   ./bootstrap.sh --yes              # 非交互: 全部安装 (适合脚本/CI)
 #   ./bootstrap.sh --only mcp,skills  # 只跑指定阶段
 #   ./bootstrap.sh --skip devtools    # 跳过指定阶段
@@ -46,7 +46,7 @@ while [ "$#" -gt 0 ]; do
         --skip)     SKIP="${2:-}"; shift 2 ;;
         --dir)      JOE_DIR="${2:-}"; shift 2 ;;
         --repo)     JOE_REPO="${2:-}"; shift 2 ;;
-        -h|--help)  sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help)  awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; exit 0 ;;
         *) echo "未知选项: $1" >&2; exit 2 ;;
     esac
 done
@@ -171,8 +171,8 @@ run_stage() {
     step "[$CURRENT_STAGE/$TOTAL_STAGES] $label"
 
     if $ASSUME_YES; then
-        # 非交互: 让安装器走"全装"分支
-        if bash "$script" < /dev/null; then
+        # --yes 是调用者显式选择全部安装, 不依赖安装器的默认行为。
+        if bash "$script" --all < /dev/null; then
             printf '  %s %s 完成\n' "$(c_g '✓')" "$label"
         else
             printf '  %s %s 失败\n' "$(c_r '✗')" "$label"

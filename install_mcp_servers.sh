@@ -6,8 +6,9 @@
 # AI CLI 工具: Claude Code (claude), Codex (codex), MiMo Code (mimo)。
 #
 # 用法:
-#   ./install_mcp_servers.sh                  # 默认进入 TUI 交互选择 (非交互则全装)
+#   ./install_mcp_servers.sh                  # 默认进入 TUI, 不预选; 非交互须指定服务器
 #   ./install_mcp_servers.sh --tui            # 强制进入 TUI 勾选界面
+#   ./install_mcp_servers.sh --all            # 显式安装全部 MCP
 #   ./install_mcp_servers.sh --list           # 列出可用 MCP 服务器及状态
 #   ./install_mcp_servers.sh filesystem       # 只装 filesystem MCP
 #   ./install_mcp_servers.sh git memory       # 装多个 MCP
@@ -19,7 +20,7 @@
 #   2. 把 id 加入 MCP_IDS_AVAILABLE, 并在 tui_component_installed / _name 中登记
 #   3. 加入参数解析 case 与主流程 case
 #
-# 依赖: git, curl, npx (Node 18+), 已装的 AI CLI (claude/codex/mimo)
+# 依赖: git, curl, npx (Node 18+), python3 (Claude/MiMo 配置), 已装的 AI CLI
 # 说明:
 #   - 幂等: 已配置的服务器自动跳过
 #   - 所有外网下载尊重 https_proxy/http_proxy 环境变量
@@ -90,6 +91,7 @@ require_npx() {
 claude_user_has_mcp() {
     local name="$1"
     [ -f "$HOME/.claude.json" ] || return 1
+    command -v python3 >/dev/null 2>&1 || die "需要 python3 来读取 Claude Code 配置"
     python3 - "$HOME/.claude.json" "$name" << 'PYEOF'
 import json, sys
 try:
@@ -106,8 +108,12 @@ mcp_add_claude_stdio() {
     if claude_user_has_mcp "$name"; then
         info "Claude Code(user): ${name} 已配置, 跳过"
     else
-        claude mcp add -s user "$name" -- "$@" 2>&1 | tail -2 || true
-        ok "Claude Code(user): ${name} MCP 已添加"
+        if claude mcp add -s user "$name" -- "$@" 2>&1 | tail -2; then
+            ok "Claude Code(user): ${name} MCP 已添加"
+        else
+            warn "Claude Code(user): ${name} MCP 添加失败" >&2
+            return 1
+        fi
     fi
 }
 
@@ -120,95 +126,168 @@ mcp_add_codex_stdio() {
     if codex mcp list 2>/dev/null | grep -qE "^\s*${name}\s"; then
         info "Codex: ${name} 已配置, 跳过"
     else
-        codex mcp add "$name" -- "$@" 2>&1 | tail -2 || true
-        ok "Codex: ${name} MCP 已添加"
+        if codex mcp add "$name" -- "$@" 2>&1 | tail -2; then
+            ok "Codex: ${name} MCP 已添加"
+        else
+            warn "Codex: ${name} MCP 添加失败" >&2
+            return 1
+        fi
     fi
 }
 
 # ---------------------------------------------------------------------------
 # 配置目标: MiMo Code (编辑 ~/.config/mimocode/mimocode.jsonc)
 # ---------------------------------------------------------------------------
-mcp_add_mimo_stdio() {
-    local name="$1"; shift
-    has_mimo || { warn "未安装 mimo, 跳过 MiMo Code 配置"; return 0; }
-    local cfg="${MIMO_CONFIG:-$HOME/.config/mimocode/mimocode.jsonc}"
-    mkdir -p "$(dirname "$cfg")"
-    if [ ! -f "$cfg" ]; then
-        printf '{\n  "$schema": "https://mimo.xiaomi.com/mimocode/config.json"\n}\n' > "$cfg"
-    fi
-    # 用 python 注入 (先严格 JSON, 失败再用字符串感知的 jsonc 解析)
-    local result
-    result=$(python3 - "$cfg" "$name" "$@" << 'PYEOF'
-import json, re, sys
+# 状态检测与写入使用同一 JSONC 解析器, 只检查 mcp 对象。
+mimo_config() {
+    command -v python3 >/dev/null 2>&1 || die "需要 python3 来处理 MiMo Code 配置"
+    python3 - "$@" << 'PYEOF'
+import json, os, re, shutil, stat, sys, tempfile, time
+
 
 def strip_jsonc(text):
-    """去 // 与 /* */ 注释, 正确跳过字符串内部 (避免误伤 https://)。"""
+    """去注释与尾随逗号, 两步均跳过字符串内部。"""
     out, i, n, in_str = [], 0, len(text), False
     while i < n:
         c = text[i]
         if in_str:
             out.append(c)
             if c == '\\' and i + 1 < n:
-                out.append(text[i + 1]); i += 2; continue
+                out.append(text[i + 1])
+                i += 2
+                continue
             if c == '"':
                 in_str = False
-            i += 1; continue
-        if c == '"':
-            in_str = True; out.append(c); i += 1; continue
-        if c == '/' and i + 1 < n and text[i + 1] == '/':
+        elif c == '"':
+            in_str = True
+            out.append(c)
+        elif c == '/' and i + 1 < n and text[i + 1] == '/':
             j = text.find('\n', i)
+            out.append(' ')
             i = n if j == -1 else j
             continue
-        if c == '/' and i + 1 < n and text[i + 1] == '*':
+        elif c == '/' and i + 1 < n and text[i + 1] == '*':
             j = text.find('*/', i + 2)
-            i = n if j == -1 else j + 2
+            if j == -1:
+                raise ValueError("块注释未闭合")
+            out.append(' ')
+            i = j + 2
             continue
-        out.append(c); i += 1
+        else:
+            out.append(c)
+        i += 1
+
+    text = ''.join(out)
+    out, i, n, in_str = [], 0, len(text), False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == '\\' and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+            out.append(c)
+        elif c == ',':
+            j = i + 1
+            while j < n and text[j].isspace():
+                j += 1
+            if j == n or text[j] not in '}]':
+                out.append(c)
+        else:
+            out.append(c)
+        i += 1
     return ''.join(out)
 
-cfg, name = sys.argv[1], sys.argv[2]
-cmd = sys.argv[3:]
-raw = open(cfg, encoding="utf-8").read()
-data = None
-if raw.strip():
-    try:
-        data = json.loads(raw)                      # 严格 JSON 优先
-    except Exception:
-        txt = strip_jsonc(raw)
-        txt = re.sub(r',(\s*[}\]])', r'\1', txt)    # 去尾随逗号
+
+mode, cfg, name = sys.argv[1:4]
+try:
+    if os.path.exists(cfg):
+        with open(cfg, encoding="utf-8-sig") as f:
+            raw = f.read()
         try:
-            data = json.loads(txt)
-        except Exception:
-            sys.stderr.write("warning: 无法解析 %s, 将重建配置\n" % cfg)
-            data = None
-if not isinstance(data, dict):
-    data = {}
-data.setdefault("$schema", "https://mimo.xiaomi.com/mimocode/config.json")
-mcp = data.get("mcp")
-if not isinstance(mcp, dict):
-    mcp = {}
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            data = json.loads(strip_jsonc(raw))
+        if not isinstance(data, dict):
+            raise ValueError("配置根节点必须是对象")
+        if "mcp" in data and not isinstance(data["mcp"], dict):
+            raise ValueError("mcp 配置必须是对象")
+    else:
+        if mode == "has":
+            sys.exit(1)
+        data = {"$schema": "https://mimo.xiaomi.com/mimocode/config.json"}
+
+    mcp = data.get("mcp", {})
+    if mode == "has":
+        sys.exit(0 if name in mcp else 1)
+    if name in mcp:
+        print("already present")
+        sys.exit(0)
+    mcp[name] = {"type": "local", "command": sys.argv[4:], "enabled": True}
     data["mcp"] = mcp
-if name in mcp:
-    print("already present")
-    sys.exit(0)
-mcp[name] = {"type": "local", "command": cmd, "enabled": True}
-open(cfg, "w", encoding="utf-8").write(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-print("added")
+    payload = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+
+    # 保留符号链接及权限, 在同目录写临时文件后替换。
+    target = os.path.realpath(cfg)
+    parent = os.path.dirname(target)
+    os.makedirs(parent, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix="." + os.path.basename(target) + ".", dir=parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(payload)
+            f.flush()
+            os.fsync(f.fileno())
+        if os.path.exists(target):
+            os.chmod(tmp, stat.S_IMODE(os.stat(target).st_mode))
+            backup = target + ".bak." + time.strftime("%Y%m%d%H%M%S")
+            candidate, index = backup, 0
+            while os.path.exists(candidate):
+                index += 1
+                candidate = backup + "." + str(index)
+            shutil.copy2(target, candidate)
+        os.replace(tmp, target)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+    pattern = re.compile(re.escape(os.path.basename(target)) + r"\.bak\.\d+(?:\.\d+)?$")
+    backups = [os.path.join(parent, f) for f in os.listdir(parent) if pattern.fullmatch(f)]
+    backups.sort(key=lambda p: os.stat(p).st_mtime_ns, reverse=True)
+    for old in backups[5:]:
+        os.unlink(old)
+    print("added")
+except (OSError, ValueError) as error:
+    sys.stderr.write("MiMo Code 配置处理失败 (%s): %s\n" % (cfg, error))
+    sys.exit(1)
 PYEOF
-)
-    if [ "$result" = "added" ]; then
-        ok "MiMo Code: ${name} MCP 已添加 (${cfg})"
+}
+
+mcp_add_mimo_stdio() {
+    local name="$1"; shift
+    has_mimo || { warn "未安装 mimo, 跳过 MiMo Code 配置"; return 0; }
+    local cfg="${MIMO_CONFIG:-$HOME/.config/mimocode/mimocode.jsonc}" result
+    if result=$(mimo_config add "$cfg" "$name" "$@"); then
+        if [ "$result" = "added" ]; then
+            ok "MiMo Code: ${name} MCP 已添加 (${cfg})"
+        else
+            info "MiMo Code: ${name} 已配置, 跳过"
+        fi
     else
-        info "MiMo Code: ${name} 已配置, 跳过"
+        return 1
     fi
 }
 
 # 统一入口: 添加到所有已安装的 AI CLI
 mcp_add_all() {
     local name="$1"; shift
-    mcp_add_claude_stdio "$name" "$@"
-    mcp_add_codex_stdio "$name" "$@"
-    mcp_add_mimo_stdio "$name" "$@"
+    mcp_add_claude_stdio "$name" "$@" || return 1
+    mcp_add_codex_stdio "$name" "$@" || return 1
+    mcp_add_mimo_stdio "$name" "$@" || return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -310,12 +389,12 @@ install_codegraph_mcp() {
     info "=== 安装 CodeGraph MCP (跨语言代码图谱) ==="
     require_npx
     local bin
-    bin="$(_resolve_codegraph_bin)"
+    bin="$(_resolve_codegraph_bin)" || bin=""
     if [ -z "$bin" ]; then
         info "全局安装 @astudioplus/codegraph-mcp (含引擎下载)..."
         npm install -g --allow-scripts=@astudioplus/codegraph-mcp \
-            @astudioplus/codegraph-mcp 2>&1 | tail -3 || true
-        bin="$(_resolve_codegraph_bin)"
+            @astudioplus/codegraph-mcp 2>&1 | tail -3 || die "CodeGraph npm 安装失败"
+        bin="$(_resolve_codegraph_bin)" || bin=""
     fi
     [ -n "$bin" ] || die "CodeGraph 安装失败 (npm 全局)"
     # 引擎缺失时先试官方补拉命令
@@ -325,8 +404,9 @@ install_codegraph_mcp() {
     fi
     # 官方补拉失败(如 GitHub CDN 不稳)时, 改用镜像下载并校验 SHA256
     if ! "$bin" --help >/dev/null 2>&1; then
-        codegraph_fetch_engine_mirror || warn "镜像补拉也失败, CodeGraph 可能不可用"
+        codegraph_fetch_engine_mirror || die "CodeGraph 引擎补拉失败"
     fi
+    "$bin" --help >/dev/null 2>&1 || die "CodeGraph 引擎不可用"
     mcp_add_all codegraph "$bin"
     ok "CodeGraph MCP 配置完成 ($bin)"
 }
@@ -386,12 +466,24 @@ codex_has_mcp() {
 
 mimo_has_mcp() {
     has_mimo || return 1
-    grep -q "\"$1\"" "${MIMO_CONFIG:-$HOME/.config/mimocode/mimocode.jsonc}" 2>/dev/null
+    mimo_config has "${MIMO_CONFIG:-$HOME/.config/mimocode/mimocode.jsonc}" "$1"
 }
 
 tui_component_installed() {
-    local id="$1"
-    claude_has_mcp "$id" || codex_has_mcp "$id" || mimo_has_mcp "$id"
+    local id="$1" found=false
+    if has_claude; then
+        claude_has_mcp "$id" || return 1
+        found=true
+    fi
+    if has_codex; then
+        codex_has_mcp "$id" || return 1
+        found=true
+    fi
+    if has_mimo; then
+        mimo_has_mcp "$id" || return 1
+        found=true
+    fi
+    $found
 }
 
 tui_component_name() {
@@ -411,7 +503,7 @@ tui_select() {
     TUI_IDS=("${MCP_IDS_AVAILABLE[@]}")
     TUI_TITLE="joe MCP 服务器安装选择"
     load_tui_module || die "未找到 tui_module.sh (与脚本同目录)"
-    tui_available || { warn "当前不是交互式终端, 跳过 TUI"; return 1; }
+    tui_available || die "当前不是交互式终端, 请指定 MCP 服务器或使用 --all (查看 --help)"
     run_tui
 }
 
@@ -423,7 +515,7 @@ export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PATH"
 load_nvm
 
 usage() {
-    sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
+    awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"
     echo
     echo "可用 MCP 服务器:"
     echo "  filesystem           - 安全文件操作"
@@ -462,11 +554,13 @@ list_mcps() {
 
 TARGETS=()
 TUI_MODE=false
+ALL_MODE=false
 HAS_ARGS=false
 while [[ $# -gt 0 ]]; do
     HAS_ARGS=true
     case "$1" in
         --tui)       TUI_MODE=true; shift ;;
+        --all)       ALL_MODE=true; shift ;;
         --list|-l)   list_mcps ;;
         -h|--help)   usage ;;
         *)
@@ -478,13 +572,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# 无参数时: 交互终端默认 TUI, 非交互默认全装
+# 无参数时只提供交互选择, 非交互调用须显式指定安装项。
 if [ "$HAS_ARGS" = "false" ]; then
     if [ -t 1 ] && [ -t 0 ]; then
         TUI_MODE=true
     else
-        TARGETS=("${MCP_IDS_AVAILABLE[@]}")
+        die "当前不是交互式终端, 请指定 MCP 服务器或使用 --all (查看 --help)"
     fi
+fi
+
+if $ALL_MODE; then
+    $TUI_MODE && die "--all 不能与 --tui 同时使用"
+    TARGETS=("${MCP_IDS_AVAILABLE[@]}")
 fi
 
 if $TUI_MODE; then
@@ -501,6 +600,8 @@ if $TUI_MODE; then
         exit 0
     fi
 fi
+
+[ "${#TARGETS[@]}" -gt 0 ] || die "没有要安装的 MCP 服务器"
 
 if [ -n "$PROXY_URL" ]; then
     export https_proxy="$PROXY_URL" http_proxy="$PROXY_URL"

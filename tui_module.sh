@@ -68,7 +68,7 @@ if ! declare -F tui_component_installed >/dev/null 2>&1; then
         local id="$1"
         case "$id" in
             node)     _tui_has_bin node ;;
-            python)   { [ -x "$HOME/.pyenv/bin/pyenv" ] || command -v pyenv >/dev/null 2>&1; } && _tui_has_bin pipx ;;
+            python)   [ -x "$HOME/.pyenv/bin/pyenv" ] || command -v pyenv >/dev/null 2>&1 ;;
             ai)       _tui_has_bin claude && _tui_has_bin codex ;;
             zed)      [ -x "$HOME/.local/bin/zed" ] || command -v zed >/dev/null 2>&1 ;;
             ghostty)  command -v ghostty >/dev/null 2>&1 ;;
@@ -86,7 +86,7 @@ if ! declare -F tui_component_name >/dev/null 2>&1; then
     tui_component_name() {
         case "$1" in
             node)     echo "Node 工具链 (nvm + LTS)" ;;
-            python)   echo "Python 工具链 (pyenv + pipx)" ;;
+            python)   echo "Python 版本管理器 (pyenv + 编译依赖)" ;;
             ai)       echo "AI CLI (Claude Code + Codex)" ;;
             zed)      echo "Zed 编辑器 + JetBrains Mono" ;;
             ghostty)  echo "Ghostty 终端 + Ctrl+Alt+T" ;;
@@ -110,11 +110,10 @@ run_tui() {
         names[$i]=$(tui_component_name "${ids[$i]}")
         if tui_component_installed "${ids[$i]}"; then
             inst[$i]=1
-            sel[$i]=0   # 已安装默认不勾选 (跳过)
         else
             inst[$i]=0
-            sel[$i]=1   # 未安装默认勾选
         fi
+        sel[$i]=0       # 按需勾选, 不预选任何组件
     done
 
     local cur=0

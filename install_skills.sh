@@ -5,8 +5,9 @@
 # 把 ./skills/<name>/SKILL.md 安装到各 AI 代理的 skills 目录。
 #
 # 用法:
-#   ./install_skills.sh                # 默认进入 TUI 交互选择 (非交互则全装)
+#   ./install_skills.sh                # 默认进入 TUI, 不预选; 非交互须指定技能
 #   ./install_skills.sh --tui          # 强制进入 TUI 勾选界面
+#   ./install_skills.sh --all          # 显式安装全部技能
 #   ./install_skills.sh --list         # 列出技能及安装状态
 #   ./install_skills.sh <name> [...]   # 只装指定技能
 #
@@ -199,7 +200,7 @@ tui_select() {
     TUI_IDS=("${ids[@]}")
     TUI_TITLE="joe 代理技能安装选择"
     load_tui_module || die "未找到 tui_module.sh (与脚本同目录)"
-    tui_available || { warn "当前不是交互式终端, 跳过 TUI"; return 1; }
+    tui_available || die "当前不是交互式终端, 请指定技能或使用 --all (查看 --help)"
     run_tui
 }
 
@@ -207,7 +208,7 @@ tui_select() {
 # 参数解析 / 主流程
 # ---------------------------------------------------------------------------
 usage() {
-    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"
     echo
     echo "可用技能 (来自 $SKILLS_SRC):"
     local s
@@ -240,11 +241,13 @@ list_skills() {
 
 TARGETS=()
 TUI_MODE=false
+ALL_MODE=false
 HAS_ARGS=false
 while [[ $# -gt 0 ]]; do
     HAS_ARGS=true
     case "$1" in
         --tui)       TUI_MODE=true; shift ;;
+        --all)       ALL_MODE=true; shift ;;
         --list|-l)   list_skills ;;
         -h|--help)   usage ;;
         *)
@@ -257,14 +260,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# 无参数: 交互终端默认 TUI, 非交互默认全装
+# 无参数只进入交互选择, 非交互调用须显式指定技能。
 if [ "$HAS_ARGS" = "false" ]; then
     if [ -t 1 ] && [ -t 0 ]; then
         TUI_MODE=true
     else
-        # shellcheck disable=SC2207
-        TARGETS=($(discover_skills))
+        die "当前不是交互式终端, 请指定技能或使用 --all (查看 --help)"
     fi
+fi
+
+if $ALL_MODE; then
+    $TUI_MODE && die "--all 不能与 --tui 同时使用"
+    mapfile -t TARGETS < <(discover_skills)
 fi
 
 if $TUI_MODE; then

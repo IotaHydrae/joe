@@ -22,12 +22,14 @@ description: 了解 joe 开发环境的内容与用法。当需要安装/更新�
 ./install_skills.sh --tui
 ```
 
+所有项目默认不勾选；非交互调用须指定安装项，只有显式 `--all` 才安装全部。
+
 TUI 按键：`↑/↓` 移动，`空格` 勾选，`a` 全选，`n` 全不选，`i` 仅未装，`回车` 开始，`q` 退出。已安装项显示 `[✓装]` 并自动跳过。
 
 ## 已安装的工具
 
 - **Node**: nvm + Node LTS（`~/.nvm`）
-- **Python**: pyenv + Python 3.12 + pipx（`~/.pyenv`）
+- **Python**: pyenv + 编译依赖（`~/.pyenv`），Python 版本与 pipx 按需自行安装
 - **AI CLI**: `claude`（Claude Code）、`codex`（Codex CLI）、`mimo`（MiMo Code，官方路径 `~/.mimocode/bin`）
 - **编辑器**: Zed（`~/.local/bin/zed`）、VS Code（`/usr/bin/code`）
 - **终端**: Ghostty（`Ctrl+Alt+T` 打开）

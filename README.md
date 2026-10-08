@@ -350,6 +350,17 @@ podman run --rm -v "$PWD:/joe:ro,z" docker.io/library/archlinux \
 
 ---
 
+## 安装器选择规则
+
+`install_devtools.sh`、`install_mcp_servers.sh`、`install_skills.sh` 无参数时进入 TUI，**所有项目默认不勾选**。用空格按需选择，再按回车安装；直接回车或退出不会安装任何项目。非交互终端必须显式指定组件、服务器、技能或 `--all`，否则报错退出。
+
+| 选项 | 三个组件安装器的行为 |
+|---|---|
+| `--tui` | 打开交互选择界面，默认不勾选 |
+| `--all` | 显式安装全部项目，不能与 `--tui` 同用 |
+| `--list` | 列出项目和当前状态 |
+| `-h, --help` | 查看用法和依赖 |
+
 ## 全流程脚本
 
 围绕"新机器 → 部署 → 体检 → 升级 → 备份"的完整闭环：
@@ -364,7 +375,7 @@ podman run --rm -v "$PWD:/joe:ro,z" docker.io/library/archlinux \
 ### bootstrap.sh — 新机器一键部署
 
 ```bash
-./bootstrap.sh                    # 交互: 各阶段进入 TUI 勾选
+./bootstrap.sh                    # 交互: 各阶段进入 TUI，默认不勾选
 ./bootstrap.sh --yes              # 非交互: 全部安装 (适合脚本/CI)
 ./bootstrap.sh --only mcp,skills  # 只跑指定阶段
 ./bootstrap.sh --skip devtools    # 跳过指定阶段
@@ -415,7 +426,7 @@ curl -fsSL <raw-url>/bootstrap.sh | bash
 | codebase-memory-mcp | `codebase-memory-mcp update -y` |
 | CodeGraph 引擎 | 镜像补拉 + SHA256 校验 |
 
-单项有 300s 超时保护（`UPDATE_TIMEOUT` 可调），失败不影响其余项。
+单项有 300s 超时保护（`UPDATE_TIMEOUT` 可调），失败不影响其余项。更新器只更新已安装工具，不再自动执行 MCP / 技能安装器；需要配置 MCP 或更新技能时，运行对应安装器按需选择。`bootstrap.sh --yes` 仍表示显式选择全部安装。
 
 ### sync-configs.sh — 配置备份
 
@@ -463,7 +474,8 @@ skills/
 ### 用法
 
 ```bash
-./install_skills.sh                # 默认进入 TUI 交互选择（非交互则全装）
+./install_skills.sh                # 默认进入 TUI，不预选；非交互须指定技能
+./install_skills.sh --all          # 显式安装全部技能
 ./install_skills.sh --tui          # 强制 TUI 勾选
 ./install_skills.sh --list         # 列出技能及安装状态
 ./install_skills.sh joe-env        # 只装指定技能
@@ -545,7 +557,8 @@ EOF
 ### 用法
 
 ```bash
-./install_mcp_servers.sh                 # 默认进入 TUI 交互选择（非交互终端则全装）
+./install_mcp_servers.sh                 # 默认进入 TUI，不预选；非交互须指定服务器
+./install_mcp_servers.sh --all           # 显式安装全部 MCP
 ./install_mcp_servers.sh --tui           # 强制进入 TUI 勾选界面
 ./install_mcp_servers.sh --list          # 列出可用 MCP 及当前配置状态
 ./install_mcp_servers.sh filesystem      # 只装 filesystem MCP
@@ -561,7 +574,7 @@ EOF
 - **↑/↓** 移动光标，**空格** 勾选/取消
 - **a** 全选，**n** 全不选，**i** 仅选未配置
 - **回车** 开始安装，**q** 退出
-- 已配置的 MCP 显示 `[✓装]`，默认自动跳过
+- 所有 MCP 默认不勾选；只有在所有已安装客户端都已配置时才显示 `[✓装]` 并跳过，因此可以补齐新安装客户端的配置
 
 ### 自定义 filesystem 可访问目录
 
@@ -579,7 +592,7 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 2. 把 id 加入 `MCP_IDS_AVAILABLE`，并在 `tui_component_installed` / `tui_component_name` 中登记
 3. 加入参数解析与主流程的 case 分支
 
-脚本幂等：已配置的服务器自动跳过，可安全重复执行。
+脚本幂等：各客户端已配置的服务器自动跳过，可安全重复执行。Claude / MiMo 配置检测依赖 `python3`；CLI 添加失败会返回非零退出码。MiMo 配置解析失败时保留原文件，成功写入前备份为 `*.bak.<timestamp>`（保留最近 5 份），随后原子替换；JSONC 注释会转换为标准 JSON，字符串内容保持不变。
 
 ---
 
@@ -612,8 +625,7 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 | 组件 | 说明 | 安装方式 |
 |---|---|---|
 | **nvm + Node LTS** | Node 版本管理器 + 默认 LTS 版 | 官方脚本，自动配置 zsh |
-| **pyenv + Python** | Python 版本管理器 + 默认 3.12.10 | 官方脚本 + 编译依赖，自动配置 zsh |
-| **pipx** | Python CLI 应用安装工具 | pip 安装 |
+| **pyenv** | Python 版本管理器，不自动安装 Python | 官方脚本 + 编译依赖，自动配置 bash/zsh |
 | **Claude Code** | Anthropic AI CLI（`claude`） | npm 全局安装 |
 | **Codex CLI** | OpenAI AI CLI（`codex`） | npm 全局安装 |
 | **Zed 编辑器** | 高性能代码编辑器 | 官方安装脚本 + Vulkan 驱动 |
@@ -628,9 +640,10 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 ### 用法
 
 ```bash
-./install_devtools.sh             # 交互式终端打开 TUI 勾选; 非交互式(管道/CI)安装全部
+./install_devtools.sh             # 默认进入 TUI，不预选；非交互须指定组件
+./install_devtools.sh --all       # 显式安装全部组件
 ./install_devtools.sh --node      # 只装 Node 工具链 (nvm + LTS)
-./install_devtools.sh --python    # 只装 Python 工具链 (pyenv + pipx)
+./install_devtools.sh --python    # 只装 pyenv + Python 编译依赖
 ./install_devtools.sh --ai        # 只装 AI CLI (claude-code + codex)
 ./install_devtools.sh --zed       # 只装 Zed 编辑器 + JetBrains Mono
 ./install_devtools.sh --ghostty   # 只装 Ghostty 终端 + Ctrl+Alt+T 快捷键
@@ -650,7 +663,7 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 - **↑/↓** 移动光标，**空格** 勾选/取消
 - **a** 全选未安装，**n** 全不选，**i** 仅选未安装
 - **回车** 开始安装，**q** 退出
-- 已安装的组件自动检测并显示 `[✓装]`，默认跳过
+- 所有组件默认不勾选；已安装的组件自动检测并显示 `[✓装]`，自动跳过
 
 ```bash
 ./install_devtools.sh --tui
@@ -660,12 +673,12 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 ### 环境变量
 
 - `NODE_LTS` - 指定 Node 版本（默认最新 LTS）
-- `PYTHON_VERSION` - 指定 Python 版本（默认 3.12.10）
 - `PROXY_URL` - 代理地址，如 `http://192.168.50.182:7890`（外网下载慢时使用）
 
 ### 注意事项
 
 - 所有组件**幂等**：已安装的会自动跳过，可安全重复执行
+- `--python` 只配置 pyenv 和编译依赖，Python 版本及 pipx 由用户自行安装
 - 已存在的 `~/.config/zed/settings.json` 不会被覆盖（只在缺失时写入默认字体配置）
 - AI CLI（Claude Code/Codex）安装后需各自登录/配置 API key 才能使用
 - Zed 依赖 Vulkan，脚本按发行版自动安装对应驱动（pacman 下为 `vulkan-radeon`+`vulkan-intel`）

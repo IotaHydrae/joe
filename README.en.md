@@ -71,6 +71,17 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install.sh --clean-backups
 ```
 
+## Component selection
+
+`install_devtools.sh`, `install_mcp_servers.sh`, and `install_skills.sh` open a TUI when run without arguments in an interactive terminal. **Every item starts unchecked.** Select items with Space and confirm with Enter; Enter with no selection or quitting installs nothing. In a non-interactive terminal, specify individual items or `--all`; running without arguments exits with an error.
+
+| Option | Behavior in all three component installers |
+|---|---|
+| `--tui` | Open the checklist with every item unchecked |
+| `--all` | Explicitly install every item; cannot be combined with `--tui` |
+| `--list` | List items and their current status |
+| `-h, --help` | Show usage and dependencies |
+
 ## Devtools suite
 
 The repository ships `install_devtools.sh`, a one-shot installer for a set of common development tools. It is independent of the main `install.sh` and entirely optional. The component list was recorded from the actual setup of a Fedora 44 server so a new machine can reproduce it.
@@ -82,8 +93,7 @@ The repository ships `install_devtools.sh`, a one-shot installer for a set of co
 | Component | Description | How it is installed |
 |-----------|-------------|---------------------|
 | **nvm + Node LTS** | Node version manager + default LTS | official script, configures zsh |
-| **pyenv + Python** | Python version manager + default 3.12.10 | official script + build dependencies, configures zsh |
-| **pipx** | Python CLI application installer | installed via pip |
+| **pyenv** | Python version manager; does not install Python automatically | official script + build dependencies, configures bash/zsh |
 | **Claude Code** | Anthropic AI CLI (`claude`) | `npm install -g` |
 | **Codex CLI** | OpenAI AI CLI (`codex`) | `npm install -g` |
 | **Zed editor** | high-performance code editor | official install script + Vulkan drivers |
@@ -98,9 +108,10 @@ The repository ships `install_devtools.sh`, a one-shot installer for a set of co
 ### Usage
 
 ```bash
-./install_devtools.sh             # interactive terminal: opens the TUI checklist; non-interactive (pipe/CI): installs everything
+./install_devtools.sh             # interactive checklist, nothing preselected; non-interactive: specify components
+./install_devtools.sh --all       # explicitly install every component
 ./install_devtools.sh --node      # Node toolchain only (nvm + LTS)
-./install_devtools.sh --python    # Python toolchain only (pyenv + pipx)
+./install_devtools.sh --python    # pyenv and Python build dependencies only
 ./install_devtools.sh --ai        # AI CLIs only (claude-code + codex)
 ./install_devtools.sh --zed       # Zed editor + JetBrains Mono only
 ./install_devtools.sh --ghostty   # Ghostty terminal + Ctrl+Alt+T only
@@ -120,7 +131,7 @@ Running `./install_devtools.sh --tui` opens a terminal UI for picking components
 - **↑/↓** move the cursor, **Space** toggle a component
 - **a** select all, **n** select none, **i** select only uninstalled
 - **Enter** start installing, **q** quit
-- Installed components are auto-detected, displayed as `[✓装]` and skipped by default
+- Every component starts unchecked; installed components are auto-detected, displayed as `[✓装]` and skipped
 
 ```bash
 ./install_devtools.sh --tui
@@ -130,17 +141,66 @@ Running `./install_devtools.sh --tui` opens a terminal UI for picking components
 ### Environment variables
 
 - `NODE_LTS` — pin the Node version (default: latest LTS)
-- `PYTHON_VERSION` — pin the Python version (default: 3.12.10)
 - `PROXY_URL` — proxy address, e.g. `http://192.168.50.182:7890` (use when external downloads are slow)
 
 ### Notes
 
 - All components are **idempotent**: anything already installed is skipped, so re-running is safe
+- `--python` configures pyenv and build dependencies; install your chosen Python version and pipx yourself
 - An existing `~/.config/zed/settings.json` is never overwritten (the default font settings are written only when the file is missing)
 - The AI CLIs (Claude Code / Codex) still need their own login / API key configuration after installation
 - Zed requires Vulkan; the script installs the matching driver per distro (`vulkan-radeon` + `vulkan-intel` on pacman)
 - Ghostty on the Budgie/labwc desktop depends on `xdg-terminal-exec` (skipped with a warning when the distro has no such package)
 - Open a new terminal afterwards (or `source ~/.zshrc`)
+
+## MCP servers
+
+`install_mcp_servers.sh` configures the installed Claude Code, Codex CLI, and MiMo Code clients. Claude uses the user scope, Codex writes its CLI configuration, and MiMo uses `~/.config/mimocode/mimocode.jsonc`.
+
+| Server | Runtime |
+|---|---|
+| `filesystem` | `npx @modelcontextprotocol/server-filesystem` |
+| `git` | `uvx mcp-server-git` |
+| `memory` | `npx @modelcontextprotocol/server-memory` |
+| `codebase-memory-mcp` | Official static binary |
+| `context7` | `npx @upstash/context7-mcp` |
+| `codegraph` | `@astudioplus/codegraph-mcp` and its engine |
+| `serena` | `uvx --from serena-agent serena start-mcp-server` |
+
+```bash
+./install_mcp_servers.sh             # checklist, nothing preselected
+./install_mcp_servers.sh memory git  # install only these servers
+./install_mcp_servers.sh --all       # explicitly install every server
+./install_mcp_servers.sh --list
+```
+
+A server is marked installed in the TUI only when every installed client has its configuration, so newly installed clients can be configured too. Each client skips servers it already has. Claude/MiMo configuration checks require `python3`; CLI registration failures return a nonzero exit code. Invalid MiMo configuration is preserved. Successful edits create `*.bak.<timestamp>` backups (keeping the latest five) and replace the file atomically. JSONC comments are converted to standard JSON while string contents are preserved.
+
+Filesystem access defaults to `$HOME` and `/tmp`; override it with `FILESYSTEM_DIRS="/home/dev /data /projects"`. `CBM_VARIANT=ui` selects the codebase-memory visual variant, and `PROXY_URL` sets the download proxy.
+
+## Agent skills
+
+```bash
+./install_skills.sh          # checklist, nothing preselected
+./install_skills.sh joe-env  # install/update only this skill
+./install_skills.sh --all    # explicitly install/update every skill
+./install_skills.sh --list
+```
+
+Skills and their supporting directories are copied to `~/.agents/skills` and the detected clients' skill directories. Items already current in every target are skipped. All three TUIs use arrows to move, Space to select, `a` to select all missing items, `n` to clear the selection, `i` to select only missing items, Enter to install, and `q` to quit.
+
+## Bootstrap and updates
+
+```bash
+./bootstrap.sh                    # each installer opens an empty checklist
+./bootstrap.sh --only mcp,skills   # run selected stages
+./bootstrap.sh --yes               # explicitly install everything without a TUI
+./update-all.sh                    # update installed tools and MCP engines
+./update-all.sh --dry-run          # preview updates
+./update-all.sh --system           # also update system packages
+```
+
+The updater no longer runs the MCP or skill installers automatically. Run the corresponding installer to select MCP configuration or skill updates. `bootstrap.sh --yes` passes `--all` explicitly to each component installer.
 
 ## What Gets Installed
 
