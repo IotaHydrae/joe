@@ -41,7 +41,7 @@ jobs:
         run: |
           set -e
           fail=0
-          for f in install_devtools.sh install_mcp_servers.sh install_skills.sh doctor.sh bootstrap.sh update-all.sh; do
+          for f in install_devtools.sh install_mcp_servers.sh install_skills.sh repair_ghostty.sh doctor.sh bootstrap.sh update-all.sh; do
             [ -f "$f" ] || continue
             if [ ! -x "$f" ]; then
               echo "::error file=$f::$f 缺少可执行权限 (chmod +x)"

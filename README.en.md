@@ -114,7 +114,7 @@ The repository ships `install_devtools.sh`, a one-shot installer for a set of co
 ./install_devtools.sh --python    # pyenv and Python build dependencies only
 ./install_devtools.sh --ai        # AI CLIs only (claude-code + codex)
 ./install_devtools.sh --zed       # Zed editor + JetBrains Mono only
-./install_devtools.sh --ghostty   # Ghostty terminal + Ctrl+Alt+T only
+./install_devtools.sh --ghostty   # install/repair Ghostty, terminfo and desktop terminal integration
 ./install_devtools.sh --vscode    # VS Code editor only
 ./install_devtools.sh --mimo      # MiMo Code only
 ./install_devtools.sh --chatgpt   # ChatGPT / Codex desktop only
@@ -150,8 +150,20 @@ Running `./install_devtools.sh --tui` opens a terminal UI for picking components
 - An existing `~/.config/zed/settings.json` is never overwritten (the default font settings are written only when the file is missing)
 - The AI CLIs (Claude Code / Codex) still need their own login / API key configuration after installation
 - Zed requires Vulkan; the script installs the matching driver per distro (`vulkan-radeon` + `vulkan-intel` on pacman)
-- Ghostty on the Budgie/labwc desktop depends on `xdg-terminal-exec` (skipped with a warning when the distro has no such package)
+- Ghostty checks the host's `xterm-ghostty` terminfo. When an AppImage keeps it only inside the image, the repair extracts it and uses `tic` to install it into `~/.terminfo`, fixing errors such as minicom's `No termcap entry for xterm-ghostty`. The ncurses tools package provides `infocmp`/`tic`: apt uses `ncurses-bin`, pacman/dnf use `ncurses`, and zypper uses `ncurses-utils`
+- Ghostty desktop entries use `~/.local/bin/joe-ghostty`, which passes the caller's directory explicitly as `--working-directory` when reusing a running instance. Cinnamon/Nemo's default terminal points to this launcher too
+- Ghostty on Budgie/labwc uses `xdg-terminal-exec`, with an upstream-script fallback when the distro package is unavailable
 - Open a new terminal afterwards (or `source ~/.zshrc`)
+
+### Repair an existing Ghostty installation
+
+```bash
+./repair_ghostty.sh                  # repair existing integration without installing packages
+infocmp -x xterm-ghostty             # verify the terminal description
+minicom -s                          # verify the minicom setup menu
+```
+
+The repair preserves Ghostty font, theme and keybinding preferences. Changed launchers, desktop entries, terminal preference lists and Cinnamon settings are backed up as `*.bak.<timestamp>` (keeping the latest five). Desktop entries are found in user directories before system directories, and other terminals remain in the fallback list. Repeated repairs leave unchanged files untouched. `doctor.sh` reports missing terminfo and suggests this repair.
 
 ## MCP servers
 

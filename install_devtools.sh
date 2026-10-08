@@ -13,7 +13,7 @@
 #   ./install_devtools.sh --python   # 只装 pyenv + Python 编译依赖
 #   ./install_devtools.sh --ai       # 只装 AI CLI (claude-code + codex)
 #   ./install_devtools.sh --zed      # 只装 Zed 编辑器 + JetBrains Mono
-#   ./install_devtools.sh --ghostty  # 只装 Ghostty 终端 + Ctrl+Alt+T 快捷键
+#   ./install_devtools.sh --ghostty  # 安装/修复 Ghostty、terminfo 和桌面终端入口
 #   ./install_devtools.sh --vscode   # 只装 VS Code 编辑器
 #   ./install_devtools.sh --mimo     # 只装 MiMo Code (小米 AI 编程助手)
 #   ./install_devtools.sh --chatgpt  # 只装 ChatGPT / Codex 桌面版
@@ -26,6 +26,7 @@
 # 说明:
 #   - nvm 装到 ~/.nvm, 默认 Node LTS
 #   - pyenv 装到 ~/.pyenv, Python 版本与 pipx 由用户自行安装
+#   - --ghostty 会修复已有安装的 terminfo 与桌面入口; 单独修复用 ./repair_ghostty.sh
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
 # =============================================================================
@@ -122,7 +123,7 @@ make_tmp() {
 # 支持 apt (Debian/Ubuntu/Mint) / pacman (Arch/CachyOS) / dnf (Fedora) / zypper (openSUSE)
 # 并处理版本差异, 例如 Ubuntu 24.04 的 t64 重命名 (libfuse2 -> libfuse2t64)
 _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-for _lib in lib_distro.sh lib_github.sh; do
+for _lib in lib_distro.sh lib_github.sh lib_ghostty.sh; do
     if [ -f "$_LIB_DIR/$_lib" ]; then
         # shellcheck disable=SC1090
         . "$_LIB_DIR/$_lib"
@@ -413,46 +414,43 @@ ensure_xdg_terminal_exec() {
 install_ghostty() {
     info "=== 安装 Ghostty 终端 ==="
 
-    if ! command -v ghostty >/dev/null 2>&1; then
+    if ! ghostty_binary >/dev/null 2>&1; then
         case "$PM" in
             dnf)
                 { sudo dnf copr enable -y scottames/ghostty && sudo dnf install -y ghostty; } \
-                    || warn "Ghostty dnf 安装失败"
+                    || die "Ghostty dnf 安装失败"
                 ;;
             apt)
-                # 失败不应中止整个脚本 (后面还要配置 xdg-terminal-exec)
-                install_ghostty_apt || true
+                install_ghostty_apt || die "Ghostty apt 安装失败"
                 ;;
             pacman)
                 sudo pacman -S --needed --noconfirm ghostty \
-                    || warn "Ghostty pacman 安装失败"
+                    || die "Ghostty pacman 安装失败"
                 ;;
             zypper)
-                sudo zypper install -y ghostty || warn "Ghostty zypper 安装失败"
+                sudo zypper install -y ghostty || die "Ghostty zypper 安装失败"
                 ;;
             *)
-                warn "Ghostty 安装方式未知, 请手动安装"
+                die "Ghostty 安装方式未知, 请手动安装"
                 ;;
         esac
     else
-        info "Ghostty 已安装: $(ghostty --version | head -1)"
+        local bin
+        bin="$(ghostty_binary)"
+        info "Ghostty 已安装: $("$bin" --version | head -1)"
     fi
+
+    ghostty_binary >/dev/null 2>&1 || die "Ghostty 安装后仍未找到可执行文件"
+    if ! command -v infocmp >/dev/null 2>&1 || ! command -v tic >/dev/null 2>&1; then
+        install_sys_pkg ncurses-tools
+    fi
+    repair_ghostty || die "Ghostty 兼容修复失败, 请查看上面的错误"
 
     # xdg-terminal-exec (默认终端执行器, Budgie/labwc 的 C-A-t 依赖它)
     # 发行版包缺失时自动回退到上游脚本, 不再直接放弃
     ensure_xdg_terminal_exec >/dev/null 2>&1 || true
     command -v xdg-terminal-exec >/dev/null 2>&1 \
         || warn "未装上 xdg-terminal-exec, Ctrl+Alt+T 可能不生效"
-
-    # 配置 Ghostty 为默认终端 (xdg-terminal-exec 首选)
-    if command -v xdg-terminal-exec >/dev/null 2>&1; then
-        mkdir -p "$HOME/.config"
-        if [ -f /usr/share/applications/com.mitchellh.ghostty.desktop ]; then
-            printf 'com.mitchellh.ghostty.desktop\n' > "$HOME/.config/xdg-terminals.list"
-            printf 'com.mitchellh.ghostty.desktop\n' > "$HOME/.config/budgie-xdg-terminals.list"
-            info "已配置 Ghostty 为默认终端"
-        fi
-    fi
 
     # labwc (Budgie) Ctrl+Alt+T 快捷键: 确保绑定指向 xdg-terminal-exec
     local rc="$HOME/.config/budgie-desktop/labwc/rc.xml"
@@ -465,7 +463,7 @@ install_ghostty() {
         fi
     fi
 
-    ok "Ghostty 配置完成 (Ctrl+Alt+T 打开)"
+    ok "Ghostty 配置完成 (terminfo 与桌面入口已修复)"
 }
 
 # ---------------------------------------------------------------------------

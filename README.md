@@ -273,6 +273,7 @@ cd /your/project
 |---|---|---|---|---|
 | `fuse2` | `libfuse2` | **`libfuse2t64`** | `fuse2` | `fuse` |
 | `ncurses-dev` | `libncursesw5-dev` | **`libncurses-dev`** | (base-devel) | `ncurses-devel` |
+| `ncurses-tools` | `ncurses-bin` | `ncurses-bin` | `ncurses` | `ncurses` |
 | `xdg-terminal-exec` | `xdg-terminal-exec` | `xdg-terminal-exec` | `xdg-terminal-exec` | `xdg-terminal-exec` |
 | `mesa-vulkan-drivers` | `mesa-vulkan-drivers` | 同左 | `vulkan-radeon` + `vulkan-intel` | `mesa-vulkan-drivers` |
 
@@ -369,6 +370,7 @@ podman run --rm -v "$PWD:/joe:ro,z" docker.io/library/archlinux \
 |---|---|
 | `bootstrap.sh` | 新机器一键部署（克隆 + 三个安装器 + 体检） |
 | `doctor.sh` | 环境体检：工具 / MCP / 技能是否就绪，给出修复建议 |
+| `repair_ghostty.sh` | 修复已有 Ghostty 的 terminfo 与桌面终端入口 |
 | `update-all.sh` | 用各工具官方自更新机制统一升级 |
 | `sync-configs.sh` | 把本机配置（脱敏后）备份进仓库 / 从仓库恢复 |
 
@@ -646,7 +648,7 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 ./install_devtools.sh --python    # 只装 pyenv + Python 编译依赖
 ./install_devtools.sh --ai        # 只装 AI CLI (claude-code + codex)
 ./install_devtools.sh --zed       # 只装 Zed 编辑器 + JetBrains Mono
-./install_devtools.sh --ghostty   # 只装 Ghostty 终端 + Ctrl+Alt+T 快捷键
+./install_devtools.sh --ghostty   # 安装/修复 Ghostty、terminfo 和桌面终端入口
 ./install_devtools.sh --vscode    # 只装 VS Code 编辑器
 ./install_devtools.sh --mimo      # 只装 MiMo Code (小米 AI 编程助手)
 ./install_devtools.sh --chatgpt   # 只装 ChatGPT / Codex 桌面版
@@ -682,8 +684,20 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 - 已存在的 `~/.config/zed/settings.json` 不会被覆盖（只在缺失时写入默认字体配置）
 - AI CLI（Claude Code/Codex）安装后需各自登录/配置 API key 才能使用
 - Zed 依赖 Vulkan，脚本按发行版自动安装对应驱动（pacman 下为 `vulkan-radeon`+`vulkan-intel`）
-- Ghostty 在 Budgie/labwc 桌面下依赖 `xdg-terminal-exec`（AUR/zypper 无此包时会提示跳过）
+- Ghostty 安装后会检查 `xterm-ghostty` terminfo；AppImage 缺失主机端描述时，从 AppImage 中提取并用 `tic` 安装到 `~/.terminfo`，避免 minicom 等程序报 `No termcap entry for xterm-ghostty`。`infocmp`/`tic` 由 ncurses 工具包提供（apt: `ncurses-bin`，pacman/dnf: `ncurses`，zypper: `ncurses-utils`）
+- Ghostty 桌面入口使用 `~/.local/bin/joe-ghostty`，将调用目录作为 `--working-directory` 显式传入，避免单实例复用时打开错误目录；Cinnamon/Nemo 的默认终端也会指向此入口
+- Ghostty 在 Budgie/labwc 桌面下依赖 `xdg-terminal-exec`，发行版包不可用时尝试上游脚本
 - 安装完成后新开终端生效（或 `source ~/.zshrc`）
+
+### 修复已有 Ghostty
+
+```bash
+./repair_ghostty.sh                  # 只修复已有安装，不安装软件包
+infocmp -x xterm-ghostty             # 验证终端描述
+minicom -s                          # 验证 minicom 配置界面
+```
+
+修复保留 Ghostty 的字体、主题和快捷键配置，为被修改的启动器、桌面文件、终端首选列表及 Cinnamon 设置创建 `*.bak.<timestamp>` 备份（保留最近 5 份）。桌面文件优先读取用户目录，再读取系统目录；终端首选列表保留其他终端作为回退。重复运行时内容无变化的文件保持不动。`doctor.sh` 会检测 terminfo 缺失并提示运行此修复。
 
 
 ## 安装内容

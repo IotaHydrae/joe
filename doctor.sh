@@ -245,6 +245,13 @@ section "编辑器 / 终端 / 桌面"
 chk_cmd zed      "运行 ./install_devtools.sh --zed"
 chk_cmd code     "运行 ./install_devtools.sh --vscode"
 chk_cmd ghostty  "运行 ./install_devtools.sh --ghostty"
+if find_bin ghostty >/dev/null 2>&1; then
+    if command -v infocmp >/dev/null 2>&1 && infocmp -x xterm-ghostty >/dev/null 2>&1; then
+        record ok "Ghostty terminfo" "xterm-ghostty 可用"
+    else
+        record fail "Ghostty terminfo" "运行 ./repair_ghostty.sh (minicom 等终端程序需要)"
+    fi
+fi
 chk_cmd chatgpt  "运行 ./install_devtools.sh --chatgpt"
 chk_cmd_present cc-switch "运行 ./install_devtools.sh --ccswitch"   # GUI 应用, --version 会启动界面
 

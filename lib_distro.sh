@@ -174,6 +174,7 @@ pkg_candidates() {
                 # Ubuntu 24.04 起 t64 重命名; 按可用性二选一
                 fuse2)               echo "libfuse2t64|libfuse2" ;;
                 ncurses-dev)         echo "libncurses-dev|libncursesw5-dev" ;;
+                ncurses-tools)       echo "ncurses-bin" ;;
                 fontconfig)          echo "fontconfig" ;;
                 unzip)               echo "unzip" ;;
                 *)                   echo "$logical" ;;
@@ -187,6 +188,7 @@ pkg_candidates() {
                 xdg-terminal-exec)   echo "xdg-terminal-exec" ;;   # 官方仓库已有
                 fuse2)               echo "fuse2" ;;
                 ncurses-dev)         echo "" ;;                    # base-devel 已覆盖
+                ncurses-tools)       echo "ncurses" ;;
                 fontconfig)          echo "fontconfig" ;;
                 unzip)               echo "unzip" ;;
                 *)                   echo "$logical" ;;
@@ -200,6 +202,7 @@ pkg_candidates() {
                 xdg-terminal-exec)   echo "xdg-terminal-exec" ;;
                 fuse2)               echo "fuse" ;;
                 ncurses-dev)         echo "ncurses-devel" ;;
+                ncurses-tools)       echo "ncurses" ;;
                 fontconfig)          echo "fontconfig" ;;
                 unzip)               echo "unzip" ;;
                 *)                   echo "$logical" ;;
@@ -213,6 +216,7 @@ pkg_candidates() {
                 xdg-terminal-exec)   echo "" ;;   # 未打包, 走脚本回退
                 fuse2)               echo "libfuse2" ;;
                 ncurses-dev)         echo "ncurses-devel" ;;
+                ncurses-tools)       echo "ncurses-utils" ;;
                 fontconfig)          echo "fontconfig" ;;
                 unzip)               echo "unzip" ;;
                 *)                   echo "$logical" ;;
