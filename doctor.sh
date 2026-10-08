@@ -147,17 +147,65 @@ skill_dirs() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. 系统
+# 1. 系统信息与兼容性
 # ---------------------------------------------------------------------------
-section "系统"
+section "系统信息与兼容性"
 if [ -r /etc/os-release ]; then
     . /etc/os-release
     record ok "操作系统" "${PRETTY_NAME:-unknown}"
+
+    # 检查发行版兼容性
+    case "${ID:-unknown}" in
+        ubuntu|debian|linuxmint|pop|elementary|arch|cachyos|manjaro|fedora|rhel|centos|opensuse*)
+            record ok "发行版支持" "已验证兼容"
+            ;;
+        *)
+            record warn "发行版支持" "未在此发行版上测试 ($ID)"
+            ;;
+    esac
+
+    # Linux Mint 特别检查
+    if [ "${ID:-}" = "linuxmint" ]; then
+        if [ -n "${UBUNTU_CODENAME:-}" ]; then
+            record ok "Ubuntu 基线" "${UBUNTU_CODENAME} (${UBUNTU_VERSION_ID:-未知})"
+        else
+            record warn "Ubuntu 基线" "无法确定对应的 Ubuntu 版本"
+        fi
+    fi
 else
     record warn "操作系统" "无法读取 /etc/os-release"
 fi
 record ok "内核" "$(uname -r)"
 record ok "架构" "$(uname -m)"
+
+# 磁盘空间检查（开发工具需要较多空间）
+section "系统资源"
+HOME_AVAIL=$(df -BG "$HOME" 2>/dev/null | awk 'NR==2 {gsub(/G/,"",$4); print $4}')
+if [ -n "$HOME_AVAIL" ]; then
+    if [ "$HOME_AVAIL" -ge 10 ]; then
+        record ok "磁盘空间" "${HOME_AVAIL}GB 可用"
+    elif [ "$HOME_AVAIL" -ge 5 ]; then
+        record warn "磁盘空间" "${HOME_AVAIL}GB 可用 (建议至少 10GB)"
+    else
+        record fail "磁盘空间" "${HOME_AVAIL}GB 可用 (不足，建议至少 10GB)"
+    fi
+else
+    record warn "磁盘空间" "无法检测"
+fi
+
+# 网络连接检查
+section "网络连接"
+if curl -fsSL --connect-timeout 5 --max-time 10 https://github.com >/dev/null 2>&1; then
+    record ok "GitHub 连接" "可访问"
+else
+    record warn "GitHub 连接" "无法访问 (某些安装步骤可能失败)"
+fi
+
+if curl -fsSL --connect-timeout 5 --max-time 10 https://registry.npmjs.org >/dev/null 2>&1; then
+    record ok "npm registry" "可访问"
+else
+    record warn "npm registry" "无法访问 (Node 包安装可能失败)"
+fi
 
 # ---------------------------------------------------------------------------
 # 2. 基础工具

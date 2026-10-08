@@ -52,6 +52,40 @@ INSTALL_ALL=true
 TUI_MODE=false
 
 # ---------------------------------------------------------------------------
+# 前置依赖检查
+# ---------------------------------------------------------------------------
+check_prerequisites() {
+    local missing=()
+
+    # 基础工具
+    command -v git >/dev/null 2>&1 || missing+=(git)
+    command -v curl >/dev/null 2>&1 || missing+=(curl)
+
+    # 如果要安装 Node 相关，检查编译依赖
+    if $INSTALL_NODE || $INSTALL_ALL; then
+        command -v gcc >/dev/null 2>&1 || command -v cc >/dev/null 2>&1 || missing+=(build-essential)
+    fi
+
+    # 如果要安装 Python 相关，检查必要依赖
+    if $INSTALL_PYTHON || $INSTALL_ALL; then
+        command -v python3 >/dev/null 2>&1 || missing+=(python3)
+        # pyenv 需要这些包来编译 Python
+        if ! pkg_installed libssl-dev 2>/dev/null && ! pkg_installed openssl-devel 2>/dev/null; then
+            missing+=(libssl-dev)
+        fi
+    fi
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        warn "缺少必要依赖: ${missing[*]}"
+        info "建议先运行: install_sys_pkg ${missing[*]}"
+        info "或手动安装: sudo $PM install ${missing[*]}"
+        return 1
+    fi
+
+    return 0
+}
+
+# ---------------------------------------------------------------------------
 # 小工具函数
 # ---------------------------------------------------------------------------
 info()  { printf '\033[0;34m[INFO]\033[0m %s\n' "$*"; }
@@ -784,6 +818,19 @@ if [ "$HAS_ARGS" = "false" ]; then
     else
         INSTALL_ALL=true
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# 前置检查
+# ---------------------------------------------------------------------------
+info "=== 开发工具安装器 ==="
+distro_report
+printf '\n'
+
+# 检查前置依赖（仅警告，不阻止）
+if ! check_prerequisites; then
+    warn "前置检查发现问题，但继续执行（部分安装可能失败）"
+    sleep 2
 fi
 
 # ---------------------------------------------------------------------------

@@ -150,6 +150,15 @@ export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PYENV_ROOT/bin:$PYENV_ROOT/sh
 # ---------------------------------------------------------------------------
 FAILED_STAGES=()
 
+# 计算总阶段数
+TOTAL_STAGES=0
+want devtools && TOTAL_STAGES=$((TOTAL_STAGES + 1))
+want mcp && TOTAL_STAGES=$((TOTAL_STAGES + 1))
+want skills && TOTAL_STAGES=$((TOTAL_STAGES + 1))
+want doctor && TOTAL_STAGES=$((TOTAL_STAGES + 1))
+
+CURRENT_STAGE=0
+
 run_stage() {
     local stage="$1" label="$2" script="$3"
     want "$stage" || return 0
@@ -157,7 +166,10 @@ run_stage() {
         printf '  %s %s: 脚本不存在 %s\n' "$(c_y '!')" "$label" "$script"
         return 0
     fi
-    step "$label"
+
+    CURRENT_STAGE=$((CURRENT_STAGE + 1))
+    step "[$CURRENT_STAGE/$TOTAL_STAGES] $label"
+
     if $ASSUME_YES; then
         # 非交互: 让安装器走"全装"分支
         if bash "$script" < /dev/null; then

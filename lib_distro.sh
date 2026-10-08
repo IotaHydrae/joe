@@ -307,6 +307,38 @@ install_sys_pkg() {
 }
 
 # ---------------------------------------------------------------------------
+# Linux Mint 特有兼容性检查
+# ---------------------------------------------------------------------------
+check_mint_compatibility() {
+    [ "$(distro_id)" = "linuxmint" ] || return 0
+
+    local issues=0
+
+    # 检查是否基于已知的 Ubuntu 版本
+    local ubuntu_base
+    ubuntu_base="$(distro_ubuntu_base)"
+    if [ -z "$ubuntu_base" ]; then
+        warn "无法确定此 Mint 版本对应的 Ubuntu 基线，某些功能可能不兼容"
+        issues=$((issues + 1))
+    elif [ "$ubuntu_base" != "24.04" ] && [ "$ubuntu_base" != "22.04" ]; then
+        warn "此脚本主要在 Mint 22.x (Ubuntu 24.04 基线) 上测试，当前版本可能存在兼容性问题"
+        issues=$((issues + 1))
+    fi
+
+    # 检查 PPA 支持（Mint 有时会禁用某些 Ubuntu PPA）
+    if [ -d /etc/apt/sources.list.d ]; then
+        if ! grep -qr "noble\|jammy" /etc/apt/sources.list.d/ 2>/dev/null && \
+           ! grep -q "noble\|jammy" /etc/apt/sources.list 2>/dev/null; then
+            warn "未检测到 Ubuntu noble/jammy 源，某些第三方软件可能无法安装"
+            info "Mint 用户可能需要手动启用 Ubuntu 源或使用官方下载"
+            issues=$((issues + 1))
+        fi
+    fi
+
+    return "$issues"
+}
+
+# ---------------------------------------------------------------------------
 # 发行版报告 (排查兼容性问题用)
 # ---------------------------------------------------------------------------
 distro_report() {
@@ -318,5 +350,16 @@ distro_report() {
     printf '  包管理器:    %s\n' "$PM"
     local ub; ub="$(distro_ubuntu_base)"
     [ -n "$ub" ] && printf '  Ubuntu 基线: %s\n' "$ub"
+
+    # Mint 兼容性检查
+    if [ "$(distro_id)" = "linuxmint" ]; then
+        printf '\n'
+        if check_mint_compatibility; then
+            printf '  Mint 兼容性: %s\n' "$(printf '\033[0;32m✓ 无已知问题\033[0m')"
+        else
+            printf '  Mint 兼容性: %s\n' "$(printf '\033[1;33m⚠ 发现 %d 个潜在问题（见上方）\033[0m' $?)"
+        fi
+    fi
+
     return 0
 }

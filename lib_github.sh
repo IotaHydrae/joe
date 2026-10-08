@@ -22,30 +22,56 @@ download_installer() {
     local url="$1" out="$2" attempt
     rm -f "$out"
     for attempt in 1 2 3; do
-        if curl -fsSL --retry 2 --retry-all-errors --connect-timeout 20 \
+        info "尝试下载 ${url##*/} (第 $attempt/3 次)..."
+        if curl -fsSL --retry 2 --retry-all-errors --connect-timeout 20 --max-time 300 \
                 "$url" -o "$out" 2>/dev/null && [ -s "$out" ]; then
             break
         fi
-        [ "$attempt" -lt 3 ] && sleep 2
+        if [ "$attempt" -lt 3 ]; then
+            warn "下载失败，5 秒后重试..."
+            sleep 5
+        fi
     done
-    [ -s "$out" ] || return 1
-    head -c 200 "$out" | grep -qiE '<html|<!doctype|<script' && return 1
-    head -1 "$out" | grep -qE '^#!' || return 1
+    if [ ! -s "$out" ]; then
+        warn "下载失败: $url"
+        return 1
+    fi
+    if head -c 200 "$out" | grep -qiE '<html|<!doctype|<script'; then
+        warn "下载的文件似乎是 HTML 错误页，而非安装脚本"
+        return 1
+    fi
+    if ! head -1 "$out" | grep -qE '^#!'; then
+        warn "下载的文件缺少 shebang，可能不是有效脚本"
+        return 1
+    fi
     return 0
 }
 
 # 经 GitHub 镜像下载 (部分网络下直连 GitHub releases 会中途截断)
-# 用法: github_mirror_download <完整GitHub URL> <输出文件> [重试次数]
+# 用法: github_mirror_download <完整GitHub URL> <输出文件> [重试次数] [超时秒数]
 github_mirror_download() {
-    local url="$1" out="$2" retries="${3:-3}" mirror
+    local url="$1" out="$2" retries="${3:-3}" timeout="${4:-300}" mirror
     [ -n "$url" ] && [ -n "$out" ] || return 2
+
+    # 检查文件大小（如果是大文件，给出提示）
+    local file_size_mb=""
+    if command -v curl >/dev/null 2>&1; then
+        file_size_mb=$(curl -sI "${url}" 2>/dev/null | grep -i content-length | awk '{print int($2/1048576)}')
+        if [ -n "$file_size_mb" ] && [ "$file_size_mb" -gt 50 ]; then
+            info "文件大小约 ${file_size_mb}MB，下载可能需要较长时间..."
+        fi
+    fi
+
     for mirror in "https://ghfast.top/" "https://gh-proxy.com/" "https://ghproxy.net/" ""; do
         info "下载 (镜像: ${mirror:-直连}): ${url##*/}"
-        if curl -fsSL --retry "$retries" --retry-all-errors --connect-timeout 20 \
+        if curl -fsSL --retry "$retries" --retry-all-errors --connect-timeout 20 --max-time "$timeout" \
                 -o "$out" "${mirror}${url}" 2>/dev/null && [ -s "$out" ]; then
+            ok "下载成功: ${url##*/}"
             return 0
         fi
+        warn "镜像 ${mirror:-直连} 失败，尝试下一个..."
     done
+    warn "所有镜像均失败: ${url##*/}"
     return 1
 }
 
