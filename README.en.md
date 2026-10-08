@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 - Installs fzf (command-line fuzzy finder)
 - Optionally installs fastfetch (system information tool)
 - Installs custom fonts
-- Copies `.config` directory configs (e.g. ghostty terminal)
+- Copies `.config` directory configs; the Ghostty preset disables paste confirmation (`clipboard-paste-protection = false`) and terminal-program clipboard read prompts (`clipboard-read = allow`). Press `Ctrl+Shift+,` to reload after editing
 - Fixes Chinese (and other IME) input in the Ghostty AppImage: writes a `<AppImage>.env` next to the AppImage with `GTK_PATH` pointing at a symlink directory of the host's GTK4 input method modules (ibus/fcitx5), so the bundled GTK can load them
 - Automatically backs up existing config files
 - Supports component update mode

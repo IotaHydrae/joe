@@ -1,6 +1,10 @@
 font-family = Fixedsys Excelsior
 font-size = 14
 
+# 粘贴和终端程序读取剪贴板时不弹确认框。
+clipboard-paste-protection = false
+clipboard-read = allow
+
 keybind = ctrl+shift+e=new_split:right
 keybind = ctrl+shift+o=new_split:down
 

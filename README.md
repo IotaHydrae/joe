@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 - 安装 fzf（命令行模糊查找器）
 - 可选安装 fastfetch（系统信息展示工具）
 - 安装自定义字体
-- 复制 .config 目录配置（如 ghostty 终端配置）
+- 复制 .config 目录配置；Ghostty 预设关闭粘贴确认（`clipboard-paste-protection = false`）和终端程序读取剪贴板的授权弹窗（`clipboard-read = allow`），修改后按 `Ctrl+Shift+,` 重载
 - 修复 Ghostty AppImage 无法输入中文的问题：在 AppImage 旁生成 `<AppImage>.env` 并设置 `GTK_PATH`，让 AppImage 自带的 GTK 加载系统的 GTK4 输入法模块（ibus/fcitx5）
 - 自动备份现有配置文件
 - 支持组件更新模式
