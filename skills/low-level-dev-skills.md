@@ -11,12 +11,15 @@
 从仓库根目录运行：
 
 ```bash
+./install.sh skills  # low-level-dev-skills → 分类 → 按需勾选
 ./install.sh skills --categories
 ./install.sh skills --category kernel-dev --tui
 ./install.sh skills --category compilers --category debuggers --tui
 ./install.sh skills device-tree gdb cross-gcc
 ./install.sh skills --category kernel-dev --all  # 显式安装该分类全部技能
 ```
+
+默认菜单将本技能集单独列出，进入后按 25 个分类打开各自的勾选列表。编号进入，`b`/`q` 返回上一级；安装完成或退出勾选列表后可继续选择分类。指定 `--category` 可直接打开过滤后的勾选列表，完成后退出安装器。
 
 分类过滤可与 `--list`、`--tui`、`--all` 和技能名组合，重复 `--category` 取并集。默认不勾选任何技能。原有技能和自定义技能归入 `local` 分类。
 

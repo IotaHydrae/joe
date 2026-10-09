@@ -12,7 +12,7 @@
 ./install.sh skills engineering-embedded-linux-driver-engineer
 ```
 
-也可以运行 `./install.sh skills --tui` 后勾选；默认不勾选任何技能。
+也可以运行 `./install.sh skills --tui`，进入「原有/本地技能」后勾选；默认不勾选任何技能。
 
 ### low-level-dev-skills 技能集
 
@@ -21,11 +21,14 @@
 从仓库根目录按分类浏览或按技能名安装：
 
 ```bash
+./install.sh skills  # low-level-dev-skills → 分类 → 按需勾选
 ./install.sh skills --categories
 ./install.sh skills --category kernel-dev --category kernel --tui
 ./install.sh skills device-tree bus-drivers-i2c-spi gdb cross-gcc
 ./install.sh skills --category kernel-dev --all  # 显式安装该分类全部技能
 ```
+
+默认先选技能组，再进入 low-level-dev-skills 的分类子菜单，142 个技能按 25 个分类展示。编号进入，`b`/`q` 返回上一级；安装后或退出勾选列表后返回当前菜单。指定 `--category` 则直接打开过滤后的勾选列表，完成后退出安装器。
 
 分类元数据在 `categories.tsv`，未列入该表的技能归入 `local`。重复 `--category` 取并集；与 `--list`、`--tui`、`--all` 和技能名组合时只作用于这些分类。默认不勾选任何技能，相关技能与系统工具也不会自动安装。
 

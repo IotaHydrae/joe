@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install.sh
 ```
 
-顶层只保留这一个 Shell 入口；无参数显示编号菜单，选择后运行对应功能，完成或失败后返回菜单。直接回车不执行操作，`q` 退出。开发工具、MCP 和 skills 使用默认不勾选的子菜单；配置备份/恢复有独立菜单。
+顶层只保留这一个 Shell 入口；无参数显示编号菜单，选择后运行对应功能，完成或失败后返回菜单。直接回车不执行操作，`q` 退出。开发工具、MCP 和 skills 默认不勾选；skills 先选技能组，low-level-dev-skills 再按分类进入勾选列表；配置备份/恢复有独立菜单。
 
 | 命令 | 功能 |
 |---|---|
@@ -526,9 +526,9 @@ skills/
 ### 用法
 
 ```bash
-./install.sh skills                # 默认进入 TUI，不预选；非交互须指定技能
+./install.sh skills                # 技能组 → 分类 → 勾选，默认不预选
 ./install.sh skills --all          # 显式安装全部技能
-./install.sh skills --tui          # 强制 TUI 勾选
+./install.sh skills --tui          # 同上；带 --category 时直接进入分类勾选
 ./install.sh skills --list         # 列出技能及安装状态
 ./install.sh skills --categories   # 列出技能分类及数量
 ./install.sh skills --category kernel-dev --tui  # 只浏览内核驱动分类, 按需勾选
@@ -537,7 +537,9 @@ skills/
 ./install.sh skills engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
 ```
 
-与 devtools / MCP 脚本同款 TUI：`↑↓` 移动、`PgUp/PgDn` 翻页、`Home/End` 到首尾、`空格` 勾选、`a/n/i` 快捷键、`回车` 开始、`q` 退出。列表按终端高度分页，显示分类与技能名；已安装技能显示 `[✓装]` 自动跳过。
+默认菜单分为「原有/本地技能（8 个）」和「low-level-dev-skills（142 个、25 个分类）」。输入编号进入技能组或分类；`b`/`q` 返回上一级，直接回车不执行操作。安装完成或退出勾选列表后返回当前菜单，可继续选择其他分类。带 `--category` 时直接打开过滤后的勾选列表，完成后退出安装器。
+
+勾选列表与 devtools / MCP 脚本同款 TUI：`↑↓` 移动、`PgUp/PgDn` 翻页、`Home/End` 到首尾、`空格` 勾选、`a/n/i` 快捷键、`回车` 开始、`q` 退出列表。列表按终端高度分页，显示分类与技能名；已安装技能显示 `[✓装]` 自动跳过。
 
 `--category` 可重复，取分类并集，并可与 `--list`、`--tui`、`--all` 或技能名组合，参数顺序不影响分类筛选。分类过滤不会默认选中技能；非交互安装仍须明确技能名或 `--all`。原有及自定义技能归入 `local` 分类。
 

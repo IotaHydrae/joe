@@ -23,3 +23,5 @@
 ```
 
 开发工具、MCP 和 skills 默认不勾选任何项；非交互安装须明确安装项或 `--all`。`bootstrap --yes` 是显式选择所有组件。
+
+`skills` / `skills --tui` 先显示「原有/本地技能」和「low-level-dev-skills」；后者进入 25 个分类的子菜单，再进入该分类的勾选列表。编号进入，`b`/`q` 返回上一级，安装后可继续选其他分类。`skills --category <name> --tui` 直接打开指定分类的勾选列表。

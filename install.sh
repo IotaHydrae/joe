@@ -9,6 +9,7 @@ usage() {
 
 无参数进入主菜单, 输入编号选择操作; 回车不执行操作, q 退出。
 开发工具、MCP 和 skills 的安装菜单默认不勾选任何项目。
+skills 先选择技能组; low-level-dev-skills 再按分类进入勾选列表。
 非交互调用须显式指定命令, 安装项须按需指定或明确使用 --all。
 
 命令:
@@ -143,7 +144,7 @@ main_menu() {
         printf '\n── joe 开发环境 ──\n'
         printf '  1) Shell 环境 (zsh / Oh My Zsh / Powerlevel10k)\n'
         printf '  2) 开发工具 (按需勾选)\n  3) MCP 服务器 (按需勾选)\n'
-        printf '  4) skills (按需勾选, 支持分类)\n  5) 环境体检\n'
+        printf '  4) skills (技能组 / 分类子菜单)\n  5) 环境体检\n'
         printf '  6) 更新已安装工具\n  7) Ghostty 兼容修复\n'
         printf '  8) 配置备份与恢复\n  9) 全流程部署 (各阶段按需勾选)\n'
         printf '  q) 退出\n选择操作 [1-9/q]: '

@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install.sh
 ```
 
-The root contains one shell entry point. Running it without arguments opens a numbered menu; each action returns to the menu when it finishes or fails. Enter without a choice does nothing, and `q` quits. Devtools, MCP and skills open unchecked component selectors. Configuration backup and restore have a separate menu.
+The root contains one shell entry point. Running it without arguments opens a numbered menu; each action returns to the menu when it finishes or fails. Enter without a choice does nothing, and `q` quits. Devtools, MCP and skills leave all items unchecked. Skills first offers skill groups, then categories within low-level-dev-skills before opening a checklist. Configuration backup and restore have a separate menu.
 
 | Command | Purpose |
 |---|---|
@@ -231,7 +231,8 @@ Filesystem access defaults to `$HOME` and `/tmp`; override it with `FILESYSTEM_D
 ## Agent skills
 
 ```bash
-./install.sh skills          # checklist, nothing preselected
+./install.sh skills          # skill group → category → checklist; nothing preselected
+./install.sh skills --tui    # same menu; --category opens a filtered checklist directly
 ./install.sh skills joe-env  # install/update only this skill
 ./install.sh skills engineering-embedded-linux-driver-engineer  # embedded Linux drivers only
 ./install.sh skills --all    # explicitly install/update every skill
@@ -241,7 +242,9 @@ Filesystem access defaults to `$HOME` and `/tmp`; override it with `FILESYSTEM_D
 ./install.sh skills --category kernel-dev --all  # explicitly install the entire category
 ```
 
-Skills and their supporting directories are copied to `~/.agents/skills` and the detected clients' skill directories. Items already current in every target are skipped. All three TUIs use arrows to move, PgUp/PgDn to move by a page, Home/End to move to the first/last item, Space to select, `a` to select all missing items, `n` to clear the selection, `i` to select only missing items, Enter to install, and `q` to quit. Lists fit the terminal height; the skill selector displays each item's category.
+The default menu separates existing/local skills (8) from low-level-dev-skills (142 skills in 25 categories). Enter a number to open a group or category; `b`/`q` goes back one level, and Enter without a choice does nothing. Installing or leaving a checklist returns to the current menu so you can choose another category. With `--category`, the installer opens a filtered checklist directly and exits afterward.
+
+Skills and their supporting directories are copied to `~/.agents/skills` and the detected clients' skill directories. Items already current in every target are skipped. All three checklists use arrows to move, PgUp/PgDn to move by a page, Home/End to move to the first/last item, Space to select, `a` to select all missing items, `n` to clear the selection, `i` to select only missing items, Enter to install, and `q` to leave the checklist. Lists fit the terminal height; the skill selector displays each item's category.
 
 Repeat `--category` to combine categories. It filters `--list`, `--tui`, `--all`, and explicit skill names regardless of argument order. Filtering leaves all items unchecked; non-interactive installation requires skill names or `--all`. Existing and custom skills belong to `local`.
 

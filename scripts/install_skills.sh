@@ -5,8 +5,8 @@
 # 把 ./skills/<name>/SKILL.md 安装到各 AI 代理的 skills 目录。
 #
 # 用法:
-#   ./install.sh skills                # 默认进入 TUI, 不预选; 非交互须指定技能
-#   ./install.sh skills --tui          # 强制进入 TUI 勾选界面
+#   ./install.sh skills                # 技能组 → 分类 → 勾选, 默认不预选
+#   ./install.sh skills --tui          # 同上; 带 --category 时直接进入分类勾选
 #   ./install.sh skills --all          # 显式安装全部技能
 #   ./install.sh skills --list         # 列出技能及安装状态
 #   ./install.sh skills --categories   # 列出分类及技能数量
@@ -26,6 +26,8 @@
 #   ~/.copilot/skills/         GitHub Copilot (目录存在时)
 #
 # 说明:
+#   - 默认菜单分为原有/本地技能和 low-level-dev-skills; 后者按分类进入勾选
+#   - 编号进入子菜单, b/q 返回上一级; 安装完成后返回当前菜单
 #   - 技能即 ./skills/<name>/, 需含 SKILL.md (YAML frontmatter 的 name/description)
 #   - 整个技能目录(含 references/ scripts/ assets/)会被一并安装
 #   - --category 可与 --list/--tui/--all/技能名组合; 未分类的技能属于 local
@@ -115,20 +117,25 @@ discover_skills() {
     done
 }
 
-list_categories() {
-    local d name category
+category_counts() {
+    local name category
     local -A counts=()
-    for d in "$SKILLS_SRC"/*/SKILL.md; do
-        [ -f "$d" ] || continue
-        name="${d%/SKILL.md}"
-        name="${name##*/}"
+    while IFS= read -r name; do
         category="${SKILL_CATEGORIES[$name]:-local}"
         counts[$category]=$(( ${counts[$category]:-0} + 1 ))
-    done
-    printf '可用分类:\n'
+    done < <(discover_skills)
     for category in "${!counts[@]}"; do
-        printf '  %-24s %d 个技能\n' "$category" "${counts[$category]}"
+        printf '%s\t%d\n' "$category" "${counts[$category]}"
     done | sort
+}
+
+list_categories() {
+    local -a CATEGORY_FILTERS=()
+    local category count
+    printf '可用分类:\n'
+    while IFS=$'\t' read -r category count; do
+        printf '  %-24s %d 个技能\n' "$category" "$count"
+    done < <(category_counts)
     exit 0
 }
 
@@ -236,16 +243,101 @@ tui_component_installed() {
 }
 
 tui_select() {
-    local ids
-    # shellcheck disable=SC2207
-    ids=($(discover_skills))
+    local -a ids=()
+    mapfile -t ids < <(discover_skills)
     [ "${#ids[@]}" -gt 0 ] || die "在 $SKILLS_SRC 下没有找到任何技能 (需 <name>/SKILL.md)"
 
     TUI_IDS=("${ids[@]}")
-    TUI_TITLE="joe 代理技能安装选择"
+    TUI_TITLE="${1:-joe 代理技能安装选择}"
     load_tui_module || die "未找到 tui_module.sh (与脚本同目录)"
     tui_available || die "当前不是交互式终端, 请指定技能或使用 --all (查看 --help)"
     run_tui
+}
+
+# ---------------------------------------------------------------------------
+# 技能组 / 分类子菜单 (仅在未指定 --category 时使用)
+# ---------------------------------------------------------------------------
+install_selection() {
+    info "joe 技能安装开始 $(date)"
+    local name
+    for name in "$@"; do
+        install_skill "$name"
+    done
+    ok "全部技能安装完成! (代理下次启动时自动发现)"
+}
+
+select_category() {
+    # Bash 动态作用域: 仅在本次选择中覆盖分类过滤, 不影响后续菜单。
+    local -a CATEGORY_FILTERS=("$1")
+    local -a selected=()
+    tui_select "joe 技能安装 — $1"
+    if [ -z "$TUI_SELECTED" ]; then
+        info "未选择任何技能, 返回菜单"
+        return 0
+    fi
+    read -r -a selected <<< "$TUI_SELECTED"
+    info "已选择技能:${TUI_SELECTED}"
+    install_selection "${selected[@]}"
+}
+
+low_level_menu() {
+    local -a categories=("$@")
+    local choice category count index
+    while true; do
+        printf '\n── low-level-dev-skills 分类 ──\n'
+        for index in "${!categories[@]}"; do
+            IFS=$'\t' read -r category count <<< "${categories[$index]}"
+            printf '  %2d) %-24s (%d 个技能)\n' "$((index + 1))" "$category" "$count"
+        done
+        printf '  b/q) 返回技能组菜单\n选择分类 [1-%d/b/q]: ' "${#categories[@]}"
+        IFS= read -r choice || return 0
+        case "$choice" in
+            b|B|q|Q|0) return 0 ;;
+            '') continue ;;
+        esac
+        # 字符串匹配编号, 避免将用户输入当作算术表达式执行。
+        for index in "${!categories[@]}"; do
+            [ "$choice" = "$((index + 1))" ] && break
+        done
+        if [ "$choice" != "$((index + 1))" ]; then
+            printf '请输入有效编号或 b/q。\n'
+            continue
+        fi
+        IFS=$'\t' read -r category count <<< "${categories[$index]}"
+        select_category "$category"
+    done
+}
+
+skills_menu() {
+    [ -t 0 ] && [ -t 1 ] || die "当前不是交互式终端, 请指定技能或使用 --all (查看 --help)"
+    local -a categories=()
+    local local_count=0 imported_count=0 category count choice
+    while IFS=$'\t' read -r category count; do
+        if [ "$category" = local ]; then
+            local_count="$count"
+        else
+            categories+=("$category"$'\t'"$count")
+            imported_count=$((imported_count + count))
+        fi
+    done < <(category_counts)
+    while true; do
+        printf '\n── joe 技能组 (按需勾选) ──\n'
+        printf '  1) 原有/本地技能 (%d 个技能)\n' "$local_count"
+        printf '  2) low-level-dev-skills (%d 个技能, %d 个分类)\n' "$imported_count" "${#categories[@]}"
+        printf '  b/q) 返回上一级 / 退出\n选择技能组 [1-2/b/q]: '
+        IFS= read -r choice || return 0
+        case "$choice" in
+            1)
+                [ "$local_count" -gt 0 ] || { warn "没有原有/本地技能"; continue; }
+                select_category local ;;
+            2)
+                [ "${#categories[@]}" -gt 0 ] || { warn "没有已分类的技能"; continue; }
+                low_level_menu "${categories[@]}" ;;
+            b|B|q|Q|0) return 0 ;;
+            '') continue ;;
+            *) printf '请输入有效编号或 b/q。\n' ;;
+        esac
+    done
 }
 
 # ---------------------------------------------------------------------------
@@ -349,10 +441,13 @@ if $ALL_MODE; then
 fi
 
 if $TUI_MODE; then
+    if [ "${#CATEGORY_FILTERS[@]}" -eq 0 ]; then
+        skills_menu
+        exit 0
+    fi
     if tui_select; then
         if [ -n "$TUI_SELECTED" ]; then
-            # shellcheck disable=SC2206
-            TARGETS=($TUI_SELECTED)
+            read -r -a TARGETS <<< "$TUI_SELECTED"
             info "已选择技能:${TUI_SELECTED}"
         else
             info "TUI 未选择任何技能, 退出"
@@ -365,8 +460,4 @@ fi
 
 [ "${#TARGETS[@]}" -gt 0 ] || die "没有要安装的技能"
 
-info "joe 技能安装开始 $(date)"
-for t in "${TARGETS[@]}"; do
-    install_skill "$t"
-done
-ok "全部技能安装完成! (代理下次启动时自动发现)"
+install_selection "${TARGETS[@]}"
