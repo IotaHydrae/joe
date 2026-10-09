@@ -76,11 +76,15 @@ Add professional skill templates for AI assistants:
 - **Repository Exploration**: Quickly understand new projects
 - **Testing**: Testing strategies and implementation
 - **Embedded**: Boot optimization and specialized skills
+- **low-level-dev-skills**: 142 low-level development skills across 25 categories
 
 ```bash
-./install.sh skills                # Install all skills
+./install.sh skills                # Skill group → category → checklist
 ./install.sh skills gdb            # Install GDB skill only
+./install.sh skills --category kernel-dev --tui  # Open the kernel driver category directly
 ```
+
+The skills menu separates existing/local skills (8) from low-level-dev-skills (142 skills in 25 categories). Choose a category, then select individual skills; nothing is preselected. Enter a number to open a submenu; `b`/`q` goes back one level. Installing or leaving a checklist returns to the current menu so you can choose another category. With `--category`, the installer opens a filtered checklist directly and exits afterward. Non-interactive installation requires skill names or an explicit `--all`.
 
 ## Common Commands
 
@@ -129,6 +133,18 @@ Add professional skill templates for AI assistants:
 --list                 # List all MCP servers
 filesystem git         # Install specified MCPs (supports multiple)
 ```
+
+### Skills Options
+
+| Option | Purpose |
+|---|---|
+| `--tui` | Open group/category submenus; with `--category`, open a filtered checklist directly |
+| `--list` | List skills and installation status |
+| `--categories` | List categories and skill counts |
+| `--category <name>` | Filter by category; repeat to combine categories; supports `--list`, `--tui`, `--all` and skill names |
+| `--all` | Explicitly install all skills, limited to selected categories when filters are supplied |
+
+Categories and counts come from `skills/categories.tsv` and the skill directories. Existing and custom skills belong to `local`. See the [low-level-dev-skills catalog](skills/low-level-dev-skills.md).
 
 ## System Support
 

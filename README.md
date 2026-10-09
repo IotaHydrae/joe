@@ -76,11 +76,15 @@ cd joe
 - **仓库探索**：快速理解新项目
 - **测试**：测试策略和实现
 - **嵌入式**：启动优化等专项技能
+- **low-level-dev-skills**：142 个底层开发技能，按 25 个分类选择
 
 ```bash
-./install.sh skills                # 安装所有技能
+./install.sh skills                # 技能组 → 分类 → 按需勾选
 ./install.sh skills gdb            # 只装 GDB 技能
+./install.sh skills --category kernel-dev --tui  # 直接打开内核驱动分类
 ```
+
+技能菜单分为「原有/本地技能（8 个）」和「low-level-dev-skills（142 个、25 个分类）」。后者先选分类，再勾选该分类的技能；默认不勾选任何项。编号进入，`b`/`q` 返回上一级；安装完成或退出勾选列表后返回当前菜单，可继续选择其他分类。指定 `--category` 则直接打开过滤后的列表，完成后退出安装器。非交互安装须指定技能名或显式使用 `--all`。
 
 ## 常用命令
 
@@ -129,6 +133,18 @@ cd joe
 --list                 # 列出所有 MCP 服务器
 filesystem git         # 安装指定的 MCP（支持多个）
 ```
+
+### Skills 选项
+
+| 参数 | 用途 |
+|---|---|
+| `--tui` | 技能组 / 分类子菜单；带 `--category` 时直接进入过滤后的勾选列表 |
+| `--list` | 列出技能及安装状态 |
+| `--categories` | 列出分类及技能数量 |
+| `--category <name>` | 按分类过滤，可重复取并集；支持 `--list`、`--tui`、`--all` 和技能名 |
+| `--all` | 显式安装全部技能；带分类过滤时仅安装所选分类 |
+
+分类与数量由 `skills/categories.tsv` 和技能目录生成；原有及自定义技能归入 `local`。完整清单见 [low-level-dev-skills](skills/low-level-dev-skills.md)。
 
 ## 系统支持
 

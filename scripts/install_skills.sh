@@ -232,7 +232,7 @@ tui_component_name() {
     local desc category="${SKILL_CATEGORIES[$1]:-local}"
     desc="$(skill_field "$1" description)"
     if [ -n "$desc" ]; then
-        printf '[%s] %s — %.56s' "$category" "$1" "$desc"
+        printf '[%s] %s — %s' "$category" "$1" "${desc:0:56}"
     else
         printf '[%s] %s' "$category" "$1"
     fi
