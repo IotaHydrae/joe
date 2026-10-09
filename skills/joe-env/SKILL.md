@@ -7,21 +7,23 @@ description: 了解 joe 开发环境的内容与用法。当需要安装/更新�
 
 本机由 [`joe`](https://github.com/IotaHydrae/joe) 仓库统一配置，所有安装脚本都是**幂等**的，可反复执行。
 
-## 三个安装脚本（均支持 TUI）
+## 统一入口与组件安装器
+
+顶层 `./install.sh` 打开编号主菜单，其他脚本全部位于 `scripts/`。按需选择操作，完成或失败后返回菜单；回车不执行操作，`q` 退出。非交互调用须指定子命令。
 
 | 脚本 | 用途 | TUI |
 |---|---|---|
-| `install_devtools.sh` | 开发工具套件（9 项） | `--tui`，无参数默认进 TUI |
-| `install_mcp_servers.sh` | MCP 服务器（7 个） | 同上 |
-| `install_skills.sh` | 代理技能 | 同上 |
+| `./install.sh devtools` | 开发工具套件（9 项） | `--tui`，无安装参数默认进 TUI |
+| `./install.sh mcp` | MCP 服务器（7 个） | 同上 |
+| `./install.sh skills` | 代理技能 | 同上 |
 
 ```bash
-./install_devtools.sh --list          # 查看组件及安装状态
-./install_devtools.sh --tui           # 勾选安装
-./install_mcp_servers.sh --list
-./install_skills.sh --tui
-./install_skills.sh --categories
-./install_skills.sh --category kernel-dev --tui  # 按分类勾选
+./install.sh devtools --list          # 查看组件及安装状态
+./install.sh devtools --tui           # 勾选安装
+./install.sh mcp --list
+./install.sh skills --tui
+./install.sh skills --categories
+./install.sh skills --category kernel-dev --tui  # 按分类勾选
 ```
 
 所有项目默认不勾选；非交互调用须指定安装项，只有显式 `--all` 才安装全部。

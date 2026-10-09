@@ -10,7 +10,7 @@
 curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | bash
 ```
 
-> 提示：一行式安装会先把仓库克隆到 `~/.joe`，再从仓库内继续执行，因此 `.config`、`fonts`、`.p10k.zsh` 等资源同样会被安装；`~/.joe` 已存在时直接复用（可用 `JOE_INSTALL_DIR` 环境变量改目录）。
+> 提示：一行安装会先把仓库克隆到 `~/.joe`，再打开统一菜单。菜单与子安装器从当前终端读取输入，按需选择后开始安装。已存在的 `~/.joe` 会直接复用（可用 `JOE_INSTALL_DIR` 环境变量改路径）。非交互调用须指定子命令，例如在管道末尾使用 `bash -s -- skills gdb`。
 
 ## 功能特性
 
@@ -40,7 +40,33 @@ curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | ba
 ./install.sh
 ```
 
-### 命令行选项
+顶层只保留这一个 Shell 入口；无参数显示编号菜单，选择后运行对应功能，完成或失败后返回菜单。直接回车不执行操作，`q` 退出。开发工具、MCP 和 skills 使用默认不勾选的子菜单；配置备份/恢复有独立菜单。
+
+| 命令 | 功能 |
+|---|---|
+| `shell` | zsh / Oh My Zsh / Powerlevel10k 环境 |
+| `devtools` | 按需选择开发工具 |
+| `mcp` | 按需选择 MCP 服务器 |
+| `skills` | 按需选择技能，支持分类过滤 |
+| `doctor` | 环境体检 |
+| `update` | 更新已安装工具 |
+| `repair-ghostty` | Ghostty terminfo 与桌面入口修复 |
+| `configs` | 配置查看、导出、恢复、对比 |
+| `bootstrap` | 串行运行开发工具、MCP、skills 和体检 |
+| `menu` / `--tui` | 打开主菜单 |
+| `-h` / `--help` | 查看统一入口帮助 |
+
+```bash
+./install.sh devtools --node
+./install.sh mcp git memory
+./install.sh skills --category kernel-dev --tui
+./install.sh doctor --json
+./install.sh configs export --check
+```
+
+非交互执行必须明确子命令；使用 `./install.sh <命令> --help` 查看该功能的参数。原有 `./install.sh --dry-run`、`--no-fonts` 等 Shell 参数继续兼容。
+
+### Shell 命令行选项（`./install.sh shell ...`）
 
 | 选项 | 说明 |
 |------|------|
@@ -277,7 +303,7 @@ cd /your/project
 | `xdg-terminal-exec` | `xdg-terminal-exec` | `xdg-terminal-exec` | `xdg-terminal-exec` | `xdg-terminal-exec` |
 | `mesa-vulkan-drivers` | `mesa-vulkan-drivers` | 同左 | `vulkan-radeon` + `vulkan-intel` | `mesa-vulkan-drivers` |
 
-`lib_distro.sh` 的做法是**声明候选**，运行时按实际情况选择：
+`scripts/lib_distro.sh` 的做法是**声明候选**，运行时按实际情况选择：
 
 ```bash
 # 组之间用空格(都要装), 组内用 | 分隔备选(选一个可用的)
@@ -304,7 +330,7 @@ mesa-vulkan-drivers) echo "vulkan-radeon vulkan-intel" ;;
 ### 查看本机适配情况
 
 ```bash
-./install_devtools.sh --check
+./install.sh devtools --check
 ```
 
 只报告不改动：
@@ -341,10 +367,10 @@ mesa-vulkan-drivers) echo "vulkan-radeon vulkan-intel" ;;
 
 ```bash
 podman run --rm -v "$PWD:/joe:ro,z" docker.io/library/ubuntu:24.04 \
-    /bin/bash -c "apt-get update -qq && cd /joe && ./install_devtools.sh --check"
+    /bin/bash -c "apt-get update -qq && cd /joe && ./install.sh devtools --check"
 
 podman run --rm -v "$PWD:/joe:ro,z" docker.io/library/archlinux \
-    /bin/bash -c "pacman -Sy --noconfirm && cd /joe && ./install_devtools.sh --check"
+    /bin/bash -c "pacman -Sy --noconfirm && cd /joe && ./install.sh devtools --check"
 ```
 
 > Fedora 上挂载需要 `:z` 做 SELinux 重标，否则容器读不到文件。
@@ -353,7 +379,7 @@ podman run --rm -v "$PWD:/joe:ro,z" docker.io/library/archlinux \
 
 ## 安装器选择规则
 
-`install_devtools.sh`、`install_mcp_servers.sh`、`install_skills.sh` 无参数时进入 TUI，**所有项目默认不勾选**。用空格按需选择，再按回车安装；直接回车或退出不会安装任何项目。非交互终端必须显式指定组件、服务器、技能或 `--all`，否则报错退出。
+`./install.sh devtools`、`./install.sh mcp`、`./install.sh skills` 无安装参数时进入 TUI，**所有项目默认不勾选**。用空格按需选择，再按回车安装；直接回车或退出不会安装任何项目。非交互终端必须显式指定组件、服务器、技能或 `--all`，否则报错退出。
 
 | 选项 | 三个组件安装器的行为 |
 |---|---|
@@ -368,26 +394,26 @@ podman run --rm -v "$PWD:/joe:ro,z" docker.io/library/archlinux \
 
 | 脚本 | 作用 |
 |---|---|
-| `bootstrap.sh` | 新机器一键部署（克隆 + 三个安装器 + 体检） |
-| `doctor.sh` | 环境体检：工具 / MCP / 技能是否就绪，给出修复建议 |
-| `repair_ghostty.sh` | 修复已有 Ghostty 的 terminfo 与桌面终端入口 |
-| `update-all.sh` | 用各工具官方自更新机制统一升级 |
-| `sync-configs.sh` | 把本机配置（脱敏后）备份进仓库 / 从仓库恢复 |
+| `scripts/bootstrap.sh` | 新机器一键部署（克隆 + 三个安装器 + 体检） |
+| `scripts/doctor.sh` | 环境体检：工具 / MCP / 技能是否就绪，给出修复建议 |
+| `scripts/repair_ghostty.sh` | 修复已有 Ghostty 的 terminfo 与桌面终端入口 |
+| `scripts/update-all.sh` | 用各工具官方自更新机制统一升级 |
+| `scripts/sync-configs.sh` | 把本机配置（脱敏后）备份进仓库 / 从仓库恢复 |
 
 ### bootstrap.sh — 新机器一键部署
 
 ```bash
-./bootstrap.sh                    # 交互: 各阶段进入 TUI，默认不勾选
-./bootstrap.sh --yes              # 非交互: 全部安装 (适合脚本/CI)
-./bootstrap.sh --only mcp,skills  # 只跑指定阶段
-./bootstrap.sh --skip devtools    # 跳过指定阶段
-./bootstrap.sh --dir ~/joe        # 指定克隆目录
+./install.sh bootstrap                    # 交互: 各阶段进入 TUI，默认不勾选
+./install.sh bootstrap --yes              # 非交互: 全部安装 (适合脚本/CI)
+./install.sh bootstrap --only mcp,skills  # 只跑指定阶段
+./install.sh bootstrap --skip devtools    # 跳过指定阶段
+./install.sh bootstrap --dir ~/joe        # 指定克隆目录
 ```
 
 也可直接管道运行（此时会先克隆自己）：
 
 ```bash
-curl -fsSL <raw-url>/bootstrap.sh | bash
+curl -fsSL <raw-url>/install.sh | bash -s -- bootstrap
 ```
 
 阶段：`devtools` | `mcp` | `skills` | `doctor`（默认全部）。
@@ -396,10 +422,10 @@ curl -fsSL <raw-url>/bootstrap.sh | bash
 ### doctor.sh — 环境体检
 
 ```bash
-./doctor.sh              # 常规检查 (较快)
-./doctor.sh --mcp        # 额外实际连接每个 MCP (慢, 每个约 10-30s)
-./doctor.sh --quiet      # 只输出问题项
-./doctor.sh --json       # 机器可读输出
+./install.sh doctor              # 常规检查 (较快)
+./install.sh doctor --mcp        # 额外实际连接每个 MCP (慢, 每个约 10-30s)
+./install.sh doctor --quiet      # 只输出问题项
+./install.sh doctor --json       # 机器可读输出
 ```
 
 检查项：系统信息、基础工具、Node/Python 工具链、AI CLI、编辑器/终端/桌面、
@@ -410,9 +436,9 @@ curl -fsSL <raw-url>/bootstrap.sh | bash
 ### update-all.sh — 统一升级
 
 ```bash
-./update-all.sh             # 更新工具链 + AI CLI + MCP 引擎 + 仓库自身
-./update-all.sh --system    # 额外升级系统包 (dnf/apt/pacman/zypper)
-./update-all.sh --dry-run   # 只显示会执行什么
+./install.sh update             # 更新工具链 + AI CLI + MCP 引擎 + 仓库自身
+./install.sh update --system    # 额外升级系统包 (dnf/apt/pacman/zypper)
+./install.sh update --dry-run   # 只显示会执行什么
 ```
 
 优先走**官方自更新**（这正是选择官方安装路径的原因）：
@@ -428,16 +454,16 @@ curl -fsSL <raw-url>/bootstrap.sh | bash
 | codebase-memory-mcp | `codebase-memory-mcp update -y` |
 | CodeGraph 引擎 | 镜像补拉 + SHA256 校验 |
 
-单项有 300s 超时保护（`UPDATE_TIMEOUT` 可调），失败不影响其余项。更新器只更新已安装工具，不再自动执行 MCP / 技能安装器；需要配置 MCP 或更新技能时，运行对应安装器按需选择。`bootstrap.sh --yes` 仍表示显式选择全部安装。
+单项有 300s 超时保护（`UPDATE_TIMEOUT` 可调），失败不影响其余项。更新器只更新已安装工具，不再自动执行 MCP / 技能安装器；需要配置 MCP 或更新技能时，运行对应安装器按需选择。`./install.sh bootstrap --yes` 仍表示显式选择全部安装。
 
 ### sync-configs.sh — 配置备份
 
 ```bash
-./sync-configs.sh list            # 列出映射与状态
-./sync-configs.sh export          # 导出(脱敏)到 configs/
-./sync-configs.sh export --check  # 只统计会擦除多少敏感项
-./sync-configs.sh import          # 从 configs/ 恢复 (原文件备份到 ~/.joe-config-backup/)
-./sync-configs.sh diff            # 对比本机与仓库备份
+./install.sh configs list            # 列出映射与状态
+./install.sh configs export          # 导出(脱敏)到 configs/
+./install.sh configs export --check  # 只统计会擦除多少敏感项
+./install.sh configs import          # 从 configs/ 恢复 (原文件备份到 ~/.joe-config-backup/)
+./install.sh configs diff            # 对比本机与仓库备份
 ```
 
 安全设计：
@@ -451,9 +477,33 @@ curl -fsSL <raw-url>/bootstrap.sh | bash
 
 ### 共享库与 CI
 
-- `lib_github.sh` — GitHub 下载相关共享函数：`download_installer`（拒绝 HTML 错误页）、
+所有实现脚本和共享库位于 `scripts/`，仓库资产保持在顶层：
+
+```text
+joe/
+├── install.sh                  # 统一菜单与命令入口
+├── scripts/
+│   ├── install_shell.sh        # Shell 环境
+│   ├── install_devtools.sh
+│   ├── install_mcp_servers.sh
+│   ├── install_skills.sh
+│   ├── bootstrap.sh
+│   ├── doctor.sh
+│   ├── repair_ghostty.sh
+│   ├── update-all.sh
+│   ├── sync-configs.sh
+│   ├── tui_module.sh
+│   └── lib_*.sh
+├── skills/
+├── configs/
+├── fonts/
+├── .config/
+└── .p10k.zsh
+```
+
+- `scripts/lib_github.sh` — GitHub 下载相关共享函数：`download_installer`（拒绝 HTML 错误页）、
   `github_mirror_download`（镜像回退）、`codegraph_fetch_engine_mirror`（带 SHA256 校验）
-- `tui_module.sh` — 通用 TUI 选择器，被三个安装器复用
+- `scripts/tui_module.sh` — 通用 TUI 选择器，被三个安装器复用
 - `.shellcheckrc` — ShellCheck 排除项，本地与 CI 共用
 - `.github/workflows/ci.yml` — push/PR 时运行：`bash -n`、ShellCheck（severity=warning）、
   可执行位检查、技能 frontmatter 校验、`references/` 链接可达性、TUI 模块完整性
@@ -462,7 +512,7 @@ curl -fsSL <raw-url>/bootstrap.sh | bash
 
 ## 代理技能（install_skills.sh）
 
-仓库的 `skills/` 目录存放可复用的 **Agent Skills**，由 `install_skills.sh` 安装到各 AI 代理。
+仓库的 `skills/` 目录存放可复用的 **Agent Skills**，由 `scripts/install_skills.sh` 安装到各 AI 代理。
 
 ### 技能目录结构
 
@@ -476,15 +526,15 @@ skills/
 ### 用法
 
 ```bash
-./install_skills.sh                # 默认进入 TUI，不预选；非交互须指定技能
-./install_skills.sh --all          # 显式安装全部技能
-./install_skills.sh --tui          # 强制 TUI 勾选
-./install_skills.sh --list         # 列出技能及安装状态
-./install_skills.sh --categories   # 列出技能分类及数量
-./install_skills.sh --category kernel-dev --tui  # 只浏览内核驱动分类, 按需勾选
-./install_skills.sh --category kernel-dev --all  # 显式安装该分类全部技能
-./install_skills.sh joe-env        # 只装指定技能
-./install_skills.sh engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
+./install.sh skills                # 默认进入 TUI，不预选；非交互须指定技能
+./install.sh skills --all          # 显式安装全部技能
+./install.sh skills --tui          # 强制 TUI 勾选
+./install.sh skills --list         # 列出技能及安装状态
+./install.sh skills --categories   # 列出技能分类及数量
+./install.sh skills --category kernel-dev --tui  # 只浏览内核驱动分类, 按需勾选
+./install.sh skills --category kernel-dev --all  # 显式安装该分类全部技能
+./install.sh skills joe-env        # 只装指定技能
+./install.sh skills engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
 ```
 
 与 devtools / MCP 脚本同款 TUI：`↑↓` 移动、`PgUp/PgDn` 翻页、`Home/End` 到首尾、`空格` 勾选、`a/n/i` 快捷键、`回车` 开始、`q` 退出。列表按终端高度分页，显示分类与技能名；已安装技能显示 `[✓装]` 自动跳过。
@@ -529,10 +579,10 @@ skills/
 嵌入式 Linux 开发可从这几个分类开始：
 
 ```bash
-./install_skills.sh --category kernel-dev --category kernel --tui
-./install_skills.sh --category embedded --category baremetal --tui
-./install_skills.sh --category compilers --category debuggers --tui
-./install_skills.sh device-tree bus-drivers-i2c-spi gdb cross-gcc
+./install.sh skills --category kernel-dev --category kernel --tui
+./install.sh skills --category embedded --category baremetal --tui
+./install.sh skills --category compilers --category debuggers --tui
+./install.sh skills device-tree bus-drivers-i2c-spi gdb cross-gcc
 ```
 
 > 较长的技能采用**渐进式披露**结构：`SKILL.md` 精简（frontmatter + 核心准则 + 章节索引），
@@ -551,8 +601,8 @@ description: 何时该用我（写清触发场景, 这是代理唯一的判断�
 # 标题
 技能正文...
 EOF
-./install_skills.sh --list     # 会自动发现
-./install_skills.sh --tui      # 勾选安装
+./install.sh skills --list     # 会自动发现
+./install.sh skills --tui      # 勾选安装
 ```
 
 脚本幂等：内容变化则更新，未变化跳过。
@@ -561,7 +611,7 @@ EOF
 
 ## MCP 服务器安装器（install_mcp_servers.sh）
 
-仓库附带 `install_mcp_servers.sh`，用于安装并配置各种 MCP（Model Context Protocol）服务器，自动接入已安装的 AI CLI 工具：
+仓库附带 `scripts/install_mcp_servers.sh`，用于安装并配置各种 MCP（Model Context Protocol）服务器，自动接入已安装的 AI CLI 工具：
 
 | 目标工具 | 配置方式 |
 |---|---|
@@ -584,19 +634,19 @@ EOF
 ### 用法
 
 ```bash
-./install_mcp_servers.sh                 # 默认进入 TUI，不预选；非交互须指定服务器
-./install_mcp_servers.sh --all           # 显式安装全部 MCP
-./install_mcp_servers.sh --tui           # 强制进入 TUI 勾选界面
-./install_mcp_servers.sh --list          # 列出可用 MCP 及当前配置状态
-./install_mcp_servers.sh filesystem      # 只装 filesystem MCP
-./install_mcp_servers.sh git memory      # 装多个 MCP
-./install_mcp_servers.sh codebase-memory-mcp   # 代码知识图谱
-./install_mcp_servers.sh context7 codegraph serena  # 文档检索 + 代码图谱 + 语义检索
+./install.sh mcp                 # 默认进入 TUI，不预选；非交互须指定服务器
+./install.sh mcp --all           # 显式安装全部 MCP
+./install.sh mcp --tui           # 强制进入 TUI 勾选界面
+./install.sh mcp --list          # 列出可用 MCP 及当前配置状态
+./install.sh mcp filesystem      # 只装 filesystem MCP
+./install.sh mcp git memory      # 装多个 MCP
+./install.sh mcp codebase-memory-mcp   # 代码知识图谱
+./install.sh mcp context7 codegraph serena  # 文档检索 + 代码图谱 + 语义检索
 ```
 
 ### TUI 交互式选择
 
-与 `install_devtools.sh --tui` 同款界面（共用 `tui_module.sh` 通用库）：
+与 `./install.sh devtools --tui` 同款界面（共用 `scripts/tui_module.sh` 通用库）：
 
 - **↑/↓** 移动光标，**空格** 勾选/取消
 - **a** 全选，**n** 全不选，**i** 仅选未配置
@@ -608,7 +658,7 @@ EOF
 默认允许访问 `$HOME` 和 `/tmp`，可通过环境变量覆盖：
 
 ```bash
-FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
+FILESYSTEM_DIRS="/home/dev /data /projects" ./install.sh mcp filesystem
 ```
 
 ### 扩展新 MCP 服务器
@@ -643,7 +693,7 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 
 ## 开发工具套件（devtools）
 
-仓库附带 `install_devtools.sh`，用于一键安装一组常用开发工具（独立于主 install.sh，可选执行）。这些工具记录自 Fedora 44 服务器（192.168.50.179）的实际安装需求，供新机器复现。
+开发工具安装器位于 `scripts/install_devtools.sh`，通过 `./install.sh devtools` 或主菜单按需执行。这些工具记录自 Fedora 44 服务器（192.168.50.179）的实际安装需求，供新机器复现。
 
 > **跨发行版支持**：脚本自动探测包管理器，支持 **apt**（Debian/Ubuntu）、**dnf**（Fedora/RHEL）、**pacman**（Arch）、**zypper**（openSUSE）。系统包名按发行版自动映射（如 JetBrains Mono 在 apt 下为 `fonts-jetbrains-mono`、pacman 下为 `ttf-jetbrains-mono`、dnf 下为 `jetbrains-mono-fonts`）。
 
@@ -667,25 +717,25 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 ### 用法
 
 ```bash
-./install_devtools.sh             # 默认进入 TUI，不预选；非交互须指定组件
-./install_devtools.sh --all       # 显式安装全部组件
-./install_devtools.sh --node      # 安装/切换 Node LTS，nvm 不随 shell 启动
-./install_devtools.sh --python    # 只装 pyenv + Python 编译依赖
-./install_devtools.sh --ai        # 只装 AI CLI (claude-code + codex)
-./install_devtools.sh --zed       # 只装 Zed 编辑器 + JetBrains Mono
-./install_devtools.sh --ghostty   # 安装/修复 Ghostty、terminfo 和桌面终端入口
-./install_devtools.sh --vscode    # 只装 VS Code 编辑器
-./install_devtools.sh --mimo      # 只装 MiMo Code (小米 AI 编程助手)
-./install_devtools.sh --chatgpt   # 只装 ChatGPT / Codex 桌面版
-./install_devtools.sh --ccswitch  # 只装 CC Switch (AI CLI 配置切换器)
-./install_devtools.sh --tui       # 交互式勾选界面 (可多选组件)
-./install_devtools.sh --list      # 列出可安装组件及当前安装状态
-./install_devtools.sh --help      # 查看完整用法与依赖说明
+./install.sh devtools             # 默认进入 TUI，不预选；非交互须指定组件
+./install.sh devtools --all       # 显式安装全部组件
+./install.sh devtools --node      # 安装/切换 Node LTS，nvm 不随 shell 启动
+./install.sh devtools --python    # 只装 pyenv + Python 编译依赖
+./install.sh devtools --ai        # 只装 AI CLI (claude-code + codex)
+./install.sh devtools --zed       # 只装 Zed 编辑器 + JetBrains Mono
+./install.sh devtools --ghostty   # 安装/修复 Ghostty、terminfo 和桌面终端入口
+./install.sh devtools --vscode    # 只装 VS Code 编辑器
+./install.sh devtools --mimo      # 只装 MiMo Code (小米 AI 编程助手)
+./install.sh devtools --chatgpt   # 只装 ChatGPT / Codex 桌面版
+./install.sh devtools --ccswitch  # 只装 CC Switch (AI CLI 配置切换器)
+./install.sh devtools --tui       # 交互式勾选界面 (可多选组件)
+./install.sh devtools --list      # 列出可安装组件及当前安装状态
+./install.sh devtools --help      # 查看完整用法与依赖说明
 ```
 
 ### TUI 交互式选择 (`--tui`)
 
-运行 `./install_devtools.sh --tui` 打开终端交互界面，用键盘勾选要安装的组件：
+运行 `./install.sh devtools --tui` 打开终端交互界面，用键盘勾选要安装的组件：
 
 - **↑/↓** 移动光标，**空格** 勾选/取消
 - **a** 全选未安装，**n** 全不选，**i** 仅选未安装
@@ -693,8 +743,8 @@ FILESYSTEM_DIRS="/home/dev /data /projects" ./install_mcp_servers.sh filesystem
 - 所有组件默认不勾选；已安装的组件自动检测并显示 `[✓装]`，自动跳过
 
 ```bash
-./install_devtools.sh --tui
-./install_devtools.sh --list      # 列出可安装组件及当前安装状态
+./install.sh devtools --tui
+./install.sh devtools --list      # 列出可安装组件及当前安装状态
 ```
 
 ### 环境变量
@@ -722,7 +772,7 @@ Node 的版本管理留在安装阶段，普通终端直接使用固定运行路
 ### 修复已有 Ghostty
 
 ```bash
-./repair_ghostty.sh                  # 修复已有安装；系统 terminfo 缺失时提示 sudo 密码
+./install.sh repair-ghostty                  # 修复已有安装；系统 terminfo 缺失时提示 sudo 密码
 infocmp -x xterm-ghostty             # 验证当前用户的终端描述
 sudo infocmp -x xterm-ghostty        # 验证 sudo 下的终端描述
 sudo minicom -s                     # 验证 sudo 下的 minicom 配置界面
@@ -734,7 +784,7 @@ sudo minicom -s                     # 验证 sudo 下的 minicom 配置界面
 | `--user-only` | 只修复当前用户，不调用 `sudo`；无法补齐 `sudo minicom` 所需的系统条目 |
 | `--help` | 显示用法 |
 
-请以普通用户运行修复脚本，让它仅对系统条目的写入调用 `sudo`；不要用 `sudo` 运行整个脚本。修复不安装软件包，保留 Ghostty 的字体、主题和快捷键配置，为被修改的启动器、桌面文件、终端首选列表及 Cinnamon 设置创建 `*.bak.<timestamp>` 备份（保留最近 5 份）。桌面文件优先读取用户目录，再读取系统目录；终端首选列表保留其他终端作为回退。重复运行时内容无变化的文件保持不动。`doctor.sh` 分别检查用户和系统 terminfo，避免把只对当前用户可用的安装报告为全部正常。
+请以普通用户运行修复脚本，让它仅对系统条目的写入调用 `sudo`；不要用 `sudo` 运行整个脚本。修复不安装软件包，保留 Ghostty 的字体、主题和快捷键配置，为被修改的启动器、桌面文件、终端首选列表及 Cinnamon 设置创建 `*.bak.<timestamp>` 备份（保留最近 5 份）。桌面文件优先读取用户目录，再读取系统目录；终端首选列表保留其他终端作为回退。重复运行时内容无变化的文件保持不动。`scripts/doctor.sh` 分别检查用户和系统 terminfo，避免把只对当前用户可用的安装报告为全部正常。
 
 
 ## 安装内容
@@ -762,6 +812,6 @@ sudo minicom -s                     # 验证 sudo 下的 minicom 配置界面
 - 安装脚本会自动备份现有配置文件，格式为 `.bak.时间戳`
 - 默认保留最近 5 个备份文件
 - 脚本会校验 Oh My Zsh 是否真的安装成功；失败时直接退出，不会留下只有几行 `source` 的 `.zshrc`
-- 如果 `.zshrc` 里只有 `source ...` 片段（缺少 `export ZSH=`、`plugins=()`、`source $ZSH/oh-my-zsh.sh`），重新执行一次 `./install.sh` 即可自动补齐
-- Ghostty AppImage 的输入法修复与文件名绑定（AppImage 运行时会读取同名的 `.env`）；换成新版本、文件名变化后，重新执行一次 `./install.sh` 即可重新指向，且需要完全退出已打开的 Ghostty 窗口再启动才会生效
+- 如果 `.zshrc` 里只有 `source ...` 片段（缺少 `export ZSH=`、`plugins=()`、`source $ZSH/oh-my-zsh.sh`），重新执行一次 `./install.sh shell` 即可自动补齐
+- Ghostty AppImage 的输入法修复与文件名绑定（AppImage 运行时会读取同名的 `.env`）；换成新版本、文件名变化后，重新执行一次 `./install.sh shell` 即可重新指向，且需要完全退出已打开的 Ghostty 窗口再启动才会生效
 - 安装完成后请重启终端或重新登录以使更改生效

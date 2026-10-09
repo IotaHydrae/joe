@@ -17,7 +17,7 @@ jobs:
         run: |
           set -e
           fail=0
-          for f in *.sh .github/**/*.sh; do
+          for f in install.sh scripts/*.sh .github/**/*.sh; do
             [ -f "$f" ] || continue
             echo "::group::bash -n $f"
             if bash -n "$f"; then
@@ -41,8 +41,8 @@ jobs:
         run: |
           set -e
           fail=0
-          for f in install_devtools.sh install_mcp_servers.sh install_skills.sh repair_ghostty.sh doctor.sh bootstrap.sh update-all.sh; do
-            [ -f "$f" ] || continue
+          for f in install.sh scripts/install_shell.sh scripts/install_devtools.sh scripts/install_mcp_servers.sh scripts/install_skills.sh scripts/repair_ghostty.sh scripts/doctor.sh scripts/bootstrap.sh scripts/update-all.sh scripts/sync-configs.sh; do
+            [ -f "$f" ] || { echo "::error file=$f::缺少必需脚本"; fail=1; continue; }
             if [ ! -x "$f" ]; then
               echo "::error file=$f::$f 缺少可执行权限 (chmod +x)"
               fail=1
@@ -134,20 +134,30 @@ jobs:
         run: |
           set -e
           fail=0
-          for f in install_devtools.sh install_mcp_servers.sh install_skills.sh; do
+          for f in scripts/install_devtools.sh scripts/install_mcp_servers.sh scripts/install_skills.sh; do
             [ -f "$f" ] || { echo "::error::$f 缺失"; fail=1; continue; }
             if ! grep -q 'tui_module.sh' "$f"; then
               echo "::error file=$f::未引用 tui_module.sh"
               fail=1
             fi
           done
-          [ -f tui_module.sh ] || { echo "::error::tui_module.sh 缺失"; fail=1; }
+          [ -f scripts/tui_module.sh ] || { echo "::error::scripts/tui_module.sh 缺失"; fail=1; }
           exit $fail
 
       - name: TUI 关键函数存在
         run: |
           set -e
           for fn in run_tui tui_available; do
-            grep -q "^$fn()" tui_module.sh || { echo "::error file=tui_module.sh::缺少函数 $fn"; exit 1; }
+            grep -q "^$fn()" scripts/tui_module.sh || { echo "::error file=scripts/tui_module.sh::缺少函数 $fn"; exit 1; }
           done
           echo "TUI 函数完整"
+
+      - name: 顶层只有一个 Shell 入口
+        run: |
+          set -e
+          shopt -s nullglob
+          files=(*.sh)
+          [ "${#files[@]}" -eq 1 ] && [ "${files[0]}" = install.sh ] || {
+            echo "::error::顶层只允许 install.sh, 其他脚本应在 scripts/"
+            exit 1
+          }

@@ -7,20 +7,20 @@
 # 已实测: Ubuntu 24.04 / Linux Mint 22.3 (noble) / Arch Linux (CachyOS 基线) / Fedora。
 #
 # 用法:
-#   ./install_devtools.sh            # 默认进入 TUI, 不预选; 非交互须指定组件
-#   ./install_devtools.sh --all      # 显式安装全部组件
-#   ./install_devtools.sh --node     # 安装/切换 Node LTS (nvm 仅在安装时加载)
-#   ./install_devtools.sh --python   # 只装 pyenv + Python 编译依赖
-#   ./install_devtools.sh --ai       # 只装 AI CLI (claude-code + codex)
-#   ./install_devtools.sh --zed      # 只装 Zed 编辑器 + JetBrains Mono
-#   ./install_devtools.sh --ghostty  # 安装/修复 Ghostty、terminfo 和桌面终端入口
-#   ./install_devtools.sh --vscode   # 只装 VS Code 编辑器
-#   ./install_devtools.sh --mimo     # 只装 MiMo Code (小米 AI 编程助手)
-#   ./install_devtools.sh --chatgpt  # 只装 ChatGPT / Codex 桌面版
-#   ./install_devtools.sh --ccswitch # 只装 CC Switch (AI CLI 配置切换器)
-#   ./install_devtools.sh --tui      # 交互式勾选界面 (TUI)
-#   ./install_devtools.sh --list     # 列出可安装组件
-#   ./install_devtools.sh --check    # 只报告本机适配情况 (发行版/包名解析/安装方式), 不做改动
+#   ./install.sh devtools            # 默认进入 TUI, 不预选; 非交互须指定组件
+#   ./install.sh devtools --all      # 显式安装全部组件
+#   ./install.sh devtools --node     # 安装/切换 Node LTS (nvm 仅在安装时加载)
+#   ./install.sh devtools --python   # 只装 pyenv + Python 编译依赖
+#   ./install.sh devtools --ai       # 只装 AI CLI (claude-code + codex)
+#   ./install.sh devtools --zed      # 只装 Zed 编辑器 + JetBrains Mono
+#   ./install.sh devtools --ghostty  # 安装/修复 Ghostty、terminfo 和桌面终端入口
+#   ./install.sh devtools --vscode   # 只装 VS Code 编辑器
+#   ./install.sh devtools --mimo     # 只装 MiMo Code (小米 AI 编程助手)
+#   ./install.sh devtools --chatgpt  # 只装 ChatGPT / Codex 桌面版
+#   ./install.sh devtools --ccswitch # 只装 CC Switch (AI CLI 配置切换器)
+#   ./install.sh devtools --tui      # 交互式勾选界面 (TUI)
+#   ./install.sh devtools --list     # 列出可安装组件
+#   ./install.sh devtools --check    # 只报告本机适配情况 (发行版/包名解析/安装方式), 不做改动
 #
 # TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
 #           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
@@ -31,7 +31,7 @@
 #   - 日常 shell 只使用 ~/.nvm/current/bin, 不加载 nvm.sh 或 nvm 补全
 #   - pyenv 装到 ~/.pyenv, Python 版本与 pipx 由用户自行安装
 #   - --ghostty 会修复已有安装的用户/系统 terminfo 与桌面入口; 系统条目缺失时需要 sudo
-#   - 单独修复用 ./repair_ghostty.sh; --user-only 不写系统 terminfo
+#   - 单独修复用 ./install.sh repair-ghostty; --user-only 不写系统 terminfo
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
 # =============================================================================

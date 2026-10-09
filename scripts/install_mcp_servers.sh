@@ -6,12 +6,12 @@
 # AI CLI 工具: Claude Code (claude), Codex (codex), MiMo Code (mimo)。
 #
 # 用法:
-#   ./install_mcp_servers.sh                  # 默认进入 TUI, 不预选; 非交互须指定服务器
-#   ./install_mcp_servers.sh --tui            # 强制进入 TUI 勾选界面
-#   ./install_mcp_servers.sh --all            # 显式安装全部 MCP
-#   ./install_mcp_servers.sh --list           # 列出可用 MCP 服务器及状态
-#   ./install_mcp_servers.sh filesystem       # 只装 filesystem MCP
-#   ./install_mcp_servers.sh git memory       # 装多个 MCP
+#   ./install.sh mcp                  # 默认进入 TUI, 不预选; 非交互须指定服务器
+#   ./install.sh mcp --tui            # 强制进入 TUI 勾选界面
+#   ./install.sh mcp --all            # 显式安装全部 MCP
+#   ./install.sh mcp --list           # 列出可用 MCP 服务器及状态
+#   ./install.sh mcp filesystem       # 只装 filesystem MCP
+#   ./install.sh mcp git memory       # 装多个 MCP
 #
 # TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
 #           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
@@ -533,9 +533,9 @@ usage() {
     echo "  PROXY_URL        代理地址, 如 http://host:7890"
     echo
     echo "示例:"
-    echo "  ./install_mcp_servers.sh"
-    echo "  ./install_mcp_servers.sh --tui"
-    echo "  ./install_mcp_servers.sh filesystem git memory codebase-memory-mcp"
+    echo "  ./install.sh mcp"
+    echo "  ./install.sh mcp --tui"
+    echo "  ./install.sh mcp filesystem git memory codebase-memory-mcp"
     exit 0
 }
 

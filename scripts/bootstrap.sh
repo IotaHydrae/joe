@@ -5,11 +5,11 @@
 # 把"克隆 joe → 装开发工具 → 配 MCP → 装技能 → 体检"串成一条命令。
 #
 # 用法:
-#   ./bootstrap.sh                    # 交互模式: 各阶段进入 TUI, 不预选任何项
-#   ./bootstrap.sh --yes              # 非交互: 全部安装 (适合脚本/CI)
-#   ./bootstrap.sh --only mcp,skills  # 只跑指定阶段
-#   ./bootstrap.sh --skip devtools    # 跳过指定阶段
-#   ./bootstrap.sh --dir ~/joe        # 指定克隆目录
+#   ./install.sh bootstrap                    # 交互模式: 各阶段进入 TUI, 不预选任何项
+#   ./install.sh bootstrap --yes              # 非交互: 全部安装 (适合脚本/CI)
+#   ./install.sh bootstrap --only mcp,skills  # 只跑指定阶段
+#   ./install.sh bootstrap --skip devtools    # 跳过指定阶段
+#   ./install.sh bootstrap --dir ~/joe        # 指定克隆目录
 #
 # 阶段: devtools | mcp | skills | doctor   (默认全部)
 #
@@ -19,7 +19,7 @@
 #   PROXY_URL  代理, 如 http://host:7890
 #
 # 也可直接管道运行(此时会先克隆到自己):
-#   curl -fsSL <raw-url>/bootstrap.sh | bash
+#   curl -fsSL <raw-url>/install.sh | bash -s -- bootstrap
 # =============================================================================
 
 set -uo pipefail
@@ -111,13 +111,13 @@ step "准备 joe 仓库"
 SELF="${BASH_SOURCE[0]:-}"
 SRC_DIR=""
 if [ -n "$SELF" ] && [ -f "$SELF" ]; then
-    SRC_DIR="$(cd "$(dirname "$SELF")" && pwd)"
+    SRC_DIR="$(cd "$(dirname "$SELF")/.." && pwd)"
 fi
 
-if [ -n "$SRC_DIR" ] && [ -f "$SRC_DIR/install_devtools.sh" ]; then
+if [ -n "$SRC_DIR" ] && [ -f "$SRC_DIR/scripts/install_devtools.sh" ]; then
     JOE_DIR="$SRC_DIR"
     printf '  %s 已在仓库内: %s\n' "$(c_g '✓')" "$JOE_DIR"
-elif [ -f "$JOE_DIR/install_devtools.sh" ]; then
+elif [ -f "$JOE_DIR/scripts/install_devtools.sh" ]; then
     printf '  %s 复用已有仓库: %s\n' "$(c_g '✓')" "$JOE_DIR"
     git -C "$JOE_DIR" pull --ff-only 2>/dev/null | tail -1 || true
 else
@@ -140,8 +140,9 @@ if [ -n "${PROXY_URL:-}" ]; then
 fi
 
 # 统一环境 PATH (nvm / pyenv / mimo / 用户 bin)
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" >/dev/null 2>&1
+# shellcheck source=lib_node.sh
+. "$JOE_DIR/scripts/lib_node.sh"
+load_node
 export PYENV_ROOT="${PYENV_ROOT:-$HOME/.pyenv}"
 export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PYENV_ROOT/bin:$PYENV_ROOT/shims:$PATH"
 
@@ -189,17 +190,17 @@ run_stage() {
     fi
 }
 
-run_stage devtools "开发工具 (install_devtools.sh)"    ./install_devtools.sh
-run_stage mcp      "MCP 服务器 (install_mcp_servers.sh)" ./install_mcp_servers.sh
-run_stage skills   "代理技能 (install_skills.sh)"       ./install_skills.sh
+run_stage devtools "开发工具"    ./scripts/install_devtools.sh
+run_stage mcp      "MCP 服务器" ./scripts/install_mcp_servers.sh
+run_stage skills   "代理技能"   ./scripts/install_skills.sh
 
 # ---------------------------------------------------------------------------
 # 4. 体检
 # ---------------------------------------------------------------------------
 if want doctor; then
     step "环境体检 (doctor.sh)"
-    if [ -f ./doctor.sh ]; then
-        bash ./doctor.sh || true
+    if [ -f ./scripts/doctor.sh ]; then
+        bash ./scripts/doctor.sh || true
     else
         printf '  %s doctor.sh 不存在\n' "$(c_y '!')"
     fi

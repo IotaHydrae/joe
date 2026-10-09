@@ -1,6 +1,6 @@
 # configs — 本机配置备份（自动生成）
 
-由 `../sync-configs.sh export` 生成，**已做脱敏**（API key / token / 密码 / Bearer 等被替换为 `***REDACTED***`）。
+由 `../install.sh configs export` 生成，**已做脱敏**（API key / token / 密码 / Bearer 等被替换为 `***REDACTED***`）。
 
 | 文件 | 来源 | 说明 |
 |---|---|---|
@@ -15,7 +15,7 @@
 ## 恢复
 
 ```bash
-./sync-configs.sh import     # 原文件会备份为 .bak.<时间戳>
+./install.sh configs import     # 原文件会备份为 .bak.<时间戳>
 ```
 
 ## 提交前请复核

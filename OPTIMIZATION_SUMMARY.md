@@ -112,8 +112,8 @@ github_mirror_download()    # 支持自定义超时，大文件提示
 ### 功能测试
 ```bash
 ✅ ./install.sh --dry-run          # 模拟安装正常
-✅ ./install_devtools.sh --list     # 组件列表正常显示
-✅ ./doctor.sh                      # 新检测项正常工作
+✅ ./install.sh devtools --list     # 组件列表正常显示
+✅ ./install.sh doctor                      # 新检测项正常工作
 ✅ lib_distro.sh distro_report      # Mint 兼容性检测工作
 ```
 
@@ -245,7 +245,7 @@ github_mirror_download()    # 支持自定义超时，大文件提示
 ## 使用建议
 
 ### Linux Mint 用户
-1. 运行 `./doctor.sh` 检查环境
+1. 运行 `./install.sh doctor` 检查环境
 2. 确保网络连接正常（或配置代理）
 3. 确保磁盘空间充足（建议至少 10GB）
 4. 使用 `--dry-run` 预览安装过程
@@ -258,15 +258,15 @@ github_mirror_download()    # 支持自定义超时，大文件提示
 ### 定制安装
 ```bash
 # 只安装特定组件
-./install_devtools.sh --node
-./install_devtools.sh --python --ai
+./install.sh devtools --node
+./install.sh devtools --python --ai
 
 # 使用代理
-PROXY_URL=http://localhost:7890 ./install_devtools.sh --zed
+PROXY_URL=http://localhost:7890 ./install.sh devtools --zed
 
 # 检查环境
-./doctor.sh --quiet    # 只显示问题项
-./doctor.sh --mcp      # 包含 MCP 连接测试（较慢）
+./install.sh doctor --quiet    # 只显示问题项
+./install.sh doctor --mcp      # 包含 MCP 连接测试（较慢）
 ```
 
 ## 贡献者

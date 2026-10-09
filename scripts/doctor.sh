@@ -5,10 +5,10 @@
 # 检查 joe 安装的工具 / MCP 服务器 / 代理技能是否就绪，并给出可执行的修复建议。
 #
 # 用法:
-#   ./doctor.sh              # 常规检查 (默认不测 MCP 连接, 较快)
-#   ./doctor.sh --mcp        # 额外实际连接每个 MCP (慢, 每个约 10-30s)
-#   ./doctor.sh --quiet      # 只输出问题项
-#   ./doctor.sh --json       # 机器可读输出
+#   ./install.sh doctor              # 常规检查 (默认不测 MCP 连接, 较快)
+#   ./install.sh doctor --mcp        # 额外实际连接每个 MCP (慢, 每个约 10-30s)
+#   ./install.sh doctor --quiet      # 只输出问题项
+#   ./install.sh doctor --json       # 机器可读输出
 #
 # 退出码: 0 = 无失败项, 1 = 有失败项(缺失/不可用)
 # =============================================================================
@@ -16,6 +16,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=lib_ghostty.sh
 . "$SCRIPT_DIR/lib_ghostty.sh"
 
@@ -134,7 +135,7 @@ expected_mcps() {
 # 从 skills/ 目录读取期望的技能列表
 expected_skills() {
     local d
-    for d in "$SCRIPT_DIR"/skills/*/SKILL.md; do
+    for d in "$REPO_ROOT"/skills/*/SKILL.md; do
         [ -f "$d" ] || continue
         basename "$(dirname "$d")"
     done
@@ -224,45 +225,45 @@ done
 # ---------------------------------------------------------------------------
 section "Node / Python 工具链"
 for c in node npm npx; do
-    chk_cmd "$c" "运行 ./install_devtools.sh --node"
+    chk_cmd "$c" "运行 ./install.sh devtools --node"
 done
 for c in python3 pipx; do
-    chk_cmd "$c" "运行 ./install_devtools.sh --python"
+    chk_cmd "$c" "运行 ./install.sh devtools --python"
 done
-chk_cmd pyenv "运行 ./install_devtools.sh --python"
+chk_cmd pyenv "运行 ./install.sh devtools --python"
 for c in uv uvx; do
-    chk_cmd "$c" "运行 ./install_mcp_servers.sh git (会装 uv)"
+    chk_cmd "$c" "运行 ./install.sh mcp git (会装 uv)"
 done
 
 # ---------------------------------------------------------------------------
 # 4. AI CLI
 # ---------------------------------------------------------------------------
 section "AI CLI"
-chk_cmd claude "运行 ./install_devtools.sh --ai"
-chk_cmd codex  "运行 ./install_devtools.sh --ai"
-chk_cmd mimo   "运行 ./install_devtools.sh --mimo"
+chk_cmd claude "运行 ./install.sh devtools --ai"
+chk_cmd codex  "运行 ./install.sh devtools --ai"
+chk_cmd mimo   "运行 ./install.sh devtools --mimo"
 
 # ---------------------------------------------------------------------------
 # 5. 编辑器 / 终端 / 桌面
 # ---------------------------------------------------------------------------
 section "编辑器 / 终端 / 桌面"
-chk_cmd zed      "运行 ./install_devtools.sh --zed"
-chk_cmd code     "运行 ./install_devtools.sh --vscode"
-chk_cmd ghostty  "运行 ./install_devtools.sh --ghostty"
+chk_cmd zed      "运行 ./install.sh devtools --zed"
+chk_cmd code     "运行 ./install.sh devtools --vscode"
+chk_cmd ghostty  "运行 ./install.sh devtools --ghostty"
 if find_bin ghostty >/dev/null 2>&1; then
     if command -v infocmp >/dev/null 2>&1 && infocmp -x xterm-ghostty >/dev/null 2>&1; then
         record ok "Ghostty terminfo" "当前用户的 xterm-ghostty 可用"
     else
-        record fail "Ghostty terminfo" "运行 ./repair_ghostty.sh (minicom 等终端程序需要)"
+        record fail "Ghostty terminfo" "运行 ./install.sh repair-ghostty (minicom 等终端程序需要)"
     fi
     if ghostty_system_terminfo_available; then
         record ok "Ghostty 系统 terminfo" "sudo 下的 xterm-ghostty 可用"
     else
-        record fail "Ghostty 系统 terminfo" "运行 ./repair_ghostty.sh 并完成 sudo 认证 (仅 ~/.terminfo 无法支持 sudo minicom)"
+        record fail "Ghostty 系统 terminfo" "运行 ./install.sh repair-ghostty 并完成 sudo 认证 (仅 ~/.terminfo 无法支持 sudo minicom)"
     fi
 fi
-chk_cmd chatgpt  "运行 ./install_devtools.sh --chatgpt"
-chk_cmd_present cc-switch "运行 ./install_devtools.sh --ccswitch"   # GUI 应用, --version 会启动界面
+chk_cmd chatgpt  "运行 ./install.sh devtools --chatgpt"
+chk_cmd_present cc-switch "运行 ./install.sh devtools --ccswitch"   # GUI 应用, --version 会启动界面
 
 # ---------------------------------------------------------------------------
 # 6. MCP 服务器
@@ -285,7 +286,7 @@ sys.exit(0 if '$m' in (d.get('mcpServers') or {}) else 1)
 " 2>/dev/null; then
                 record ok "claude: $m"
             else
-                record fail "claude: $m" "运行 ./install_mcp_servers.sh $m"
+                record fail "claude: $m" "运行 ./install.sh mcp $m"
             fi
         done
     else
@@ -299,7 +300,7 @@ sys.exit(0 if '$m' in (d.get('mcpServers') or {}) else 1)
             if printf '%s\n' "$CODEX_MCP" | grep -qx "$m"; then
                 record ok "codex: $m"
             else
-                record fail "codex: $m" "运行 ./install_mcp_servers.sh $m"
+                record fail "codex: $m" "运行 ./install.sh mcp $m"
             fi
         done
     fi
@@ -311,7 +312,7 @@ sys.exit(0 if '$m' in (d.get('mcpServers') or {}) else 1)
             if grep -q "\"$m\"" "$MIMO_CFG" 2>/dev/null; then
                 record ok "mimo: $m"
             else
-                record fail "mimo: $m" "运行 ./install_mcp_servers.sh $m"
+                record fail "mimo: $m" "运行 ./install.sh mcp $m"
             fi
         done
     fi
@@ -350,7 +351,7 @@ else
         if [ -z "$missing" ]; then
             record ok "$label" "$(printf '%s' "$EXPECTED_SKILLS" | wc -w) 个技能就绪"
         else
-            record fail "$label" "缺少:$missing (运行 ./install_skills.sh)"
+            record fail "$label" "缺少:$missing (运行 ./install.sh skills)"
         fi
     done
 fi
@@ -361,7 +362,7 @@ fi
 section "技能定义校验"
 bad=0
 for s in $EXPECTED_SKILLS; do
-    f="$SCRIPT_DIR/skills/$s/SKILL.md"
+    f="$REPO_ROOT/skills/$s/SKILL.md"
     [ -f "$f" ] || continue
     if ! head -1 "$f" | grep -qE '^---[[:space:]]*$'; then
         record fail "$s frontmatter" "缺少 YAML frontmatter"; bad=1; continue

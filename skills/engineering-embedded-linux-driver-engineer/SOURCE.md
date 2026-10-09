@@ -8,7 +8,7 @@
 - 作者（上游元数据）：`agency-agents-zh`
 - 许可证：MIT，随附上游仓库根目录的 [LICENSE](LICENSE) 原文。
 
-`SKILL.md` 与 `skill.json` 按上述提交原样导入。此文件仅记录来源；安装仍由 joe 的 `install_skills.sh` 按需选择，整个技能目录一起复制。
+`SKILL.md` 与 `skill.json` 按上述提交原样导入。此文件仅记录来源；安装仍由 joe 的 `scripts/install_skills.sh` 按需选择，整个技能目录一起复制。
 
 ## 上游文件 SHA256
 

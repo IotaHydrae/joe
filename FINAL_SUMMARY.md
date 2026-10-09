@@ -132,7 +132,7 @@
 ### 3. Linux Mint 专项支持
 
 ```bash
-./doctor.sh
+./install.sh doctor
 
 ── 系统信息与兼容性 ──
   ✓ 操作系统    Linux Mint 22.3
@@ -196,7 +196,7 @@
 ### 场景 1: 新机器首次安装
 ```bash
 # 1. 检查环境
-./doctor.sh
+./install.sh doctor
 
 # 2. 预览安装内容
 ./install.sh --dry-run
@@ -217,7 +217,7 @@
 ### 场景 3: 批量部署
 ```bash
 # Bootstrap 一键安装（带阶段进度）
-./bootstrap.sh --yes
+./install.sh bootstrap --yes
 # 输出: [1/4] 开发工具
 # 输出: [2/4] MCP 服务器
 # 输出: [3/4] 代理技能

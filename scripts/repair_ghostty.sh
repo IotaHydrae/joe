@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 修复已有 Ghostty 的 terminfo、桌面入口和 Cinnamon/Nemo 工作目录。
-# 用法: ./repair_ghostty.sh [--user-only]
+# 用法: ./install.sh repair-ghostty [--user-only]
 # 默认补齐系统 terminfo (缺失时通过 sudo 写入), 支持 sudo minicom。
 # --user-only 只修复当前用户, 不使用 sudo, 不保证 sudo 下的终端程序可用。
 # 不安装软件包, 不改 Ghostty 主题、字体或快捷键配置。

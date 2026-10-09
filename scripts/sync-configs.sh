@@ -9,11 +9,11 @@
 #   * 不自动提交: 导出后请自行 git diff 复核再提交
 #
 # 用法:
-#   ./sync-configs.sh list            # 列出映射与状态
-#   ./sync-configs.sh export          # 导出(脱敏)到 configs/
-#   ./sync-configs.sh export --check  # 只检查会擦除多少敏感项, 不写文件
-#   ./sync-configs.sh import          # 从 configs/ 恢复到本机 (原文件备份为 .bak.<时间>)
-#   ./sync-configs.sh diff            # 显示本机与仓库备份的差异
+#   ./install.sh configs list            # 列出映射与状态
+#   ./install.sh configs export          # 导出(脱敏)到 configs/
+#   ./install.sh configs export --check  # 只检查会擦除多少敏感项, 不写文件
+#   ./install.sh configs import          # 从 configs/ 恢复到本机 (原文件备份为 .bak.<时间>)
+#   ./install.sh configs diff            # 显示本机与仓库备份的差异
 #
 # 退出码: 0 成功, 1 有错误
 # =============================================================================
@@ -21,7 +21,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONF_DIR="$SCRIPT_DIR/configs"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONF_DIR="$REPO_ROOT/configs"
 BACKUP_ROOT="${BACKUP_ROOT:-$HOME/.joe-config-backup}"
 
 c_g() { printf '\033[0;32m%s\033[0m' "$1"; }
@@ -223,7 +224,7 @@ do_export() {
         cat > "$CONF_DIR/README.md" <<'EOF'
 # configs — 本机配置备份（自动生成）
 
-由 `../sync-configs.sh export` 生成，**已做脱敏**（API key / token / 密码 / Bearer 等被替换为 `***REDACTED***`）。
+由 `../install.sh configs export` 生成，**已做脱敏**（API key / token / 密码 / Bearer 等被替换为 `***REDACTED***`）。
 
 | 文件 | 来源 | 说明 |
 |---|---|---|
@@ -238,7 +239,7 @@ do_export() {
 ## 恢复
 
 ```bash
-./sync-configs.sh import     # 原文件会备份为 .bak.<时间戳>
+./install.sh configs import     # 原文件会备份为 .bak.<时间戳>
 ```
 
 ## 提交前请复核

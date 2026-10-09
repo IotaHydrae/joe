@@ -5,15 +5,15 @@
 # 把 ./skills/<name>/SKILL.md 安装到各 AI 代理的 skills 目录。
 #
 # 用法:
-#   ./install_skills.sh                # 默认进入 TUI, 不预选; 非交互须指定技能
-#   ./install_skills.sh --tui          # 强制进入 TUI 勾选界面
-#   ./install_skills.sh --all          # 显式安装全部技能
-#   ./install_skills.sh --list         # 列出技能及安装状态
-#   ./install_skills.sh --categories   # 列出分类及技能数量
-#   ./install_skills.sh --category kernel-dev --tui  # 按分类勾选, 可重复 --category
-#   ./install_skills.sh --category kernel-dev --all  # 显式安装该分类全部技能
-#   ./install_skills.sh <name> [...]   # 只装指定技能
-#   ./install_skills.sh engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
+#   ./install.sh skills                # 默认进入 TUI, 不预选; 非交互须指定技能
+#   ./install.sh skills --tui          # 强制进入 TUI 勾选界面
+#   ./install.sh skills --all          # 显式安装全部技能
+#   ./install.sh skills --list         # 列出技能及安装状态
+#   ./install.sh skills --categories   # 列出分类及技能数量
+#   ./install.sh skills --category kernel-dev --tui  # 按分类勾选, 可重复 --category
+#   ./install.sh skills --category kernel-dev --all  # 显式安装该分类全部技能
+#   ./install.sh skills <name> [...]   # 只装指定技能
+#   ./install.sh skills engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
 #
 # TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
 #           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
@@ -37,7 +37,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILLS_SRC="$SCRIPT_DIR/skills"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SKILLS_SRC="$REPO_ROOT/skills"
 CATEGORY_FILTERS=()
 declare -A SKILL_CATEGORIES=()
 

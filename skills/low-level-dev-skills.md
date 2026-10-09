@@ -11,11 +11,11 @@
 从仓库根目录运行：
 
 ```bash
-./install_skills.sh --categories
-./install_skills.sh --category kernel-dev --tui
-./install_skills.sh --category compilers --category debuggers --tui
-./install_skills.sh device-tree gdb cross-gcc
-./install_skills.sh --category kernel-dev --all  # 显式安装该分类全部技能
+./install.sh skills --categories
+./install.sh skills --category kernel-dev --tui
+./install.sh skills --category compilers --category debuggers --tui
+./install.sh skills device-tree gdb cross-gcc
+./install.sh skills --category kernel-dev --all  # 显式安装该分类全部技能
 ```
 
 分类过滤可与 `--list`、`--tui`、`--all` 和技能名组合，重复 `--category` 取并集。默认不勾选任何技能。原有技能和自定义技能归入 `local` 分类。

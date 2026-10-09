@@ -90,7 +90,7 @@ ghostty_install_system_terminfo() {
         command -v sudo >/dev/null 2>&1 \
             || { warn "系统 terminfo 需要 sudo; 仅修复当前用户可使用 --user-only"; return 1; }
         sudo -- "$install_bin" -D -m 644 -- "$entry" "$dest" \
-            || { warn "系统 terminfo 安装失败; 请在自己的终端中运行 ./repair_ghostty.sh 并完成 sudo 认证"; return 1; }
+            || { warn "系统 terminfo 安装失败; 请在自己的终端中运行 ./install.sh repair-ghostty 并完成 sudo 认证"; return 1; }
     fi
     ghostty_system_terminfo_available \
         || { warn "安装后系统仍无法读取 xterm-ghostty terminfo"; return 1; }
@@ -130,7 +130,7 @@ ghostty_install_terminfo() {
     fi
     if [ "$user_only" = true ]; then
         if ! ghostty_system_terminfo_available; then
-            warn "--user-only 仅修复当前用户; sudo minicom 仍需要系统 terminfo, 运行 ./repair_ghostty.sh 补齐"
+            warn "--user-only 仅修复当前用户; sudo minicom 仍需要系统 terminfo, 运行 ./install.sh repair-ghostty 补齐"
         fi
     else
         ghostty_install_system_terminfo "$work" || return 1
@@ -241,7 +241,7 @@ EOF
 repair_ghostty() (
     set -euo pipefail
     local bin work user_only="${1:-false}"
-    bin="$(ghostty_binary)" || { warn "未找到 Ghostty, 请先运行 ./install_devtools.sh --ghostty"; return 1; }
+    bin="$(ghostty_binary)" || { warn "未找到 Ghostty, 请先运行 ./install.sh devtools --ghostty"; return 1; }
     work="$(mktemp -d "${TMPDIR:-/tmp}/joe-ghostty.XXXXXX")" || return 1
     trap 'rm -rf -- "$work"' EXIT
     ghostty_install_terminfo "$bin" "$work" "$user_only" || return 1

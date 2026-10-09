@@ -116,7 +116,7 @@ show_progress() {
 
 #### 3. Bootstrap 阶段进度
 ```bash
-./bootstrap.sh --yes
+./install.sh bootstrap --yes
 # 输出: [1/4] 开发工具... [4/4] 环境体检
 ```
 
@@ -241,7 +241,7 @@ CYAN (PROGRESS) - 进度信息 ← 新增
 
 ### Bootstrap 整体安装
 ```bash
-./bootstrap.sh --yes
+./install.sh bootstrap --yes
 # 显示 4 个阶段的总体进度
 ```
 

@@ -1,6 +1,6 @@
 # joe skills — 代理技能库
 
-存放可复用的 **Agent Skills**，通过 `../install_skills.sh` 安装到各 AI 代理。
+存放可复用的 **Agent Skills**，通过 `../install.sh skills` 安装到各 AI 代理。
 
 ## 第三方技能
 
@@ -9,10 +9,10 @@
 在仓库根目录按需安装：
 
 ```bash
-./install_skills.sh engineering-embedded-linux-driver-engineer
+./install.sh skills engineering-embedded-linux-driver-engineer
 ```
 
-也可以运行 `./install_skills.sh --tui` 后勾选；默认不勾选任何技能。
+也可以运行 `./install.sh skills --tui` 后勾选；默认不勾选任何技能。
 
 ### low-level-dev-skills 技能集
 
@@ -21,10 +21,10 @@
 从仓库根目录按分类浏览或按技能名安装：
 
 ```bash
-./install_skills.sh --categories
-./install_skills.sh --category kernel-dev --category kernel --tui
-./install_skills.sh device-tree bus-drivers-i2c-spi gdb cross-gcc
-./install_skills.sh --category kernel-dev --all  # 显式安装该分类全部技能
+./install.sh skills --categories
+./install.sh skills --category kernel-dev --category kernel --tui
+./install.sh skills device-tree bus-drivers-i2c-spi gdb cross-gcc
+./install.sh skills --category kernel-dev --all  # 显式安装该分类全部技能
 ```
 
 分类元数据在 `categories.tsv`，未列入该表的技能归入 `local`。重复 `--category` 取并集；与 `--list`、`--tui`、`--all` 和技能名组合时只作用于这些分类。默认不勾选任何技能，相关技能与系统工具也不会自动安装。
@@ -61,7 +61,7 @@ description: 一句话说明何时该用我 (代理先只看到这段, 要具体
 
 ## 安装位置
 
-`install_skills.sh` 会把技能复制到以下目录（按已安装的代理）：
+`./install.sh skills` 会把技能复制到以下目录（按已安装的代理）：
 
 | 目录 | 归属 |
 |---|---|
@@ -79,8 +79,8 @@ description: 一句话说明何时该用我 (代理先只看到这段, 要具体
 ```bash
 mkdir -p skills/<skill-name>
 $EDITOR skills/<skill-name>/SKILL.md
-../install_skills.sh --list        # 确认已被识别
-../install_skills.sh --tui          # 勾选安装
+../install.sh skills --list        # 确认已被识别
+../install.sh skills --tui          # 勾选安装
 ```
 
 脚本是**幂等**的：内容有变化的技能会更新，未变化的跳过。

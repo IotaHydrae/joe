@@ -6,10 +6,10 @@
 # MCP / 技能配置请运行对应安装器按需选择。
 #
 # 用法:
-#   ./update-all.sh             # 更新工具链 + AI CLI + MCP 引擎 + joe 仓库
-#   ./update-all.sh --system    # 额外升级系统包 (dnf/apt/pacman/zypper)
-#   ./update-all.sh --dry-run   # 只显示将要执行什么
-#   ./update-all.sh --quiet     # 精简输出
+#   ./install.sh update             # 更新工具链 + AI CLI + MCP 引擎 + joe 仓库
+#   ./install.sh update --system    # 额外升级系统包 (dnf/apt/pacman/zypper)
+#   ./install.sh update --dry-run   # 只显示将要执行什么
+#   ./install.sh update --quiet     # 精简输出
 #
 # 说明:
 #   - 单项失败不影响其余项, 最后统一汇总
@@ -19,6 +19,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # 共享的 GitHub 下载/校验函数 (镜像回退等)
 if [ -f "$SCRIPT_DIR/lib_github.sh" ]; then
@@ -118,8 +119,8 @@ $DRY_RUN && printf '%s\n' "$(c_y '(dry-run 模式, 不会真正执行)')"
 # 1. joe 仓库
 # ---------------------------------------------------------------------------
 section "joe 仓库"
-if [ -d "$SCRIPT_DIR/.git" ]; then
-    update_item "joe (git pull)" git -C "$SCRIPT_DIR" pull --ff-only
+if [ -e "$REPO_ROOT/.git" ]; then
+    update_item "joe (git pull)" git -C "$REPO_ROOT" pull --ff-only
 else
     skip_item "joe (git pull)" "非 git 仓库"
 fi
@@ -223,8 +224,8 @@ fi
 # ---------------------------------------------------------------------------
 if ! $QUIET; then
     section "按需配置"
-    printf '  MCP 配置: ./install_mcp_servers.sh --tui\n'
-    printf '  技能安装/更新: ./install_skills.sh --tui\n'
+    printf '  MCP 配置: ./install.sh mcp --tui\n'
+    printf '  技能安装/更新: ./install.sh skills --tui\n'
 fi
 
 # ---------------------------------------------------------------------------
@@ -253,6 +254,6 @@ printf '  %s 成功   %s 跳过   %s 失败\n' "$(c_g "$OK")" "$(c_d "$SKIP")" "
 if [ "$FAILED" -gt 0 ]; then
     printf '\n%s\n' "$(c_r '失败项:')"
     for i in "${FAILED_ITEMS[@]}"; do printf '  • %s\n' "$i"; done
-    printf '\n提示: 单项网络问题可稍后重试；也可查看 ./doctor.sh --mcp\n'
+    printf '\n提示: 单项网络问题可稍后重试；也可查看 ./install.sh doctor --mcp\n'
 fi
 [ "$FAILED" -eq 0 ]

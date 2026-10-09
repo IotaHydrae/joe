@@ -51,21 +51,21 @@
 
 #### 检查环境
 ```bash
-./doctor.sh              # 完整检查
-./doctor.sh --quiet      # 只显示问题项
+./install.sh doctor              # 完整检查
+./install.sh doctor --quiet      # 只显示问题项
 ```
 
 #### 安装前预览
 ```bash
 ./install.sh --dry-run
-./install_devtools.sh --list
+./install.sh devtools --list
 ```
 
 #### 实际安装
 ```bash
 ./install.sh                    # 主安装器
-./install_devtools.sh --python  # 安装 Python 工具链
-./install_devtools.sh --tui     # TUI 交互选择
+./install.sh devtools --python  # 安装 Python 工具链
+./install.sh devtools --tui     # TUI 交互选择
 ```
 
 ### 📝 相关文档
@@ -93,7 +93,7 @@
 
 如果遇到问题：
 
-1. 运行 `./doctor.sh` 检查环境
+1. 运行 `./install.sh doctor` 检查环境
 2. 查看 `install.log` 了解详细错误
 3. 使用 `--dry-run` 预览操作
 4. 检查网络连接（GitHub、npm registry）
