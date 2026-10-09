@@ -111,7 +111,7 @@ jobs:
           fail=0
           for f in skills/*/SKILL.md; do
             dir="$(dirname "$f")"
-            # 提取 markdown 链接里的相对路径, 检查文件是否存在
+            # 跳过代码围栏, 避免把 C++ lambda 的 ](...) 误判为 markdown 链接
             while IFS= read -r link; do
               [ -n "$link" ] || continue
               case "$link" in http*|"#"*) continue ;; esac
@@ -119,7 +119,8 @@ jobs:
                 echo "::error file=$f::引用的文件不存在: $link"
                 fail=1
               fi
-            done < <(grep -oE '\]\([^)]+\)' "$f" 2>/dev/null | sed 's/^](//; s/)$//' | sort -u)
+            done < <(awk '/^[[:space:]]*(```|~~~)/ { fenced = !fenced; next } !fenced { print }' "$f" |
+              grep -oE '\]\([^)]+\)' | sed 's/^](//; s/)$//' | sort -u)
           done
           exit $fail
 

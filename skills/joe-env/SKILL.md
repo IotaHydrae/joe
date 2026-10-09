@@ -20,11 +20,15 @@ description: 了解 joe 开发环境的内容与用法。当需要安装/更新�
 ./install_devtools.sh --tui           # 勾选安装
 ./install_mcp_servers.sh --list
 ./install_skills.sh --tui
+./install_skills.sh --categories
+./install_skills.sh --category kernel-dev --tui  # 按分类勾选
 ```
 
 所有项目默认不勾选；非交互调用须指定安装项，只有显式 `--all` 才安装全部。
 
-TUI 按键：`↑/↓` 移动，`空格` 勾选，`a` 全选，`n` 全不选，`i` 仅未装，`回车` 开始，`q` 退出。已安装项显示 `[✓装]` 并自动跳过。
+TUI 按键：`↑/↓` 移动，`PgUp/PgDn` 翻页，`Home/End` 到首尾，`空格` 勾选，`a` 全选，`n` 全不选，`i` 仅未装，`回车` 开始，`q` 退出。已安装项显示 `[✓装]` 并自动跳过。
+
+技能库包含 low-level-dev-skills 的 142 个子技能、25 个分类。重复 `--category` 可组合分类；原有及自定义技能归入 `local`。仅复制选择的技能，不会自动安装相关技能或系统工具。
 
 ## 已安装的工具
 

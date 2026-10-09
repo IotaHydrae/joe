@@ -22,6 +22,9 @@
 #   ./install_devtools.sh --list     # 列出可安装组件
 #   ./install_devtools.sh --check    # 只报告本机适配情况 (发行版/包名解析/安装方式), 不做改动
 #
+# TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
+#           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
+#
 # 依赖: git, curl, sudo (非 root 时), bash/zsh
 # 说明:
 #   - nvm 装到 ~/.nvm; --node 会切换到最新 LTS, 迁移已有全局包

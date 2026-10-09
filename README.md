@@ -403,7 +403,7 @@ curl -fsSL <raw-url>/bootstrap.sh | bash
 ```
 
 检查项：系统信息、基础工具、Node/Python 工具链、AI CLI、编辑器/终端/桌面、
-7 个 MCP 在三端的配置、8 个技能在 5 个代理目录的就位情况、技能 frontmatter 合法性。
+7 个 MCP 在三端的配置、仓库技能在 5 个代理目录的就位情况、技能 frontmatter 合法性。
 
 退出码 `0` = 无失败项。失败项会附带**具体的修复命令**。
 
@@ -480,11 +480,21 @@ skills/
 ./install_skills.sh --all          # 显式安装全部技能
 ./install_skills.sh --tui          # 强制 TUI 勾选
 ./install_skills.sh --list         # 列出技能及安装状态
+./install_skills.sh --categories   # 列出技能分类及数量
+./install_skills.sh --category kernel-dev --tui  # 只浏览内核驱动分类, 按需勾选
+./install_skills.sh --category kernel-dev --all  # 显式安装该分类全部技能
 ./install_skills.sh joe-env        # 只装指定技能
 ./install_skills.sh engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
 ```
 
-与 devtools / MCP 脚本同款 TUI：`↑↓` 移动、`空格` 勾选、`a/n/i` 快捷键、`回车` 开始、`q` 退出；已安装技能显示 `[✓装]` 自动跳过。
+与 devtools / MCP 脚本同款 TUI：`↑↓` 移动、`PgUp/PgDn` 翻页、`Home/End` 到首尾、`空格` 勾选、`a/n/i` 快捷键、`回车` 开始、`q` 退出。列表按终端高度分页，显示分类与技能名；已安装技能显示 `[✓装]` 自动跳过。
+
+`--category` 可重复，取分类并集，并可与 `--list`、`--tui`、`--all` 或技能名组合，参数顺序不影响分类筛选。分类过滤不会默认选中技能；非交互安装仍须明确技能名或 `--all`。原有及自定义技能归入 `local` 分类。
+
+| 参数 | 用途 |
+|---|---|
+| `--categories` | 列出分类及技能数量 |
+| `--category <name>` | 按分类过滤，可重复；分类元数据来自 `skills/categories.tsv` |
 
 ### 安装位置（按已安装的代理自动选择）
 
@@ -513,6 +523,17 @@ skills/
 | **engineering-embedded-linux-driver-engineer** | 嵌入式 Linux 内核驱动与 BSP 开发（设备树、Platform/I2C/SPI/USB、DMA/中断、Yocto/Buildroot） |
 
 新增驱动技能来自 [clowlove/hermes-house](https://www.skills.sh/clowlove/hermes-house/engineering-embedded-linux-driver-engineer)，保留上游 `SKILL.md` 和 `skill.json`，并随附 MIT 许可证与 [来源版本记录](skills/engineering-embedded-linux-driver-engineer/SOURCE.md)。安装时仍须按需勾选或显式指定技能名。
+
+另外集成了 [mohitmishra786/low-level-dev-skills](https://github.com/mohitmishra786/low-level-dev-skills) 的 **142 个子技能、25 个分类**，涵盖编译器、调试器、性能分析、Linux 内核驱动、裸机、Rust、Zig、GPU 等；完整清单见 [技能集目录](skills/low-level-dev-skills.md)。每个技能带参考文件、MIT 许可证和固定提交的 `SOURCE.md`，跨技能引用已适配 joe 目录。相关技能与系统工具须另行按需安装。
+
+嵌入式 Linux 开发可从这几个分类开始：
+
+```bash
+./install_skills.sh --category kernel-dev --category kernel --tui
+./install_skills.sh --category embedded --category baremetal --tui
+./install_skills.sh --category compilers --category debuggers --tui
+./install_skills.sh device-tree bus-drivers-i2c-spi gdb cross-gcc
+```
 
 > 较长的技能采用**渐进式披露**结构：`SKILL.md` 精简（frontmatter + 核心准则 + 章节索引），
 > 完整原文放在 `references/full.md`，代理仅在需要细节时才读取，避免占用上下文。

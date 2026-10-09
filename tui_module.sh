@@ -6,6 +6,7 @@
 #
 #   install_devtools.sh --tui       (devtools 组件)
 #   install_mcp_servers.sh --tui    (MCP 服务器)
+#   install_skills.sh --tui         (代理技能)
 #
 # 调用方可在 source 本文件之前定义以下内容覆盖默认值:
 #   TUI_IDS=(...)                    组件 id 列表 (顺序即显示顺序)
@@ -16,6 +17,8 @@
 #
 # 按键:
 #   ↑/↓      移动光标
+#   PgUp/PgDn 翻页 (列表按终端高度显示)
+#   Home/End  到第一项 / 最后一项
 #   空格      勾选 / 取消 (已安装组件固定跳过)
 #   a         全选 (未安装)
 #   n         全不选
@@ -133,6 +136,21 @@ run_tui() {
                 '[B') key=DOWN ;;
                 '[D') key=LEFT ;;
                 '[C') key=RIGHT ;;
+                '[H') key=HOME ;;
+                '[F') key=END ;;
+                '[5'|'[6'|'[1'|'[4')
+                    IFS= read -r -n1 ch3 2>/dev/null || true
+                    if [ "$ch3" = '~' ]; then
+                        case "$ch2" in
+                            '[5') key=PAGE_UP ;;
+                            '[6') key=PAGE_DOWN ;;
+                            '[1') key=HOME ;;
+                            '[4') key=END ;;
+                        esac
+                    else
+                        key=ESC
+                    fi
+                    ;;
                 *)    key=ESC ;;
             esac
         elif [ "$ch" = " " ]; then
@@ -152,18 +170,46 @@ run_tui() {
         fi
     }
 
+    # 按显示宽度截断, 避免长技能名/中文描述换行后挤出分页视口。
+    fit_label() {
+        local label="$1" limit="$2" result="" width=0 char char_width pos
+        for ((pos=0; pos<${#label}; pos++)); do
+            char="${label:pos:1}"
+            case "$char" in
+                [\ -~]) char_width=1 ;;
+                *) char_width=2 ;;
+            esac
+            [ "$((width + char_width))" -le "$limit" ] || break
+            result+="$char"
+            width=$((width + char_width))
+        done
+        printf '%s' "$result"
+    }
+
+    local page_size=16
     # 渲染
     render() {
+        local rows=24 columns=80 dimensions start end label
+        dimensions="$(stty size 2>/dev/null || true)"
+        if [[ "$dimensions" =~ ^([0-9]+)[[:space:]]+([0-9]+)$ ]]; then
+            [ "${BASH_REMATCH[1]}" -gt 0 ] && rows="${BASH_REMATCH[1]}"
+            [ "${BASH_REMATCH[2]}" -gt 0 ] && columns="${BASH_REMATCH[2]}"
+        fi
+        page_size=$((rows - 8))
+        [ "$page_size" -ge 1 ] || page_size=1
+        start=$((cur / page_size * page_size))
+        end=$((start + page_size))
+        [ "$end" -le "${#ids[@]}" ] || end="${#ids[@]}"
         printf '\033[2J\033[H'  # 清屏
-        printf '\033[1;36m═══ %s ═══\033[0m\n' "$TUI_TITLE"
-        printf '\033[2m↑↓移动 空格勾选 a全选 n全不选 i仅未装 回车开始 q退出\033[0m\n'
-        printf '%s\n' "──────────────────────────────────────────"
+        printf '\033[1;36m%s\033[0m\n' "$(fit_label "═══ $TUI_TITLE ═══" "$columns")"
+        printf '\033[2m%s\033[0m\n' "$(fit_label '↑↓/PgUp/PgDn移动 空格勾选 a/n/i 回车开始 q退出' "$columns")"
+        printf '%s\n' "$(fit_label '──────────────────────────────────────────' "$columns")"
         local checked=0
         for i in "${!sel[@]}"; do
             [ "${sel[$i]}" = "1" ] && checked=$((checked+1))
         done
 
-        for i in "${!ids[@]}"; do
+        for ((i=start; i<end; i++)); do
             local box="[ ]"
             local tag="   "
             local prefix="  "
@@ -178,10 +224,12 @@ run_tui() {
                 prefix="> "
                 if [ "${inst[$i]}" = "1" ]; then attr='\033[7;2m'; else attr='\033[7m'; fi
             fi
-            printf '%b%s %-3s  %s\033[0m\n' "$attr" "$prefix$box" "$tag" "${names[$i]}"
+            label="$(fit_label "${names[$i]}" "$((columns - 13))")"
+            printf '%b%s %-3s  %s\033[0m\n' "$attr" "$prefix$box" "$tag" "$label"
         done
-        printf '%s\n' "──────────────────────────────────────────"
-        printf '\033[1;32m已选 %d 项\033[0m  (已安装组件显示 [✓装] 将自动跳过)\n' "$checked"
+        printf '%s\n' "$(fit_label '──────────────────────────────────────────' "$columns")"
+        printf '\033[1;32m已选 %d 项\033[0m  显示 %d-%d/%d 项\n' "$checked" "$((start + 1))" "$end" "${#ids[@]}"
+        printf '%s\n' "$(fit_label '已安装组件显示 [✓装] 将自动跳过' "$columns")"
     }
 
     # 主循环
@@ -195,6 +243,16 @@ run_tui() {
             DOWN)
                 if [ "$cur" -lt $(( ${#ids[@]} - 1 )) ]; then cur=$((cur+1)); fi
                 ;;
+            PAGE_UP)
+                cur=$((cur - page_size))
+                [ "$cur" -ge 0 ] || cur=0
+                ;;
+            PAGE_DOWN)
+                cur=$((cur + page_size))
+                [ "$cur" -lt "${#ids[@]}" ] || cur=$((${#ids[@]} - 1))
+                ;;
+            HOME) cur=0 ;;
+            END) cur=$((${#ids[@]} - 1)) ;;
             SPACE)
                 if [ "${inst[$cur]}" != "1" ]; then
                     if [ "${sel[$cur]}" = "1" ]; then sel[$cur]=0; else sel[$cur]=1; fi

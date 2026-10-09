@@ -210,11 +210,32 @@ Filesystem access defaults to `$HOME` and `/tmp`; override it with `FILESYSTEM_D
 ./install_skills.sh engineering-embedded-linux-driver-engineer  # embedded Linux drivers only
 ./install_skills.sh --all    # explicitly install/update every skill
 ./install_skills.sh --list
+./install_skills.sh --categories
+./install_skills.sh --category kernel-dev --tui  # browse a category; nothing preselected
+./install_skills.sh --category kernel-dev --all  # explicitly install the entire category
 ```
 
-Skills and their supporting directories are copied to `~/.agents/skills` and the detected clients' skill directories. Items already current in every target are skipped. All three TUIs use arrows to move, Space to select, `a` to select all missing items, `n` to clear the selection, `i` to select only missing items, Enter to install, and `q` to quit.
+Skills and their supporting directories are copied to `~/.agents/skills` and the detected clients' skill directories. Items already current in every target are skipped. All three TUIs use arrows to move, PgUp/PgDn to move by a page, Home/End to move to the first/last item, Space to select, `a` to select all missing items, `n` to clear the selection, `i` to select only missing items, Enter to install, and `q` to quit. Lists fit the terminal height; the skill selector displays each item's category.
+
+Repeat `--category` to combine categories. It filters `--list`, `--tui`, `--all`, and explicit skill names regardless of argument order. Filtering leaves all items unchecked; non-interactive installation requires skill names or `--all`. Existing and custom skills belong to `local`.
+
+| Option | Purpose |
+|---|---|
+| `--categories` | List categories and skill counts |
+| `--category <name>` | Filter by category; repeatable; metadata comes from `skills/categories.tsv` |
 
 The bundled `engineering-embedded-linux-driver-engineer` skill covers embedded Linux kernel drivers and BSP development: Device Tree, Platform/I2C/SPI/USB, DMA/interrupts, and Yocto/Buildroot. It comes from [clowlove/hermes-house](https://www.skills.sh/clowlove/hermes-house/engineering-embedded-linux-driver-engineer), with the upstream `SKILL.md` and `skill.json` preserved, the MIT license included, and the [source revision recorded](skills/engineering-embedded-linux-driver-engineer/SOURCE.md). Select it in the TUI or specify its name explicitly to install it.
+
+The repository also bundles **142 skills in 25 categories** from [mohitmishra786/low-level-dev-skills](https://github.com/mohitmishra786/low-level-dev-skills): compilers, debuggers, profilers, Linux kernel drivers, bare-metal programming, Rust, Zig, GPU development, and more. See the [complete catalog](skills/low-level-dev-skills.md). Each skill includes its reference files, the MIT license, and a `SOURCE.md` recording the pinned upstream commit. Cross-skill references use joe's directory layout. Related skills and system tools are installed separately as needed.
+
+For embedded Linux development:
+
+```bash
+./install_skills.sh --category kernel-dev --category kernel --tui
+./install_skills.sh --category embedded --category baremetal --tui
+./install_skills.sh --category compilers --category debuggers --tui
+./install_skills.sh device-tree bus-drivers-i2c-spi gdb cross-gcc
+```
 
 ## Bootstrap and updates
 

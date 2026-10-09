@@ -14,11 +14,28 @@
 
 也可以运行 `./install_skills.sh --tui` 后勾选；默认不勾选任何技能。
 
+### low-level-dev-skills 技能集
+
+来自 [mohitmishra786/low-level-dev-skills](https://github.com/mohitmishra786/low-level-dev-skills) 的 **142 个子技能、25 个分类**已分别集成，完整分类清单与来源版本见 [low-level-dev-skills.md](low-level-dev-skills.md)。每个技能保留参考文件，附带 MIT 许可证及 `SOURCE.md`。上游 `skills/<category>/<name>` 跨技能引用已统一为 joe 的 `skills/<name>`。
+
+从仓库根目录按分类浏览或按技能名安装：
+
+```bash
+./install_skills.sh --categories
+./install_skills.sh --category kernel-dev --category kernel --tui
+./install_skills.sh device-tree bus-drivers-i2c-spi gdb cross-gcc
+./install_skills.sh --category kernel-dev --all  # 显式安装该分类全部技能
+```
+
+分类元数据在 `categories.tsv`，未列入该表的技能归入 `local`。重复 `--category` 取并集；与 `--list`、`--tui`、`--all` 和技能名组合时只作用于这些分类。默认不勾选任何技能，相关技能与系统工具也不会自动安装。
+
 ## 目录结构
 
 ```
 skills/
 ├── README.md                 # 本文件
+├── categories.tsv            # 可选分类元数据 (技能名 TAB 分类名)
+├── low-level-dev-skills.md    # 第三方技能集目录与来源
 └── <skill-name>/
     └── SKILL.md              # 技能定义 (必需)
 ```
@@ -67,3 +84,5 @@ $EDITOR skills/<skill-name>/SKILL.md
 ```
 
 脚本是**幂等**的：内容有变化的技能会更新，未变化的跳过。
+
+为技能指定分类时，在 `categories.tsv` 中追加一行 `技能名<TAB>分类名`；不用修改安装器的技能清单。TUI 支持 `PgUp/PgDn` 翻页和 `Home/End` 到首尾。

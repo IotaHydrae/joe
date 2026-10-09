@@ -9,10 +9,14 @@
 #   ./install_skills.sh --tui          # 强制进入 TUI 勾选界面
 #   ./install_skills.sh --all          # 显式安装全部技能
 #   ./install_skills.sh --list         # 列出技能及安装状态
+#   ./install_skills.sh --categories   # 列出分类及技能数量
+#   ./install_skills.sh --category kernel-dev --tui  # 按分类勾选, 可重复 --category
+#   ./install_skills.sh --category kernel-dev --all  # 显式安装该分类全部技能
 #   ./install_skills.sh <name> [...]   # 只装指定技能
 #   ./install_skills.sh engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
 #
-# TUI 按键: ↑/↓ 移动, 空格 勾选, a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
+# TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
+#           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
 #
 # 安装位置 (按已安装的代理自动选择):
 #   ~/.agents/skills/          通用 (跨工具约定, 总是安装)
@@ -24,6 +28,8 @@
 # 说明:
 #   - 技能即 ./skills/<name>/, 需含 SKILL.md (YAML frontmatter 的 name/description)
 #   - 整个技能目录(含 references/ scripts/ assets/)会被一并安装
+#   - --category 可与 --list/--tui/--all/技能名组合; 未分类的技能属于 local
+#   - 相关技能与系统工具不自动安装; 仅复制显式选择的技能目录
 #   - 幂等: 内容有变则更新, 无变化跳过
 #   - MiMo Code 也会扫描 ~/.claude、~/.agents、~/.codex 下的 skills, 故可复用
 # =============================================================================
@@ -32,6 +38,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_SRC="$SCRIPT_DIR/skills"
+CATEGORY_FILTERS=()
+declare -A SKILL_CATEGORIES=()
 
 # 多字节文本按"字符"处理 (POSIX locale 下 bash 按字节截断会切坏中文)
 if [ -z "${LC_ALL:-}" ]; then
@@ -52,6 +60,14 @@ info()  { printf '\033[0;34m[INFO]\033[0m %s\n' "$*"; }
 ok()    { printf '\033[0;32m[SUCCESS]\033[0m %s\n' "$*"; }
 warn()  { printf '\033[1;33m[WARNING]\033[0m %s\n' "$*"; }
 die()   { printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
+
+# 分类只用于筛选, 技能清单仍从 SKILL.md 自动发现。
+if [ -f "$SKILLS_SRC/categories.tsv" ]; then
+    while IFS=$'\t' read -r skill category; do
+        [[ -z "$skill" || "$skill" == \#* ]] && continue
+        SKILL_CATEGORIES["$skill"]="$category"
+    done < "$SKILLS_SRC/categories.tsv"
+fi
 
 # 命令探测: PATH 或常见安装路径
 _has_bin() {
@@ -82,11 +98,37 @@ skill_targets() {
 # 技能发现与元数据
 # ---------------------------------------------------------------------------
 discover_skills() {
-    local d
+    local d name category wanted
     for d in "$SKILLS_SRC"/*/SKILL.md; do
         [ -f "$d" ] || continue
-        basename "$(dirname "$d")"
+        name="${d%/SKILL.md}"
+        name="${name##*/}"
+        category="${SKILL_CATEGORIES[$name]:-local}"
+        if [ "${#CATEGORY_FILTERS[@]}" -gt 0 ]; then
+            for wanted in "${CATEGORY_FILTERS[@]}"; do
+                [ "$category" = "$wanted" ] && break
+            done
+            [ "$category" = "$wanted" ] || continue
+        fi
+        printf '%s\n' "$name"
     done
+}
+
+list_categories() {
+    local d name category
+    local -A counts=()
+    for d in "$SKILLS_SRC"/*/SKILL.md; do
+        [ -f "$d" ] || continue
+        name="${d%/SKILL.md}"
+        name="${name##*/}"
+        category="${SKILL_CATEGORIES[$name]:-local}"
+        counts[$category]=$(( ${counts[$category]:-0} + 1 ))
+    done
+    printf '可用分类:\n'
+    for category in "${!counts[@]}"; do
+        printf '  %-24s %d 个技能\n' "$category" "${counts[$category]}"
+    done | sort
+    exit 0
 }
 
 # 取 frontmatter 字段 (仅首个 --- 块)
@@ -179,12 +221,12 @@ load_tui_module() {
 
 # 技能显示名: "name — 简短描述"
 tui_component_name() {
-    local desc
+    local desc category="${SKILL_CATEGORIES[$1]:-local}"
     desc="$(skill_field "$1" description)"
     if [ -n "$desc" ]; then
-        printf '%s — %.56s' "$1" "$desc"
+        printf '[%s] %s — %.56s' "$category" "$1" "$desc"
     else
-        echo "$1"
+        printf '[%s] %s' "$category" "$1"
     fi
 }
 
@@ -227,11 +269,12 @@ usage() {
 
 list_skills() {
     printf '可用技能 (%s):\n' "$SKILLS_SRC"
-    local s status desc
+    local s status desc category
     for s in $(discover_skills); do
         if skill_installed "$s"; then status="已安装"; else status="未安装"; fi
         desc="$(skill_field "$s" description)"
-        printf '  %-22s %-4s %s\n' "$s" "$status" "${desc:0:60}"
+        category="${SKILL_CATEGORIES[$s]:-local}"
+        printf '  %-22s %-4s [%-16s] %s\n' "$s" "$status" "$category" "${desc:0:60}"
     done
     printf '\n安装位置:\n'
     for d in $(skill_targets); do
@@ -244,15 +287,22 @@ TARGETS=()
 TUI_MODE=false
 ALL_MODE=false
 HAS_ARGS=false
+HELP_MODE=false
+LIST_MODE=false
+CATEGORIES_MODE=false
 while [[ $# -gt 0 ]]; do
     HAS_ARGS=true
     case "$1" in
         --tui)       TUI_MODE=true; shift ;;
         --all)       ALL_MODE=true; shift ;;
-        --list|-l)   list_skills ;;
-        -h|--help)   usage ;;
+        --list|-l)   LIST_MODE=true; shift ;;
+        --categories) CATEGORIES_MODE=true; shift ;;
+        --category)
+            [ "$#" -ge 2 ] && [[ "$2" != -* ]] || die "--category 需要分类名 (查看 --categories)"
+            CATEGORY_FILTERS+=("$2"); shift 2 ;;
+        -h|--help)   HELP_MODE=true; shift ;;
         *)
-            if [ -d "$SKILLS_SRC/$1" ]; then
+            if [[ "$1" != */* && -f "$SKILLS_SRC/$1/SKILL.md" ]]; then
                 TARGETS+=("$1"); shift
             else
                 die "未知技能: $1"
@@ -261,8 +311,30 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+$HELP_MODE && usage
+for category in "${CATEGORY_FILTERS[@]}"; do
+    known=false
+    for skill in local "${SKILL_CATEGORIES[@]}"; do
+        if [ "$category" = "$skill" ]; then known=true; break; fi
+    done
+    $known || die "未知分类: $category (查看 --categories)"
+done
+$CATEGORIES_MODE && list_categories
+$LIST_MODE && list_skills
+
+for skill in "${TARGETS[@]}"; do
+    if [ "${#CATEGORY_FILTERS[@]}" -gt 0 ]; then
+        category="${SKILL_CATEGORIES[$skill]:-local}"
+        known=false
+        for wanted in "${CATEGORY_FILTERS[@]}"; do
+            if [ "$category" = "$wanted" ]; then known=true; break; fi
+        done
+        $known || die "技能 $skill 不属于所选分类"
+    fi
+done
+
 # 无参数只进入交互选择, 非交互调用须显式指定技能。
-if [ "$HAS_ARGS" = "false" ]; then
+if [ "$HAS_ARGS" = "false" ] || { ! $ALL_MODE && ! $TUI_MODE && [ "${#TARGETS[@]}" -eq 0 ]; }; then
     if [ -t 1 ] && [ -t 0 ]; then
         TUI_MODE=true
     else

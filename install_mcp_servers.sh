@@ -13,7 +13,8 @@
 #   ./install_mcp_servers.sh filesystem       # 只装 filesystem MCP
 #   ./install_mcp_servers.sh git memory       # 装多个 MCP
 #
-# TUI 按键: ↑/↓ 移动, 空格 勾选, a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
+# TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
+#           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
 #
 # 新增 MCP 服务器:
 #   1. 添加 install_<name>_mcp() 函数
