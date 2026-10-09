@@ -2,332 +2,224 @@
 
 > [中文](README.md) | **English**
 
-An automated zsh environment setup script, including Oh My Zsh, the powerlevel10k theme, and common plugins.
+Automated development environment setup: terminal beautification (zsh + Oh My Zsh), development tools installation, and AI coding assistant integration.
 
-## Quick Install
+## Quick Start
 
+### One-line Installation
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | bash
 ```
 
-> Note: The one-liner clones the repository to `~/.joe` and opens the main menu. The menu and component selectors read input from your terminal. An existing `~/.joe` clone is reused; override the location with `JOE_INSTALL_DIR`. Non-interactive usage requires a subcommand, for example `bash -s -- skills gdb` at the end of the pipeline.
+Clones to `~/.joe` and opens a menu to select components.
 
-## Features
-
-- Automatically installs zsh (supports apt/pacman/dnf/zypper package managers)
-- Installs and configures Oh My Zsh
-- Installs Oh My Zsh by cloning the repository instead of `curl | sh`, so a failed download can no longer be mistaken for a successful install; the script reports the failure and stops
-- Guarantees `.zshrc` actually loads Oh My Zsh: the file is generated from the upstream template when missing, and an existing file without `oh-my-zsh.sh` gets the bootstrap block prepended (the original is backed up first)
-- Installs the powerlevel10k theme with a preset configuration
-- Installs zsh-autosuggestions (command autosuggestions)
-- Installs zsh-syntax-highlighting (syntax highlighting)
-- Detects plugins already bundled with Oh My Zsh: if a plugin already exists in `oh-my-zsh/plugins` (or `custom/plugins`), skips cloning it and enables it via `plugins=()` in `.zshrc` instead
-- Enables a curated set of bundled plugins (`git`, `sudo`, `extract`, `colored-man-pages`, `colorize`, `z`, `history`, `aliases`, `dirhistory`, `web-search`, `command-not-found`, `you-should-use`), only appending to the existing `plugins=()` — never overwriting it
-- Installs fzf (command-line fuzzy finder)
-- Optionally installs fastfetch (system information tool)
-- Installs custom fonts
-- Copies `.config` directory configs; the Ghostty preset disables paste confirmation (`clipboard-paste-protection = false`) and terminal-program clipboard read prompts (`clipboard-read = allow`). Press `Ctrl+Shift+,` to reload after editing
-- Fixes Chinese (and other IME) input in the Ghostty AppImage: writes a `<AppImage>.env` next to the AppImage with `GTK_PATH` pointing at a symlink directory of the host's GTK4 input method modules (ibus/fcitx5), so the bundled GTK can load them
-- Automatically backs up existing config files
-- Supports component update mode
-- Supports cleaning up old backups
-
-## Installation & Usage
-
-### Basic installation
-
+### Local Installation
 ```bash
+git clone https://github.com/IotaHydrae/joe.git
+cd joe
 ./install.sh
 ```
 
-The root contains one shell entry point. Running it without arguments opens a numbered menu; each action returns to the menu when it finishes or fails. Enter without a choice does nothing, and `q` quits. Devtools, MCP and skills leave all items unchecked. Skills first offers skill groups, then categories within low-level-dev-skills before opening a checklist. Configuration backup and restore have a separate menu.
+## Main Features
 
-| Command | Purpose |
-|---|---|
-| `shell` | zsh / Oh My Zsh / Powerlevel10k environment |
-| `devtools` | Select developer tools |
-| `mcp` | Select MCP servers |
-| `skills` | Select skills, with category filters |
-| `doctor` | Check the environment |
-| `update` | Update installed tools |
-| `repair-ghostty` | Repair Ghostty terminfo and desktop integration |
-| `configs` | List, export, restore or compare configurations |
-| `bootstrap` | Run devtools, MCP, skills and doctor in sequence |
-| `menu` / `--tui` | Open the main menu |
-| `-h` / `--help` | Show launcher help |
+### 1. Terminal Beautification (Shell)
+- **zsh** + **Oh My Zsh** automatic installation and configuration
+- **powerlevel10k** theme (elegant command-line prompt)
+- **Common plugins**: auto-completion, syntax highlighting, fzf fuzzy search, etc.
+- **Auto-backup**: backs up original config before changes, keeps last 5
 
 ```bash
-./install.sh devtools --node
-./install.sh mcp git memory
-./install.sh skills --category kernel-dev --tui
-./install.sh doctor --json
-./install.sh configs export --check
+./install.sh shell              # Full installation
+./install.sh shell --dry-run    # Preview operations
+./install.sh shell --no-fonts   # Skip fonts
 ```
 
-Non-interactive usage requires an explicit subcommand. Use `./install.sh <command> --help` for component options. Existing Shell options such as `./install.sh --dry-run` and `--no-fonts` still work.
+### 2. Development Tools (Devtools)
+Cross-distro development tools installation (supports apt/pacman/dnf/zypper):
 
-### Shell command-line options (`./install.sh shell ...`)
-
-| Option | Description |
-|--------|-------------|
-| `-h, --help` | Show this help message and exit |
-| `-n, --dry-run` | Simulate the installation without making changes |
-| `--no-fonts` | Skip font installation |
-| `--no-config` | Skip copying the `.config` directory |
-| `--no-p10k` | Skip powerlevel10k configuration |
-| `--no-fastfetch` | Skip fastfetch installation |
-| `--no-default-plugins` | Skip enabling the default plugins |
-| `--no-ghostty-ime` | Skip the Ghostty AppImage input method fix |
-| `--clean-backups` | Clean up old backup files (keeps the last 5) |
-| `-u, --update` | Update installed components instead of installing |
-
-### Usage examples
+- **Node.js**: nvm + LTS version
+- **Python**: pyenv (doesn't pre-install Python, you choose the version)
+- **AI CLI**: Claude Code, Codex
+- **Editors**: Zed, VS Code
+- **Terminal**: Ghostty
+- **Others**: MiMo Code, ChatGPT, CC Switch
 
 ```bash
-# Simulate the installation to preview what it will do
-./install.sh --dry-run
-
-# Install without installing fonts
-./install.sh --no-fonts
-
-# Update installed components
-./install.sh --update
-
-# Clean up old backups
-./install.sh --clean-backups
+./install.sh devtools              # TUI interactive selection
+./install.sh devtools --list       # List all components
+./install.sh devtools --node       # Install Node.js only
+./install.sh devtools --python     # Install pyenv only
+./install.sh devtools --ai         # Install AI CLI only
 ```
 
-## Component selection
+### 3. MCP Servers
+Install Model Context Protocol servers for AI coding assistants:
 
-`./install.sh devtools`, `./install.sh mcp`, and `./install.sh skills` open a TUI when run without installation arguments in an interactive terminal. **Every item starts unchecked.** Select items with Space and confirm with Enter; Enter with no selection or quitting installs nothing. In a non-interactive terminal, specify individual items or `--all`; running without arguments exits with an error.
-
-| Option | Behavior in all three component installers |
-|---|---|
-| `--tui` | Open the checklist with every item unchecked |
-| `--all` | Explicitly install every item; cannot be combined with `--tui` |
-| `--list` | List items and their current status |
-| `-h, --help` | Show usage and dependencies |
-
-## Devtools suite
-
-The developer tools installer lives in `scripts/install_devtools.sh`. Run it through `./install.sh devtools` or select it in the main menu. The component list was recorded from the actual setup of a Fedora 44 server so a new machine can reproduce it.
-
-> **Cross-distro support**: the script auto-detects the package manager — **apt** (Debian/Ubuntu), **dnf** (Fedora/RHEL), **pacman** (Arch) and **zypper** (openSUSE). System package names are mapped per distro (e.g. JetBrains Mono is `fonts-jetbrains-mono` on apt, `ttf-jetbrains-mono` on pacman and `jetbrains-mono-fonts` on dnf).
-
-### What gets installed
-
-| Component | Description | How it is installed |
-|-----------|-------------|---------------------|
-| **Node LTS (installed via nvm)** | Install/switch LTS and migrate existing global packages | nvm loads only during installation; bash/zsh use a fixed PATH |
-| **pyenv** | Python version manager; does not install Python automatically | official script + build dependencies, configures bash/zsh |
-| **Claude Code** | Anthropic AI CLI (`claude`) | `npm install -g` |
-| **Codex CLI** | OpenAI AI CLI (`codex`) | `npm install -g` |
-| **Zed editor** | high-performance code editor | official install script + Vulkan drivers |
-| **JetBrains Mono font** | code font (used by default in Zed) | system package (mapped per distro) |
-| **Ghostty terminal** | modern terminal emulator | dnf: COPR / apt: community deb / pacman: official package |
-| **Ctrl+Alt+T shortcut** | quick-open for Ghostty | labwc rc.xml + xdg-terminal-exec |
-| **VS Code editor** | Microsoft code editor | official Microsoft repo (dnf/apt/zypper) / pacman: `code` |
-| **MiMo Code** | Xiaomi AI coding assistant | `npm install -g` (`@mimo-ai/cli`) |
-| **ChatGPT / Codex desktop** | OpenAI official Linux desktop app | official rpm/deb/install script |
-| **CC Switch** | AI CLI configuration switcher (desktop) | GitHub release rpm/deb/AppImage |
-
-### Usage
+- **filesystem** / **git**: File and code management
+- **memory**: Conversation memory
+- **context7**: Real-time documentation lookup
+- **Code Intelligence**: codebase-memory-mcp, codegraph, serena (choose one)
 
 ```bash
-./install.sh devtools             # interactive checklist, nothing preselected; non-interactive: specify components
-./install.sh devtools --all       # explicitly install every component
-./install.sh devtools --node      # install/switch Node LTS without loading nvm at shell startup
-./install.sh devtools --python    # pyenv and Python build dependencies only
-./install.sh devtools --ai        # AI CLIs only (claude-code + codex)
-./install.sh devtools --zed       # Zed editor + JetBrains Mono only
-./install.sh devtools --ghostty   # install/repair Ghostty, terminfo and desktop terminal integration
-./install.sh devtools --vscode    # VS Code editor only
-./install.sh devtools --mimo      # MiMo Code only
-./install.sh devtools --chatgpt   # ChatGPT / Codex desktop only
-./install.sh devtools --ccswitch  # CC Switch only
-./install.sh devtools --tui       # interactive checklist (multi-select)
-./install.sh devtools --list      # list installable components and their current status
-./install.sh devtools --help      # full usage and dependency notes
+./install.sh mcp                   # TUI interactive selection
+./install.sh mcp --list            # List all MCPs
+./install.sh mcp filesystem git    # Install specified ones
 ```
 
-### TUI component selection (`--tui`)
+**Tip**: When first using code intelligence MCPs, tell the AI to "index this project".
 
-Running `./install.sh devtools --tui` opens a terminal UI for picking components with the keyboard:
+### 4. Agent Skills
+Add professional skill templates for AI assistants:
 
-- **↑/↓** move the cursor, **Space** toggle a component
-- **a** select all, **n** select none, **i** select only uninstalled
-- **Enter** start installing, **q** quit
-- Every component starts unchecked; installed components are auto-detected, displayed as `[✓装]` and skipped
+- **Code Exploration**: Cross-project code navigation
+- **Code Quality**: Code review standards
+- **Repository Exploration**: Quickly understand new projects
+- **Testing**: Testing strategies and implementation
+- **Embedded**: Boot optimization and specialized skills
 
 ```bash
-./install.sh devtools --tui
-./install.sh devtools --list      # list components with their install status
+./install.sh skills                # Install all skills
+./install.sh skills gdb            # Install GDB skill only
 ```
 
-### Environment variables
-
-- `NODE_LTS` — pin the Node version (default: latest LTS)
-- `PROXY_URL` — proxy address, e.g. `http://192.168.50.182:7890` (use when external downloads are slow)
-
-### Notes
-
-- All components are **idempotent**: anything already installed is skipped, so re-running is safe
-- `--node` selects the latest Node LTS even when a non-LTS version is already installed, and migrates its global npm packages. Ordinary shells only add `~/.nvm/current/bin` to PATH, without loading `nvm.sh` or its completion. Re-run `--node` to update LTS and the fixed link. Changed shell configs are backed up as `*.bak.<timestamp>` (keeping the latest five)
-- `--python` configures pyenv and build dependencies; install your chosen Python version and pipx yourself
-- An existing `~/.config/zed/settings.json` is never overwritten (the default font settings are written only when the file is missing)
-- The AI CLIs (Claude Code / Codex) still need their own login / API key configuration after installation
-- Zed requires Vulkan; the script installs the matching driver per distro (`vulkan-radeon` + `vulkan-intel` on pacman)
-- Ghostty checks both user and system `xterm-ghostty` terminfo. When an AppImage keeps it only inside the image, the repair extracts and compiles it with `tic`. Besides `~/.terminfo`, a missing system entry is installed into `/usr/share/terminfo` through `sudo`, fixing `No termcap entry for xterm-ghostty` for both ordinary users and `sudo minicom`. The ncurses tools package provides `infocmp`/`tic`: apt uses `ncurses-bin`, pacman/dnf use `ncurses`, and zypper uses `ncurses-utils`
-- Ghostty desktop entries use `~/.local/bin/joe-ghostty`, which passes the caller's directory explicitly as `--working-directory` when reusing a running instance. Cinnamon/Nemo's default terminal points to this launcher too
-- Ghostty on Budgie/labwc uses `xdg-terminal-exec`, with an upstream-script fallback when the distro package is unavailable
-- Open a new terminal afterwards (or `source ~/.zshrc`)
-
-### zsh startup cost
-
-Node version management runs during installation; ordinary terminals use the fixed runtime path. Load nvm explicitly with `source ~/.nvm/nvm.sh --no-use` when managing versions manually. The Powerlevel10k preset omits the `nvm` segment to avoid calculating a Node executable checksum in every new terminal. Autosuggestions and syntax highlighting load once through Oh My Zsh's `plugins=()`; the saved config no longer sources separate copies or loads an additional robbyrussell theme.
-
-### Repair an existing Ghostty installation
+## Common Commands
 
 ```bash
-./install.sh repair-ghostty                  # repair; prompts for sudo when system terminfo is missing
-infocmp -x xterm-ghostty             # verify the current user's terminal description
-sudo infocmp -x xterm-ghostty        # verify the terminal description under sudo
-sudo minicom -s                     # verify the minicom setup menu under sudo
+# Install everything (recommended for new machines)
+./install.sh shell devtools mcp skills
+
+# Environment check
+./doctor.sh                        # Check installation status
+./doctor.sh --quiet                # Show problems only
+
+# Update
+./update-all.sh                    # Update all components
+
+# Config sync
+./sync-configs.sh                  # Sync configuration files
 ```
 
-| Option | Behavior |
-|---|---|
-| No option | Repair user/system terminfo and desktop integration, using `sudo` when needed |
-| `--user-only` | Repair only the current user without `sudo`; cannot install the system entry needed by `sudo minicom` |
-| `--help` | Show usage |
+## Options
 
-Run the repair as your ordinary user so that only the system entry is written through `sudo`; do not run the whole script with `sudo`. It installs no packages and preserves Ghostty font, theme and keybinding preferences. Changed launchers, desktop entries, terminal preference lists and Cinnamon settings are backed up as `*.bak.<timestamp>` (keeping the latest five). Desktop entries are found in user directories before system directories, and other terminals remain in the fallback list. Repeated repairs leave unchanged files untouched. `scripts/doctor.sh` checks user and system terminfo separately, so a user-only entry does not count as a complete repair.
-
-## MCP servers
-
-`scripts/install_mcp_servers.sh` configures the installed Claude Code, Codex CLI, and MiMo Code clients. Claude uses the user scope, Codex writes its CLI configuration, and MiMo uses `~/.config/mimocode/mimocode.jsonc`.
-
-| Server | Runtime |
-|---|---|
-| `filesystem` | `npx @modelcontextprotocol/server-filesystem` |
-| `git` | `uvx mcp-server-git` |
-| `memory` | `npx @modelcontextprotocol/server-memory` |
-| `codebase-memory-mcp` | Official static binary |
-| `context7` | `npx @upstash/context7-mcp` |
-| `codegraph` | `@astudioplus/codegraph-mcp` and its engine |
-| `serena` | `uvx --from serena-agent serena start-mcp-server` |
-
+### Shell Options
 ```bash
-./install.sh mcp             # checklist, nothing preselected
-./install.sh mcp memory git  # install only these servers
-./install.sh mcp --all       # explicitly install every server
-./install.sh mcp --list
+--dry-run              # Simulate run without actual changes
+--no-fonts             # Skip font installation
+--no-config            # Skip .config copy
+--no-p10k              # Skip powerlevel10k
+--no-fastfetch         # Skip fastfetch
+--clean-backups        # Clean old backups (keep last 5)
+-u, --update           # Update installed components
 ```
 
-A server is marked installed in the TUI only when every installed client has its configuration, so newly installed clients can be configured too. Each client skips servers it already has. Claude/MiMo configuration checks require `python3`; CLI registration failures return a nonzero exit code. Invalid MiMo configuration is preserved. Successful edits create `*.bak.<timestamp>` backups (keeping the latest five) and replace the file atomically. JSONC comments are converted to standard JSON while string contents are preserved.
-
-Filesystem access defaults to `$HOME` and `/tmp`; override it with `FILESYSTEM_DIRS="/home/dev /data /projects"`. `CBM_VARIANT=ui` selects the codebase-memory visual variant, and `PROXY_URL` sets the download proxy.
-
-## Agent skills
-
+### Devtools Options
 ```bash
-./install.sh skills          # skill group → category → checklist; nothing preselected
-./install.sh skills --tui    # same menu; --category opens a filtered checklist directly
-./install.sh skills joe-env  # install/update only this skill
-./install.sh skills engineering-embedded-linux-driver-engineer  # embedded Linux drivers only
-./install.sh skills --all    # explicitly install/update every skill
-./install.sh skills --list
-./install.sh skills --categories
-./install.sh skills --category kernel-dev --tui  # browse a category; nothing preselected
-./install.sh skills --category kernel-dev --all  # explicitly install the entire category
+--tui                  # Force TUI selection interface
+--list                 # List all components and status
+--node                 # Install Node.js toolchain only
+--python               # Install Python toolchain only
+--ai                   # Install AI CLI only
+--zed                  # Install Zed editor only
+--vscode               # Install VS Code only
 ```
 
-The default menu separates existing/local skills (8) from low-level-dev-skills (142 skills in 25 categories). Enter a number to open a group or category; `b`/`q` goes back one level, and Enter without a choice does nothing. Installing or leaving a checklist returns to the current menu so you can choose another category. With `--category`, the installer opens a filtered checklist directly and exits afterward.
-
-Skills and their supporting directories are copied to `~/.agents/skills` and the detected clients' skill directories. Items already current in every target are skipped. All three checklists use arrows to move, PgUp/PgDn to move by a page, Home/End to move to the first/last item, Space to select, `a` to select all missing items, `n` to clear the selection, `i` to select only missing items, Enter to install, and `q` to leave the checklist. Lists fit the terminal height; the skill selector displays each item's category.
-
-Repeat `--category` to combine categories. It filters `--list`, `--tui`, `--all`, and explicit skill names regardless of argument order. Filtering leaves all items unchecked; non-interactive installation requires skill names or `--all`. Existing and custom skills belong to `local`.
-
-| Option | Purpose |
-|---|---|
-| `--categories` | List categories and skill counts |
-| `--category <name>` | Filter by category; repeatable; metadata comes from `skills/categories.tsv` |
-
-The bundled `engineering-embedded-linux-driver-engineer` skill covers embedded Linux kernel drivers and BSP development: Device Tree, Platform/I2C/SPI/USB, DMA/interrupts, and Yocto/Buildroot. It comes from [clowlove/hermes-house](https://www.skills.sh/clowlove/hermes-house/engineering-embedded-linux-driver-engineer), with the upstream `SKILL.md` and `skill.json` preserved, the MIT license included, and the [source revision recorded](skills/engineering-embedded-linux-driver-engineer/SOURCE.md). Select it in the TUI or specify its name explicitly to install it.
-
-The repository also bundles **142 skills in 25 categories** from [mohitmishra786/low-level-dev-skills](https://github.com/mohitmishra786/low-level-dev-skills): compilers, debuggers, profilers, Linux kernel drivers, bare-metal programming, Rust, Zig, GPU development, and more. See the [complete catalog](skills/low-level-dev-skills.md). Each skill includes its reference files, the MIT license, and a `SOURCE.md` recording the pinned upstream commit. Cross-skill references use joe's directory layout. Related skills and system tools are installed separately as needed.
-
-For embedded Linux development:
-
+### MCP Options
 ```bash
-./install.sh skills --category kernel-dev --category kernel --tui
-./install.sh skills --category embedded --category baremetal --tui
-./install.sh skills --category compilers --category debuggers --tui
-./install.sh skills device-tree bus-drivers-i2c-spi gdb cross-gcc
+--tui                  # Force TUI selection interface
+--list                 # List all MCP servers
+filesystem git         # Install specified MCPs (supports multiple)
 ```
 
-## Bootstrap and updates
+## System Support
 
-All implementation scripts and shared libraries live in `scripts/`; repository assets stay at the root:
+Verified distributions:
 
-```text
+| Distribution | Package Manager | Status |
+|--------------|----------------|--------|
+| Ubuntu 24.04 / 22.04 | apt | ✅ |
+| Linux Mint 22.3 | apt | ✅ |
+| Arch Linux / CachyOS | pacman | ✅ |
+| Fedora | dnf | ✅ |
+| openSUSE | zypper | ✅ |
+
+## FAQ
+
+### No Python after pyenv installation?
+This is normal, you need to manually select a version:
+```bash
+pyenv install --list      # View available versions
+pyenv install 3.12.0      # Install specific version
+pyenv global 3.12.0       # Set as global version
+```
+
+### MCP servers not working?
+1. Check connection status: `claude mcp list` (or `codex mcp list`)
+2. Code intelligence MCPs need indexing first: tell the AI "index this project"
+3. View detailed logs: `~/.claude/mcp.log`
+
+### How to make AI assistants use MCPs?
+The most effective way is to put rule files in the project root:
+```bash
+cp ~/.joe/templates/AGENTS.md /your/project/
+cp ~/.joe/templates/CLAUDE.md /your/project/
+```
+
+### Which code intelligence MCP to choose?
+- **Large repos (>5000 files)**: `codebase-memory-mcp` (constant query latency)
+- **Need semantic search**: `codegraph`
+- **Need precise refactoring**: `serena` (depends on LSP)
+
+See [`skills/code-exploration/SKILL.md`](skills/code-exploration/SKILL.md) for details.
+
+## Project Structure
+
+```
 joe/
-├── install.sh                  # menu and command entry point
+├── install.sh              # Main entry, unified menu
+├── doctor.sh               # Environment check
+├── update-all.sh           # Update tools
+├── sync-configs.sh         # Config sync
 ├── scripts/
-│   ├── install_shell.sh
-│   ├── install_devtools.sh
-│   ├── install_mcp_servers.sh
-│   ├── install_skills.sh
-│   ├── bootstrap.sh
-│   ├── doctor.sh
-│   ├── repair_ghostty.sh
-│   ├── update-all.sh
-│   ├── sync-configs.sh
-│   ├── tui_module.sh
-│   └── lib_*.sh
-├── skills/
-├── configs/
-├── fonts/
-├── .config/
-└── .p10k.zsh
+│   ├── install_shell.sh    # Shell environment installation
+│   ├── install_devtools.sh # Development tools installation
+│   ├── install_mcp_servers.sh  # MCP installation
+│   └── install_skills.sh   # Skills installation
+├── skills/                 # Agent skill templates
+├── templates/              # Project rule file templates
+├── .config/                # Config files (Ghostty, etc.)
+└── fonts/                  # Font files
 ```
 
+## Advanced Usage
+
+### Environment Variables
 ```bash
-./install.sh bootstrap                    # each installer opens an empty checklist
-./install.sh bootstrap --only mcp,skills   # run selected stages
-./install.sh bootstrap --yes               # explicitly install everything without a TUI
-./install.sh update                    # update installed tools and MCP engines
-./install.sh update --dry-run          # preview updates
-./install.sh update --system           # also update system packages
+JOE_INSTALL_DIR=~/my-joe    # Custom install directory (default ~/.joe)
+PROXY_URL=http://proxy:7890 # Use proxy
 ```
 
-The updater no longer runs the MCP or skill installers automatically. Run the corresponding installer to select MCP configuration or skill updates. `./install.sh bootstrap --yes` passes `--all` explicitly to each component installer.
+### Offline Installation
+```bash
+# On a machine with internet
+git clone --depth 1 https://github.com/IotaHydrae/joe.git
+cd joe
+./install.sh devtools --list  # Confirm needed components
 
-## What Gets Installed
+# Package
+tar czf joe.tar.gz joe/
 
-### Dependencies
+# On offline machine
+tar xzf joe.tar.gz
+cd joe
+./install.sh shell  # Basic features work offline
+```
 
-- git, curl (sudo is also required for non-root users)
-- fc-cache (optional; the font cache update is skipped if it is missing)
+### Contributing
+Issues and Pull Requests are welcome!
 
-### Installed components
+### License
+MIT License
 
-1. **zsh** — installed automatically via the system package manager if missing
-2. **Oh My Zsh** — zsh configuration framework
-3. **powerlevel10k** — fast, customizable zsh theme
-4. **fzf** — command-line fuzzy finder
-5. **zsh-autosuggestions** — suggests commands based on history
-6. **zsh-syntax-highlighting** — command syntax highlighting
-7. **fastfetch** — system information tool (optional)
-8. **Custom fonts** — e.g. Fixedsys (optional)
-9. **Config files** — contents of the `.config` directory (e.g. ghostty terminal)
-10. **Ghostty AppImage input method fix** — when a Ghostty AppImage is found in `~/.local/bin` (or `~/Applications`), an `<AppImage>.env` is written with `GTK_PATH` pointing at a symlink directory of the host's GTK4 input method modules (override the path with `GHOSTTY_APPIMAGE`, skip with `--no-ghostty-ime`)
+---
 
-## Notes
-
-- The script automatically backs up existing config files as `.bak.<timestamp>`
-- The last 5 backups are kept by default
-- The script verifies that Oh My Zsh really got installed and aborts otherwise, so it never leaves a `.zshrc` with only a few `source` lines behind
-- If your `.zshrc` contains only `source ...` fragments (no `export ZSH=`, `plugins=()` or `source $ZSH/oh-my-zsh.sh`), re-run `./install.sh shell` to repair it
-- The Ghostty AppImage input method fix is tied to the AppImage file name (the runtime reads a `.env` file with the same name); after switching to a new version with a different file name, re-run `./install.sh shell` to point it at the new file, and restart any running Ghostty windows for it to take effect
-- Restart your terminal or log out and back in after installation for the changes to take effect
+**Tip**: Use `--dry-run` to preview before first run.
