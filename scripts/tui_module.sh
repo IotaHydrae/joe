@@ -40,7 +40,7 @@ fi
 
 # ---- 默认组件 (devtools); 调用方可预先覆盖 ----
 if [ -z "${TUI_IDS+x}" ]; then
-    TUI_IDS=(node python ai zed ghostty vscode mimo chatgpt ccswitch)
+    TUI_IDS=(node python ai zed ghostty vscode brave mimo chatgpt ccswitch)
 fi
 if [ -z "${TUI_TITLE+x}" ]; then
     TUI_TITLE="joe devtools 组件安装选择"
@@ -76,6 +76,7 @@ if ! declare -F tui_component_installed >/dev/null 2>&1; then
             zed)      [ -x "$HOME/.local/bin/zed" ] || command -v zed >/dev/null 2>&1 ;;
             ghostty)  command -v ghostty >/dev/null 2>&1 ;;
             vscode)   command -v code >/dev/null 2>&1 ;;
+            brave)    command -v brave-browser >/dev/null 2>&1 ;;
             mimo)     _tui_has_bin mimo ;;
             chatgpt)  command -v chatgpt >/dev/null 2>&1 ;;
             ccswitch) command -v cc-switch >/dev/null 2>&1 ;;
@@ -94,6 +95,7 @@ if ! declare -F tui_component_name >/dev/null 2>&1; then
             zed)      echo "Zed 编辑器 + JetBrains Mono" ;;
             ghostty)  echo "Ghostty 终端 + Ctrl+Alt+T" ;;
             vscode)   echo "VS Code 编辑器" ;;
+            brave)    echo "Brave 浏览器 (隐私优先)" ;;
             mimo)     echo "MiMo Code (小米 AI 助手)" ;;
             chatgpt)  echo "ChatGPT / Codex 桌面版" ;;
             ccswitch) echo "CC Switch (AI CLI 配置切换器)" ;;

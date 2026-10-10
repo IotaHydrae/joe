@@ -15,6 +15,7 @@
 #   ./install.sh devtools --zed      # 只装 Zed 编辑器 + JetBrains Mono
 #   ./install.sh devtools --ghostty  # 安装/修复 Ghostty、terminfo 和桌面终端入口
 #   ./install.sh devtools --vscode   # 只装 VS Code 编辑器
+#   ./install.sh devtools --brave    # 只装 Brave 浏览器
 #   ./install.sh devtools --mimo     # 只装 MiMo Code (小米 AI 编程助手)
 #   ./install.sh devtools --chatgpt  # 只装 ChatGPT / Codex 桌面版
 #   ./install.sh devtools --ccswitch # 只装 CC Switch (AI CLI 配置切换器)
@@ -51,6 +52,7 @@ INSTALL_AI=false
 INSTALL_ZED=false
 INSTALL_GHOSTTY=false
 INSTALL_VSCODE=false
+INSTALL_BRAVE=false
 INSTALL_MIMO=false
 INSTALL_CHATGPT=false
 INSTALL_CCSWITCH=false
@@ -525,6 +527,60 @@ install_vscode() {
 }
 
 # ---------------------------------------------------------------------------
+# 组件: Brave 浏览器
+# ---------------------------------------------------------------------------
+install_brave() {
+    info "=== 安装 Brave 浏览器 ==="
+
+    if command -v brave-browser >/dev/null 2>&1; then
+        info "Brave 已安装: $(brave-browser --version 2>/dev/null | head -1)"
+    else
+        case "$PM" in
+            apt)
+                # 添加 Brave GPG 密钥和 APT 源
+                sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
+                    https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+                echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
+                    | sudo tee /etc/apt/sources.list.d/brave-browser-release.list
+                sudo apt-get update -qq
+                sudo apt-get install -y brave-browser
+                ;;
+            dnf)
+                sudo dnf install -y dnf-plugins-core
+                sudo dnf config-manager --add-repo https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
+                sudo rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
+                sudo dnf install -y brave-browser
+                ;;
+            pacman)
+                # Brave 在 AUR，需要用 AUR helper
+                if command -v yay >/dev/null 2>&1; then
+                    yay -S --needed --noconfirm brave-bin
+                elif command -v paru >/dev/null 2>&1; then
+                    paru -S --needed --noconfirm brave-bin
+                else
+                    warn "Brave 在 AUR 中，请手动安装 AUR helper (yay/paru) 后再试"
+                    warn "或手动安装: https://aur.archlinux.org/packages/brave-bin"
+                    return 1
+                fi
+                ;;
+            zypper)
+                sudo rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
+                sudo zypper addrepo https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
+                sudo zypper refresh
+                sudo zypper install -y brave-browser
+                ;;
+            *)
+                warn "Brave 安装方式未知, 请手动安装"
+                warn "访问: https://brave.com/linux/"
+                return 1
+                ;;
+        esac
+    fi
+
+    ok "Brave 浏览器配置完成"
+}
+
+# ---------------------------------------------------------------------------
 # 组件: MiMo Code (小米 AI 编程助手)
 # ---------------------------------------------------------------------------
 install_mimo() {
@@ -801,6 +857,7 @@ while [[ $# -gt 0 ]]; do
         --zed)      INSTALL_ZED=true; shift ;;
         --ghostty)  INSTALL_GHOSTTY=true; shift ;;
         --vscode)   INSTALL_VSCODE=true; shift ;;
+        --brave)    INSTALL_BRAVE=true; shift ;;
         --mimo)     INSTALL_MIMO=true; shift ;;
         --chatgpt)  INSTALL_CHATGPT=true; shift ;;
         --ccswitch) INSTALL_CCSWITCH=true; shift ;;
@@ -866,6 +923,7 @@ if $TUI_MODE; then
             zed)      INSTALL_ZED=true ;;
             ghostty)  INSTALL_GHOSTTY=true ;;
             vscode)   INSTALL_VSCODE=true ;;
+            brave)    INSTALL_BRAVE=true ;;
             mimo)     INSTALL_MIMO=true ;;
             chatgpt)  INSTALL_CHATGPT=true ;;
             ccswitch) INSTALL_CCSWITCH=true ;;
@@ -894,6 +952,7 @@ if $INSTALL_ALL || $INSTALL_AI; then install_ai; fi
 if $INSTALL_ALL || $INSTALL_ZED; then install_zed; fi
 if $INSTALL_ALL || $INSTALL_GHOSTTY; then install_ghostty; fi
 if $INSTALL_ALL || $INSTALL_VSCODE; then install_vscode; fi
+if $INSTALL_ALL || $INSTALL_BRAVE; then install_brave; fi
 if $INSTALL_ALL || $INSTALL_MIMO; then install_mimo; fi
 if $INSTALL_ALL || $INSTALL_CHATGPT; then install_chatgpt; fi
 if $INSTALL_ALL || $INSTALL_CCSWITCH; then install_ccswitch; fi
