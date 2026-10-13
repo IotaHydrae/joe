@@ -39,7 +39,7 @@ Cross-distro development tools installation (supports apt/pacman/dnf/zypper):
 
 - **Node.js**: nvm + LTS version
 - **Python**: pyenv (doesn't pre-install Python, you choose the version)
-- **AI CLI**: Claude Code, Codex
+- **AI CLI**: Claude Code, Codex (`--ai` installs only these two), Gemini CLI, OpenCode, GitHub Copilot CLI, Grok Build
 - **Editors**: Zed, VS Code
 - **Terminal**: Ghostty
 - **Others**: MiMo Code, ChatGPT, CC Switch
@@ -49,7 +49,13 @@ Cross-distro development tools installation (supports apt/pacman/dnf/zypper):
 ./install.sh devtools --list       # List all components
 ./install.sh devtools --node       # Install Node.js only
 ./install.sh devtools --python     # Install pyenv only
-./install.sh devtools --ai         # Install AI CLI only
+./install.sh devtools --claude     # Install Claude Code only
+./install.sh devtools --codex      # Install Codex CLI only
+./install.sh devtools --ai         # Install Claude Code and Codex
+./install.sh devtools --gemini     # Install Gemini CLI only
+./install.sh devtools --opencode   # Install OpenCode only
+./install.sh devtools --copilot    # Install GitHub Copilot CLI only
+./install.sh devtools --grok       # Install Grok Build only
 ```
 
 ### 3. MCP Servers
@@ -59,6 +65,8 @@ Install Model Context Protocol servers for AI coding assistants:
 - **memory**: Conversation memory
 - **context7**: Real-time documentation lookup
 - **Code Intelligence**: codebase-memory-mcp, codegraph, serena (choose one)
+
+Installed Gemini CLI, OpenCode, Grok Build, Zed, and VS Code receive the same MCP entries. Copilot CLI uses `copilot mcp add`. `filesystem` requires `FILESYSTEM_DIRS`. Running `./install.sh mcp <id>` again updates an entry when its command changes.
 
 ```bash
 ./install.sh mcp                   # TUI interactive selection
@@ -85,6 +93,8 @@ Add professional skill templates for AI assistants:
 ```
 
 The skills menu separates existing/local skills (8) from low-level-dev-skills (142 skills in 25 categories). Choose a category, then select individual skills; nothing is preselected. Enter a number to open a submenu; `b`/`q` goes back one level. Installing or leaving a checklist returns to the current menu so you can choose another category. With `--category`, the installer opens a filtered checklist directly and exits afterward. Non-interactive installation requires skill names or an explicit `--all`.
+
+The only real copy lives in `~/.agents/skills`. Claude Code, Codex, Gemini, OpenCode, Grok Build, MiMo, and Copilot skill directories are symlinks to that copy.
 
 ## Common Commands
 
@@ -122,7 +132,13 @@ The skills menu separates existing/local skills (8) from low-level-dev-skills (1
 --list                 # List all components and status
 --node                 # Install Node.js toolchain only
 --python               # Install Python toolchain only
---ai                   # Install AI CLI only
+--claude               # Install Claude Code only
+--codex                # Install Codex CLI only
+--ai                   # Install Claude Code and Codex
+--gemini               # Install Gemini CLI only
+--opencode             # Install OpenCode only
+--copilot              # Install GitHub Copilot CLI only
+--grok                 # Install Grok Build only
 --zed                  # Install Zed editor only
 --vscode               # Install VS Code only
 ```

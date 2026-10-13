@@ -11,7 +11,13 @@
 #   ./install.sh devtools --all      # 显式安装全部组件
 #   ./install.sh devtools --node     # 安装/切换 Node LTS (nvm 仅在安装时加载)
 #   ./install.sh devtools --python   # 只装 pyenv + Python 编译依赖
-#   ./install.sh devtools --ai       # 只装 AI CLI (claude-code + codex)
+#   ./install.sh devtools --claude   # 只装 Claude Code
+#   ./install.sh devtools --codex    # 只装 Codex CLI
+#   ./install.sh devtools --ai       # 同时装 Claude Code 和 Codex
+#   ./install.sh devtools --gemini   # 只装 Gemini CLI
+#   ./install.sh devtools --opencode # 只装 OpenCode
+#   ./install.sh devtools --copilot  # 只装 GitHub Copilot CLI
+#   ./install.sh devtools --grok     # 只装 Grok Build
 #   ./install.sh devtools --zed      # 只装 Zed 编辑器 + JetBrains Mono
 #   ./install.sh devtools --ghostty  # 安装/修复 Ghostty、terminfo 和桌面终端入口
 #   ./install.sh devtools --vscode   # 只装 VS Code 编辑器
@@ -48,7 +54,12 @@ PROXY_URL="${PROXY_URL:-}"                  # 可选: http://host:7890
 # 标记位
 INSTALL_NODE=false
 INSTALL_PYTHON=false
-INSTALL_AI=false
+INSTALL_CLAUDE=false
+INSTALL_CODEX=false
+INSTALL_GEMINI=false
+INSTALL_OPENCODE=false
+INSTALL_COPILOT=false
+INSTALL_GROK=false
 INSTALL_ZED=false
 INSTALL_GHOSTTY=false
 INSTALL_VSCODE=false
@@ -280,39 +291,173 @@ install_python() {
 }
 
 # ---------------------------------------------------------------------------
-# 组件: AI CLI (Claude Code + Codex)
+# 组件: Claude Code / Codex CLI
 # ---------------------------------------------------------------------------
-install_ai() {
-    info "=== 安装 AI CLI 工具 ==="
-    load_node
-    command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node)"
+print_ai_followup() {
+    local cmd="$1" root
+    root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    printf '下一步: 运行 %s 完成登录。\n' "$cmd"
+    printf '让助手使用本机 MCP: 将 %s/templates/AGENTS.md 和 CLAUDE.md 复制到项目根目录。\n' "$root"
+}
+
+install_claude() {
+    info "=== 安装 Claude Code ==="
+    export PATH="$HOME/.local/bin:$PATH"
 
     if command -v claude >/dev/null 2>&1; then
-        info "Claude Code 已安装: $(claude --version 2>/dev/null | head -1), 跳过"
+        info "Claude Code 已安装: $(claude --version 2>/dev/null | head -1)"
     else
         # 优先官方安装脚本 (npm 方式已被官方标记 deprecated)
-        local tpl=/tmp/claude-install.sh
+        local tpl
+        make_tmp tpl .sh
         if download_installer https://claude.ai/install.sh "$tpl"; then
             info "安装 Claude Code (官方脚本)..."
-            bash "$tpl" 2>&1 | tail -3 || true
-            rm -f "$tpl"
+            if ! bash "$tpl" 2>&1 | tail -3; then
+                warn "官方安装脚本执行失败, 尝试 npm"
+            fi
             export PATH="$HOME/.local/bin:$PATH"
         else
-            warn "官方安装脚本不可用 (网络/区域限制), 使用 npm (deprecated)"
+            warn "官方安装脚本不可用 (网络/区域限制), 尝试 npm"
         fi
         if ! command -v claude >/dev/null 2>&1; then
-            npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code || true
+            load_node
+            command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node), 官方安装脚本也未装上 Claude Code"
+            npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code \
+                || die "Claude Code npm 安装失败"
+        fi
+        command -v claude >/dev/null 2>&1 || die "Claude Code 安装失败, 请检查网络"
+    fi
+
+    ok "Claude Code 就绪: $(claude --version 2>/dev/null | head -1)"
+    print_ai_followup claude
+}
+
+install_codex() {
+    info "=== 安装 Codex CLI ==="
+    export PATH="$HOME/.local/bin:$PATH"
+
+    if command -v codex >/dev/null 2>&1; then
+        info "Codex CLI 已安装: $(codex --version 2>/dev/null | head -1)"
+    else
+        load_node
+        command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node)"
+        info "安装 Codex CLI (@openai/codex)..."
+        npm install -g @openai/codex || die "Codex CLI 安装失败"
+        command -v codex >/dev/null 2>&1 || die "Codex CLI 安装失败, 请检查网络"
+    fi
+
+    ok "Codex CLI 就绪: $(codex --version 2>/dev/null | head -1)"
+    print_ai_followup codex
+}
+
+install_gemini() {
+    info "=== 安装 Gemini CLI ==="
+    export PATH="$HOME/.local/bin:$PATH"
+
+    if command -v gemini >/dev/null 2>&1; then
+        info "Gemini CLI 已安装: $(gemini --version 2>/dev/null | head -1)"
+    else
+        load_node
+        command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node)"
+        info "安装 Gemini CLI (@google/gemini-cli)..."
+        npm install -g @google/gemini-cli || die "Gemini CLI 安装失败"
+        command -v gemini >/dev/null 2>&1 || die "Gemini CLI 安装失败, 请检查网络"
+    fi
+
+    ok "Gemini CLI 就绪: $(gemini --version 2>/dev/null | head -1)"
+    print_ai_followup gemini
+}
+
+install_opencode() {
+    info "=== 安装 OpenCode ==="
+    export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$PATH"
+    export XDG_BIN_DIR="${XDG_BIN_DIR:-$HOME/.local/bin}"
+
+    if command -v opencode >/dev/null 2>&1; then
+        info "OpenCode 已安装: $(opencode --version 2>/dev/null | head -1)"
+    else
+        local tpl
+        make_tmp tpl .sh
+        if download_installer https://opencode.ai/install "$tpl"; then
+            info "安装 OpenCode (官方脚本)..."
+            if ! bash "$tpl" 2>&1 | tail -3; then
+                warn "官方安装脚本执行失败, 尝试 npm"
+            fi
+            export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$PATH"
+        else
+            warn "官方安装脚本不可用, 尝试 npm"
+        fi
+        if ! command -v opencode >/dev/null 2>&1; then
+            load_node
+            command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node), 官方安装脚本也未装上 OpenCode"
+            npm install -g @opencode/cli@latest || die "OpenCode npm 安装失败"
+        fi
+        command -v opencode >/dev/null 2>&1 || die "OpenCode 安装失败, 请检查网络"
+    fi
+
+    ok "OpenCode 就绪: $(opencode --version 2>/dev/null | head -1)"
+    print_ai_followup opencode
+}
+
+install_copilot() {
+    info "=== 安装 GitHub Copilot CLI ==="
+    export PATH="$HOME/.local/bin:$PATH"
+
+    if command -v copilot >/dev/null 2>&1 && [ "${COPILOT_FORCE:-}" != 1 ]; then
+        info "Copilot CLI 已安装: $(copilot --version 2>/dev/null | head -1)"
+    else
+        local tpl
+        make_tmp tpl .sh
+        # 非 root 默认装到 ~/.local/bin, 显式 PREFIX 避免写到 /usr/local。
+        if download_installer https://gh.io/copilot-install "$tpl"; then
+            info "安装 Copilot CLI (官方脚本)..."
+            if ! env PREFIX="$HOME/.local" bash "$tpl" 2>&1 | tail -3; then
+                warn "官方安装脚本执行失败, 尝试 npm"
+            fi
+            export PATH="$HOME/.local/bin:$PATH"
+        else
+            warn "官方安装脚本不可用, 尝试 npm"
+        fi
+        if ! command -v copilot >/dev/null 2>&1; then
+            if [ "${COPILOT_FORCE:-}" = 1 ]; then
+                die "Copilot CLI 升级失败"
+            fi
+            load_node
+            command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node), 官方安装脚本也未装上 Copilot CLI"
+            npm install -g @github/copilot || die "Copilot CLI npm 安装失败"
+        fi
+        command -v copilot >/dev/null 2>&1 || die "Copilot CLI 安装失败, 请检查网络"
+    fi
+
+    ok "Copilot CLI 就绪: $(copilot --version 2>/dev/null | head -1)"
+    printf '下一步: 运行 copilot 完成 GitHub 登录。MCP 用 copilot mcp add 配置。\n'
+}
+
+install_grok() {
+    info "=== 安装 Grok Build ==="
+    export PATH="$HOME/.grok/bin:$HOME/.local/bin:$PATH"
+
+    if { command -v grok >/dev/null 2>&1 || [ -x "$HOME/.grok/bin/grok" ]; } \
+        && [ "${GROK_FORCE:-}" != 1 ]; then
+        info "Grok Build 已安装: $(grok --version 2>/dev/null | head -1)"
+    else
+        local tpl
+        make_tmp tpl .sh
+        if ! download_installer https://x.ai/cli/install.sh "$tpl"; then
+            die "无法下载 Grok Build 安装脚本: https://x.ai/cli/install.sh"
+        fi
+        info "安装 Grok Build (官方脚本)..."
+        if ! bash "$tpl" 2>&1 | tail -5; then
+            die "Grok Build 官方安装脚本失败"
+        fi
+        export PATH="$HOME/.grok/bin:$HOME/.local/bin:$PATH"
+        if ! command -v grok >/dev/null 2>&1 && [ ! -x "$HOME/.grok/bin/grok" ]; then
+            die "Grok Build 安装失败, 请检查网络"
         fi
     fi
 
-    if command -v codex >/dev/null 2>&1; then
-        info "Codex CLI 已安装: $(codex --version 2>/dev/null | head -1), 跳过"
-    else
-        info "安装 Codex CLI (@openai/codex)..."
-        npm install -g @openai/codex
-    fi
-
-    ok "AI CLI 就绪: $(claude --version 2>/dev/null | head -1 || true), $(codex --version 2>/dev/null | head -1 || true)"
+    ok "Grok Build 就绪: $(grok --version 2>/dev/null | head -1)"
+    print_ai_followup grok
 }
 
 # ---------------------------------------------------------------------------
@@ -594,18 +739,20 @@ install_mimo() {
         info "MiMo Code 已安装: $(mimo --version 2>/dev/null | head -1)"
     else
         # 官方脚本 (macOS/Linux 推荐; Windows 官方为 npm)
-        local tpl=/tmp/mimo-install.sh
+        local tpl
+        make_tmp tpl .sh
         if download_installer https://mimo.xiaomi.com/install "$tpl"; then
             info "安装 MiMo Code (官方脚本)..."
-            bash "$tpl" 2>&1 | tail -3 || true
-            rm -f "$tpl"
-            export PATH="$HOME/.local/bin:$PATH"
+            if ! bash "$tpl" 2>&1 | tail -3; then
+                warn "官方安装脚本执行失败, 尝试 npm"
+            fi
+            export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PATH"
         else
             warn "官方安装脚本不可用, 回退 npm"
         fi
         if ! command -v mimo >/dev/null 2>&1; then
             command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node) 或手动安装 MiMo Code"
-            npm install -g --allow-scripts=@mimo-ai/cli @mimo-ai/cli || true
+            npm install -g --allow-scripts=@mimo-ai/cli @mimo-ai/cli || die "MiMo Code npm 安装失败"
         fi
     fi
 
@@ -676,15 +823,12 @@ install_chatgpt() {
             rm -f -- "$tmp_pkg"
             ;;
         *)
-            warn "不支持的包管理器, 请手动安装 ChatGPT 桌面版"
+            die "不支持的包管理器 ($PM), 请手动安装 ChatGPT 桌面版"
             ;;
     esac
 
-    if command -v chatgpt >/dev/null 2>&1; then
-        ok "ChatGPT 桌面版安装完成: $(chatgpt --version 2>/dev/null | head -1)"
-    else
-        warn "ChatGPT 安装可能未成功, 请检查"
-    fi
+    command -v chatgpt >/dev/null 2>&1 || die "ChatGPT 安装失败, 请检查网络或包管理器输出"
+    ok "ChatGPT 桌面版安装完成: $(chatgpt --version 2>/dev/null | head -1)"
 }
 
 # ---------------------------------------------------------------------------
@@ -693,8 +837,21 @@ install_chatgpt() {
 install_ccswitch() {
     info "=== 安装 CC Switch (AI CLI 配置切换器) ==="
 
-    if command -v cc-switch >/dev/null 2>&1; then
-        info "CC Switch 已安装"
+    export PATH="$HOME/.local/bin:$PATH"
+    local stamp="$HOME/.local/share/joe/cc-switch.version"
+    local installed_tag=""
+    [ -f "$stamp" ] && installed_tag="$(cat "$stamp")"
+
+    # 普通安装保持幂等。update-all 设置 CCSWITCH_FORCE=1 时才按最新 release 升级。
+    if command -v cc-switch >/dev/null 2>&1 && [ "${CCSWITCH_FORCE:-}" != 1 ]; then
+        info "CC Switch 已安装${installed_tag:+ ($installed_tag)}"
+        return 0
+    fi
+
+    local tag
+    tag="$(ccswitch_latest_tag)" || die "无法确定 CC Switch 版本。可设置 CCSWITCH_VERSION=vX.Y.Z 后重试, 或从 https://github.com/farion1231/cc-switch/releases 手动安装"
+    if command -v cc-switch >/dev/null 2>&1 && [ "$installed_tag" = "$tag" ]; then
+        info "CC Switch 已是 $tag"
         return 0
     fi
 
@@ -706,31 +863,17 @@ install_ccswitch() {
         *) die "不支持的架构: $arch" ;;
     esac
 
-    # GitHub 官方 release 直链 + 镜像前缀 (GitHub CDN 走代理不稳定时用镜像)
-    local gh_url="https://github.com/farion1231/cc-switch/releases/download/v3.20.4/CC-Switch-v3.20.4-Linux-${arch_id}"
-    local mirrors=("" "https://ghfast.top/" "https://gh-proxy.com/" "https://ghproxy.net/")
-    local dl=""
     local pkg_suffix=".AppImage"
-    local tmp_pkg
+    local tmp_pkg gh_url
 
     case "$PM" in
         dnf|zypper) pkg_suffix=".rpm" ;;
         apt)        pkg_suffix=".deb" ;;
     esac
-    # 后缀要与 release 资产一致, 也便于包管理器识别本地文件类型
+    gh_url="https://github.com/farion1231/cc-switch/releases/download/${tag}/CC-Switch-${tag}-Linux-${arch_id}${pkg_suffix}"
     make_tmp tmp_pkg "$pkg_suffix"
-
-    for m in "${mirrors[@]}"; do
-        info "尝试下载 CC Switch: ${m}${gh_url}${pkg_suffix}"
-        if curl -fsSL --connect-timeout 15 -o "$tmp_pkg" "${m}${gh_url}${pkg_suffix}" 2>/dev/null; then
-            dl="${m}${gh_url}${pkg_suffix}"
-            break
-        fi
-    done
-
-    if [ -z "$dl" ]; then
-        die "CC Switch 下载失败, 请手动从 https://github.com/farion1231/cc-switch/releases 安装"
-    fi
+    github_mirror_download "$gh_url" "$tmp_pkg" \
+        || die "CC Switch 下载失败, 请手动从 https://github.com/farion1231/cc-switch/releases 安装"
 
     case "$PM" in
         dnf)
@@ -751,11 +894,14 @@ install_ccswitch() {
             ;;
     esac
     rm -f -- "$tmp_pkg"
+    export PATH="$HOME/.local/bin:$PATH"
 
-    if command -v cc-switch >/dev/null 2>&1; then
-        ok "CC Switch 安装完成"
+    if command -v cc-switch >/dev/null 2>&1 || [ -x "$HOME/.local/bin/cc-switch" ]; then
+        mkdir -p "$(dirname "$stamp")"
+        printf '%s\n' "$tag" > "$stamp"
+        ok "CC Switch 安装完成 ($tag)"
     else
-        warn "CC Switch 安装可能未成功 (AppImage 方式已放入 ~/.local/bin)"
+        die "CC Switch 安装失败"
     fi
 }
 
@@ -804,8 +950,13 @@ cmd_check() {
     esac
     printf '  %-12s %s\n' node   "Node LTS (nvm 仅在安装时使用, 日常只设置 PATH)"
     printf '  %-12s %s\n' python "pyenv (需构建依赖)"
-    printf '  %-12s %s\n' ai     "npm 全局安装"
-    printf '  %-12s %s\n' zed    "Zed 官方安装脚本 (发行版无关)"
+    printf '  %-12s %s\n' claude "官方安装脚本, 失败时回退 npm"
+    printf '  %-12s %s\n' codex    "npm 全局安装 (@openai/codex)"
+    printf '  %-12s %s\n' gemini   "npm 全局安装 (@google/gemini-cli)"
+    printf '  %-12s %s\n' opencode "官方安装脚本, 失败时回退 npm"
+    printf '  %-12s %s\n' copilot  "官方安装脚本, 装到 ~/.local, 失败时回退 npm"
+    printf '  %-12s %s\n' grok     "官方安装脚本 (https://x.ai/cli/install.sh)"
+    printf '  %-12s %s\n' zed      "Zed 官方安装脚本 (发行版无关)"
     printf '  %-12s %s\n' mimo   "MiMo 官方安装脚本 (发行版无关)"
     printf '\n'
 }
@@ -853,7 +1004,13 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --node)     INSTALL_NODE=true; shift ;;
         --python)   INSTALL_PYTHON=true; shift ;;
-        --ai)       INSTALL_AI=true; shift ;;
+        --claude)   INSTALL_CLAUDE=true; shift ;;
+        --codex)    INSTALL_CODEX=true; shift ;;
+        --ai)       INSTALL_CLAUDE=true; INSTALL_CODEX=true; shift ;;
+        --gemini)   INSTALL_GEMINI=true; shift ;;
+        --opencode) INSTALL_OPENCODE=true; shift ;;
+        --copilot)  INSTALL_COPILOT=true; shift ;;
+        --grok)     INSTALL_GROK=true; shift ;;
         --zed)      INSTALL_ZED=true; shift ;;
         --ghostty)  INSTALL_GHOSTTY=true; shift ;;
         --vscode)   INSTALL_VSCODE=true; shift ;;
@@ -912,14 +1069,23 @@ if $TUI_MODE; then
         exit 0
     fi
     INSTALL_ALL=false
-    INSTALL_NODE=false; INSTALL_PYTHON=false; INSTALL_AI=false
+    INSTALL_NODE=false; INSTALL_PYTHON=false
+    INSTALL_CLAUDE=false; INSTALL_CODEX=false
+    INSTALL_GEMINI=false; INSTALL_OPENCODE=false; INSTALL_COPILOT=false
+    INSTALL_GROK=false
     INSTALL_ZED=false; INSTALL_GHOSTTY=false; INSTALL_VSCODE=false
+    INSTALL_BRAVE=false
     INSTALL_MIMO=false; INSTALL_CHATGPT=false; INSTALL_CCSWITCH=false
     for comp in $TUI_SELECTED; do
         case "$comp" in
             node)     INSTALL_NODE=true ;;
             python)   INSTALL_PYTHON=true ;;
-            ai)       INSTALL_AI=true ;;
+            claude)   INSTALL_CLAUDE=true ;;
+            codex)    INSTALL_CODEX=true ;;
+            gemini)   INSTALL_GEMINI=true ;;
+            opencode) INSTALL_OPENCODE=true ;;
+            copilot)  INSTALL_COPILOT=true ;;
+            grok)     INSTALL_GROK=true ;;
             zed)      INSTALL_ZED=true ;;
             ghostty)  INSTALL_GHOSTTY=true ;;
             vscode)   INSTALL_VSCODE=true ;;
@@ -948,7 +1114,12 @@ info "joe devtools 安装开始 $(date) [包管理器: $PM]"
 
 if $INSTALL_ALL || $INSTALL_NODE; then install_node; fi
 if $INSTALL_ALL || $INSTALL_PYTHON; then install_python; fi
-if $INSTALL_ALL || $INSTALL_AI; then install_ai; fi
+if $INSTALL_ALL || $INSTALL_CLAUDE; then install_claude; fi
+if $INSTALL_ALL || $INSTALL_CODEX; then install_codex; fi
+if $INSTALL_ALL || $INSTALL_GEMINI; then install_gemini; fi
+if $INSTALL_ALL || $INSTALL_OPENCODE; then install_opencode; fi
+if $INSTALL_ALL || $INSTALL_COPILOT; then install_copilot; fi
+if $INSTALL_ALL || $INSTALL_GROK; then install_grok; fi
 if $INSTALL_ALL || $INSTALL_ZED; then install_zed; fi
 if $INSTALL_ALL || $INSTALL_GHOSTTY; then install_ghostty; fi
 if $INSTALL_ALL || $INSTALL_VSCODE; then install_vscode; fi

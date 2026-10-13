@@ -28,6 +28,7 @@ skills 先选择技能组; low-level-dev-skills 再按分类进入勾选列表�
 示例:
     ./install.sh shell --dry-run
     ./install.sh devtools --node
+    ./install.sh devtools --claude
     ./install.sh mcp memory git
     ./install.sh skills --category kernel-dev --tui
     ./install.sh doctor --json

@@ -40,7 +40,7 @@ fi
 
 # ---- 默认组件 (devtools); 调用方可预先覆盖 ----
 if [ -z "${TUI_IDS+x}" ]; then
-    TUI_IDS=(node python ai zed ghostty vscode brave mimo chatgpt ccswitch)
+    TUI_IDS=(node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch)
 fi
 if [ -z "${TUI_TITLE+x}" ]; then
     TUI_TITLE="joe devtools 组件安装选择"
@@ -58,6 +58,7 @@ _tui_has_bin() {
     command -v "$name" >/dev/null 2>&1 && return 0
     [ -x "$HOME/.local/bin/$name" ] && return 0
     [ -x "$HOME/.mimocode/bin/$name" ] && return 0   # MiMo Code 官方安装路径
+    [ -x "$HOME/.grok/bin/$name" ] && return 0       # Grok Build 官方安装路径
     local f
     for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
         [ -x "$f" ] && return 0
@@ -72,7 +73,12 @@ if ! declare -F tui_component_installed >/dev/null 2>&1; then
         case "$id" in
             node)     _tui_has_bin node ;;
             python)   [ -x "$HOME/.pyenv/bin/pyenv" ] || command -v pyenv >/dev/null 2>&1 ;;
-            ai)       _tui_has_bin claude && _tui_has_bin codex ;;
+            claude)   _tui_has_bin claude ;;
+            codex)    _tui_has_bin codex ;;
+            gemini)   _tui_has_bin gemini ;;
+            opencode) _tui_has_bin opencode ;;
+            copilot)  _tui_has_bin copilot ;;
+            grok)     _tui_has_bin grok ;;
             zed)      [ -x "$HOME/.local/bin/zed" ] || command -v zed >/dev/null 2>&1 ;;
             ghostty)  command -v ghostty >/dev/null 2>&1 ;;
             vscode)   command -v code >/dev/null 2>&1 ;;
@@ -91,7 +97,12 @@ if ! declare -F tui_component_name >/dev/null 2>&1; then
         case "$1" in
             node)     echo "Node 工具链 (nvm + LTS)" ;;
             python)   echo "Python 版本管理器 (pyenv + 编译依赖)" ;;
-            ai)       echo "AI CLI (Claude Code + Codex)" ;;
+            claude)   echo "Claude Code" ;;
+            codex)    echo "Codex CLI" ;;
+            gemini)   echo "Gemini CLI" ;;
+            opencode) echo "OpenCode" ;;
+            copilot)  echo "GitHub Copilot CLI" ;;
+            grok)     echo "Grok Build" ;;
             zed)      echo "Zed 编辑器 + JetBrains Mono" ;;
             ghostty)  echo "Ghostty 终端 + Ctrl+Alt+T" ;;
             vscode)   echo "VS Code 编辑器" ;;

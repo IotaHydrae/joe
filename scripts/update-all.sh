@@ -62,7 +62,7 @@ section() { $QUIET || printf '\n%s\n' "$(c_b "── $* ──")"; }
 . "$SCRIPT_DIR/lib_node.sh"
 load_node
 export PYENV_ROOT="${PYENV_ROOT:-$HOME/.pyenv}"
-export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PYENV_ROOT/bin:$PYENV_ROOT/shims:$PATH"
+export PATH="$HOME/.grok/bin:$HOME/.mimocode/bin:$HOME/.local/bin:$PYENV_ROOT/bin:$PYENV_ROOT/shims:$PATH"
 
 # 命令探测
 find_bin() {
@@ -70,6 +70,7 @@ find_bin() {
     command -v "$name" >/dev/null 2>&1 && { command -v "$name"; return 0; }
     [ -x "$HOME/.local/bin/$name" ] && { echo "$HOME/.local/bin/$name"; return 0; }
     [ -x "$HOME/.mimocode/bin/$name" ] && { echo "$HOME/.mimocode/bin/$name"; return 0; }
+    [ -x "$HOME/.grok/bin/$name" ] && { echo "$HOME/.grok/bin/$name"; return 0; }
     for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
         [ -x "$f" ] && { echo "$f"; return 0; }
     done
@@ -178,13 +179,71 @@ else
 fi
 
 if find_bin codex >/dev/null 2>&1; then
-    if find_bin npm >/dev/null 2>&1; then
+    codex_bin="$(find_bin codex)"
+    if command -v timeout >/dev/null 2>&1; then
+        codex_help="$(timeout 15 "$codex_bin" --help 2>&1 || true)"
+    else
+        codex_help="$("$codex_bin" --help 2>&1 || true)"
+    fi
+    if printf '%s\n' "$codex_help" | grep -Eq '^[[:space:]]+update([[:space:]]|$)'; then
+        update_item "codex (Codex CLI)" "$codex_bin" update
+    elif find_bin npm >/dev/null 2>&1; then
         update_item "codex (Codex CLI)" npm update -g @openai/codex
     else
-        skip_item "codex" "无 npm"
+        skip_item "codex" "无 codex update 或 npm"
     fi
 else
     skip_item "codex"
+fi
+
+if find_bin gemini >/dev/null 2>&1; then
+    if find_bin npm >/dev/null 2>&1; then
+        update_item "gemini (Gemini CLI)" npm update -g @google/gemini-cli
+    else
+        skip_item "gemini" "无 npm"
+    fi
+else
+    skip_item "gemini"
+fi
+
+if find_bin opencode >/dev/null 2>&1; then
+    update_item "opencode" opencode upgrade
+else
+    skip_item "opencode"
+fi
+
+if find_bin grok >/dev/null 2>&1; then
+    update_item "grok (Grok Build)" grok update
+else
+    skip_item "grok"
+fi
+
+if find_bin copilot >/dev/null 2>&1; then
+    update_item "copilot (Copilot CLI)" env COPILOT_FORCE=1 \
+        bash "$SCRIPT_DIR/install_devtools.sh" --copilot
+else
+    skip_item "copilot"
+fi
+
+if find_bin cc-switch >/dev/null 2>&1; then
+    cc_tag="$(ccswitch_latest_tag 2>/dev/null || true)"
+    cc_stamp="$(cat "$HOME/.local/share/joe/cc-switch.version" 2>/dev/null || true)"
+    if [ -z "$cc_tag" ]; then
+        skip_item "cc-switch" "无法查询最新版本"
+    elif [ "$cc_stamp" = "$cc_tag" ]; then
+        skip_item "cc-switch" "已是 $cc_tag"
+    else
+        update_item "cc-switch" env CCSWITCH_FORCE=1 CCSWITCH_VERSION="$cc_tag" \
+            bash "$SCRIPT_DIR/install_devtools.sh" --ccswitch
+    fi
+else
+    skip_item "cc-switch"
+fi
+
+if find_bin chatgpt >/dev/null 2>&1; then
+    skip_item "chatgpt 桌面版" "应用内自行更新; 要重装请卸掉后运行 devtools --chatgpt"
+else
+    skip_item "chatgpt"
 fi
 
 if find_bin mimo >/dev/null 2>&1; then

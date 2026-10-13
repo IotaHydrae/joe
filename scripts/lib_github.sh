@@ -8,6 +8,7 @@
 #   download_installer <url> <out>          下载并校验是"合法脚本"(拒绝 HTML 错误页)
 #   github_mirror_download <gh_url> <out>   经镜像下载 (应对 GitHub CDN 截断)
 #   codegraph_fetch_engine_mirror           补拉 CodeGraph 引擎并校验 SHA256
+#   ccswitch_latest_tag                     CC Switch 最新 GitHub release tag
 #
 # 调用方若已定义 info/ok/warn 则复用, 否则使用内置简易实现。
 # =============================================================================
@@ -49,6 +50,25 @@ download_installer() {
         return 1
     fi
     return 0
+}
+
+# CC Switch 发布标签。CCSWITCH_VERSION 可覆盖 (须为 vX.Y.Z 形式的 tag)。
+ccswitch_latest_tag() {
+    local tag
+    if [ -n "${CCSWITCH_VERSION:-}" ]; then
+        tag="$CCSWITCH_VERSION"
+    else
+        command -v python3 >/dev/null 2>&1 || return 1
+        tag="$(curl -fsSL --connect-timeout 15 --max-time 30 \
+            https://api.github.com/repos/farion1231/cc-switch/releases/latest \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))')" || return 1
+    fi
+    case "$tag" in
+        *[!a-zA-Z0-9._-]*) return 1 ;;
+        v[0-9]*) ;;
+        *) return 1 ;;
+    esac
+    printf '%s\n' "$tag"
 }
 
 # 经 GitHub 镜像下载 (部分网络下直连 GitHub releases 会中途截断)

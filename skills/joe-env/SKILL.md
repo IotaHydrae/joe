@@ -13,7 +13,7 @@ description: 了解 joe 开发环境的内容与用法。当需要安装/更新�
 
 | 脚本 | 用途 | TUI |
 |---|---|---|
-| `./install.sh devtools` | 开发工具套件（9 项） | `--tui`，无安装参数默认进 TUI |
+| `./install.sh devtools` | 开发工具套件（`devtools --list`） | `--tui`，无安装参数默认进 TUI |
 | `./install.sh mcp` | MCP 服务器（7 个） | 同上 |
 | `./install.sh skills` | 代理技能 | 技能组 → 分类 → 勾选；`--category` 可直达分类 |
 
@@ -36,7 +36,7 @@ TUI 按键：`↑/↓` 移动，`PgUp/PgDn` 翻页，`Home/End` 到首尾，`空
 
 - **Node**: nvm + Node LTS（`~/.nvm`）
 - **Python**: pyenv + 编译依赖（`~/.pyenv`），Python 版本与 pipx 按需自行安装
-- **AI CLI**: `claude`（Claude Code）、`codex`（Codex CLI）、`mimo`（MiMo Code，官方路径 `~/.mimocode/bin`）
+- **AI CLI**: `claude`、`codex`（`--ai` 只装这两个）、`gemini`、`opencode`、`copilot`、`grok`（官方路径 `~/.grok/bin`）、`mimo`（官方路径 `~/.mimocode/bin`）
 - **编辑器**: Zed（`~/.local/bin/zed`）、VS Code（`/usr/bin/code`）
 - **终端**: Ghostty（`Ctrl+Alt+T` 打开）
 - **桌面**: ChatGPT 桌面版、CC Switch
@@ -47,7 +47,7 @@ TUI 按键：`↑/↓` 移动，`PgUp/PgDn` 翻页，`Home/End` 到首尾，`空
 ## 已配置的 MCP 服务器
 
 `filesystem`、`git`、`memory`、`codebase-memory-mcp`、`context7`、`codegraph`、`serena`
-（由 `install_mcp_servers.sh` 统一写入 Claude Code / Codex / MiMo Code）
+（写入已安装的 Claude Code / Codex / Gemini CLI / OpenCode / Grok Build / MiMo Code，以及已安装的 Zed / VS Code。Copilot CLI 用 `copilot mcp add`。代码智能三个里选一个。`filesystem` 要用 `FILESYSTEM_DIRS` 指定目录）
 
 ## 约定
 

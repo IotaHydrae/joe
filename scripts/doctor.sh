@@ -11,6 +11,8 @@
 #   ./install.sh doctor --json       # 机器可读输出
 #
 # 退出码: 0 = 无失败项, 1 = 有失败项(缺失/不可用)
+# 未安装的 AI CLI、桌面 AI 工具和未选择的 MCP 记为跳过, 不算失败。
+# 代码智能 MCP 三选一; 装了多个只警告。配置了但命令不可用则失败。
 # =============================================================================
 
 set -uo pipefail
@@ -41,7 +43,7 @@ for a in "$@"; do
     esac
 done
 
-PASS=0; FAIL=0; WARN=0
+PASS=0; FAIL=0; WARN=0; SKIP=0
 FAILED_ITEMS=()
 JSON_ITEMS=()
 
@@ -53,22 +55,24 @@ c_d() { printf '\033[2m%s\033[0m' "$1"; }
 
 section() { $QUIET || printf '\n%s\n' "$(c_b "── $* ──")"; }
 
-# 记录结果: ok|fail|warn  <名称>  <详情>
+# 记录结果: ok|fail|warn|skip  <名称>  <详情>
 record() {
     local status="$1" name="$2" detail="${3:-}"
     case "$status" in
         ok)   PASS=$((PASS + 1)) ;;
         warn) WARN=$((WARN + 1)) ;;
+        skip) SKIP=$((SKIP + 1)) ;;
         fail) FAIL=$((FAIL + 1)); FAILED_ITEMS+=("$name${detail:+ — $detail}") ;;
     esac
     JSON_ITEMS+=("$(printf '{"status":"%s","name":"%s","detail":"%s"}' \
         "$status" "${name//\"/}" "${detail//\"/}")")
     $JSON && return 0
-    if $QUIET && [ "$status" = "ok" ]; then return 0; fi
+    if $QUIET && { [ "$status" = "ok" ] || [ "$status" = "skip" ]; }; then return 0; fi
     local mark
     case "$status" in
         ok)   mark="$(c_g '✓')" ;;
         warn) mark="$(c_y '!')" ;;
+        skip) mark="$(c_d '·')" ;;
         fail) mark="$(c_r '✗')" ;;
     esac
     if [ -n "$detail" ]; then
@@ -86,6 +90,7 @@ find_bin() {
     command -v "$name" >/dev/null 2>&1 && { command -v "$name"; return 0; }
     [ -x "$HOME/.local/bin/$name" ] && { echo "$HOME/.local/bin/$name"; return 0; }
     [ -x "$HOME/.mimocode/bin/$name" ] && { echo "$HOME/.mimocode/bin/$name"; return 0; }
+    [ -x "$HOME/.grok/bin/$name" ] && { echo "$HOME/.grok/bin/$name"; return 0; }
     [ -x "$HOME/.pyenv/bin/$name" ] && { echo "$HOME/.pyenv/bin/$name"; return 0; }
     [ -x "$HOME/.pyenv/shims/$name" ] && { echo "$HOME/.pyenv/shims/$name"; return 0; }
     for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
@@ -125,6 +130,26 @@ chk_cmd_present() {
     fi
 }
 
+# 可选命令: 没装就跳过, 不记失败
+chk_cmd_optional() {
+    local name="$1" hint="${2:-未安装（可选）}" path ver
+    if path="$(find_bin "$name")"; then
+        ver="$(_probe_version "$path")"
+        record ok "$name" "${ver:-$path}"
+    else
+        record skip "$name" "$hint"
+    fi
+}
+
+chk_cmd_present_optional() {
+    local name="$1" hint="${2:-未安装（可选）}" path
+    if path="$(find_bin "$name")"; then
+        record ok "$name" "$path"
+    else
+        record skip "$name" "$hint"
+    fi
+}
+
 # 从 install_mcp_servers.sh 读取期望的 MCP 列表
 expected_mcps() {
     local f="$SCRIPT_DIR/install_mcp_servers.sh"
@@ -145,8 +170,13 @@ expected_skills() {
 skill_dirs() {
     find_bin claude >/dev/null 2>&1 && echo "$HOME/.claude/skills"
     find_bin codex  >/dev/null 2>&1 && echo "$HOME/.codex/skills"
+    find_bin gemini >/dev/null 2>&1 && echo "$HOME/.gemini/skills"
+    find_bin opencode >/dev/null 2>&1 && echo "$HOME/.config/opencode/skills"
+    find_bin grok >/dev/null 2>&1 && echo "$HOME/.grok/skills"
     find_bin mimo   >/dev/null 2>&1 && echo "$HOME/.config/mimocode/skills"
-    [ -d "$HOME/.copilot" ] && echo "$HOME/.copilot/skills"
+    if find_bin copilot >/dev/null 2>&1 || [ -d "$HOME/.copilot" ]; then
+        echo "$HOME/.copilot/skills"
+    fi
     echo "$HOME/.agents/skills"
     return 0
 }
@@ -239,9 +269,13 @@ done
 # 4. AI CLI
 # ---------------------------------------------------------------------------
 section "AI CLI"
-chk_cmd claude "运行 ./install.sh devtools --ai"
-chk_cmd codex  "运行 ./install.sh devtools --ai"
-chk_cmd mimo   "运行 ./install.sh devtools --mimo"
+chk_cmd_optional claude   "未安装（可选，./install.sh devtools --claude）"
+chk_cmd_optional codex    "未安装（可选，./install.sh devtools --codex）"
+chk_cmd_optional gemini   "未安装（可选，./install.sh devtools --gemini）"
+chk_cmd_optional opencode "未安装（可选，./install.sh devtools --opencode）"
+chk_cmd_optional copilot  "未安装（可选，./install.sh devtools --copilot）"
+chk_cmd_optional grok     "未安装（可选，./install.sh devtools --grok）"
+chk_cmd_optional mimo     "未安装（可选，./install.sh devtools --mimo）"
 
 # ---------------------------------------------------------------------------
 # 5. 编辑器 / 终端 / 桌面
@@ -262,8 +296,8 @@ if find_bin ghostty >/dev/null 2>&1; then
         record fail "Ghostty 系统 terminfo" "运行 ./install.sh repair-ghostty 并完成 sudo 认证 (仅 ~/.terminfo 无法支持 sudo minicom)"
     fi
 fi
-chk_cmd chatgpt  "运行 ./install.sh devtools --chatgpt"
-chk_cmd_present cc-switch "运行 ./install.sh devtools --ccswitch"   # GUI 应用, --version 会启动界面
+chk_cmd_optional chatgpt "未安装（可选，./install.sh devtools --chatgpt）"
+chk_cmd_present_optional cc-switch "未安装（可选，./install.sh devtools --ccswitch）"   # GUI 应用, --version 会启动界面
 
 # ---------------------------------------------------------------------------
 # 6. MCP 服务器
@@ -273,48 +307,152 @@ EXPECTED_MCPS="$(expected_mcps || true)"
 if [ -z "$EXPECTED_MCPS" ]; then
     record warn "MCP 清单" "无法从 install_mcp_servers.sh 读取"
 else
-    # Claude Code (user 作用域)
-    if [ -f "$HOME/.claude.json" ]; then
-        for m in $EXPECTED_MCPS; do
-            if python3 -c "
-import json,sys
+    # 列出某个客户端已配置的 MCP: 每行 name<TAB>command
+    list_client_mcps() {
+        python3 - "$1" "$2" << 'PY'
+import json, os, re, sys
+
+kind, path = sys.argv[1], sys.argv[2]
+if not os.path.exists(path):
+    sys.exit(0)
+
+def emit(name, command):
+    if name:
+        sys.stdout.write("%s\t%s\n" % (name, command or ""))
+
+def command_of(entry):
+    if not isinstance(entry, dict):
+        return ""
+    raw = entry.get("command")
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list) and raw:
+        return str(raw[0])
+    if isinstance(raw, dict):
+        return str(raw.get("path") or raw.get("command") or "")
+    return ""
+
 try:
-    d=json.load(open('$HOME/.claude.json'))
+    if kind == "toml":
+        text = open(path, encoding="utf-8").read()
+        pattern = re.compile(r"(?m)^\[mcp_servers\.([^\]]+)\][ \t]*$(.*?)(?=^\[|\Z)", re.S)
+        for match in pattern.finditer(text):
+            body = match.group(2)
+            cmd = ""
+            for line in body.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("command") and "=" in stripped:
+                    cmd = stripped.split("=", 1)[1].strip().strip('"').strip("'")
+                    break
+            emit(match.group(1).strip(), cmd)
+    else:
+        bucket = {
+            "claude": "mcpServers",
+            "gemini": "mcpServers",
+            "zed": "context_servers",
+            "vscode": "servers",
+            "mimo": "mcp",
+            "opencode": "mcp",
+        }[kind]
+        raw = open(path, encoding="utf-8-sig").read()
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            raw = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
+            raw = re.sub(r"(^|[^\\:])//.*?$", r"\1", raw, flags=re.M)
+            data = json.loads(raw)
+        servers = data.get(bucket) or {}
+        if isinstance(servers, dict):
+            for name, entry in servers.items():
+                emit(name, command_of(entry))
 except Exception:
-    sys.exit(1)
-sys.exit(0 if '$m' in (d.get('mcpServers') or {}) else 1)
-" 2>/dev/null; then
-                record ok "claude: $m"
+    sys.exit(2)
+PY
+    }
+
+    command_usable() {
+        local cmd="$1"
+        [ -n "$cmd" ] || return 1
+        case "$cmd" in
+            /*) [ -x "$cmd" ] ;;
+            *) find_bin "$cmd" >/dev/null 2>&1 ;;
+        esac
+    }
+
+    report_client_mcps() {
+        local label="$1" kind="$2" path="$3"
+        local rows rc=0 missing="" intel=0 cmd
+        rows="$(list_client_mcps "$kind" "$path")" || rc=$?
+        if [ "$rc" -ne 0 ]; then
+            record fail "$label MCP 配置" "无法解析 $path"
+            return
+        fi
+        if [ -z "$rows" ]; then
+            record warn "$label MCP" "已安装客户端, 但还没有 MCP 配置"
+            return
+        fi
+        for m in $EXPECTED_MCPS; do
+            cmd="$(printf '%s\n' "$rows" | awk -F '\t' -v id="$m" '$1 == id { print $2; exit }')"
+            if ! printf '%s\n' "$rows" | awk -F '\t' -v id="$m" '$1 == id { found=1 } END { exit !found }'; then
+                case " $m " in
+                    *" codebase-memory-mcp "*|*" codegraph "*|*" serena "*) ;;
+                    *) missing="$missing $m" ;;
+                esac
+                continue
+            fi
+            case "$m" in
+                codebase-memory-mcp|codegraph|serena) intel=$((intel + 1)) ;;
+            esac
+            if command_usable "$cmd"; then
+                record ok "$label: $m"
             else
-                record fail "claude: $m" "运行 ./install.sh mcp $m"
+                record fail "$label: $m" "命令不可用: ${cmd:-<空>}"
             fi
         done
-    else
-        record warn "claude MCP 配置" "~/.claude.json 不存在 (未用过 Claude Code?)"
-    fi
+        if [ -n "$missing" ]; then
+            record skip "$label 可选 MCP" "未配置:${missing}"
+        fi
+        if [ "$intel" -eq 0 ]; then
+            record warn "$label 代码智能" "未配置。三选一: codebase-memory-mcp / codegraph / serena"
+        elif [ "$intel" -gt 1 ]; then
+            record warn "$label 代码智能" "同时启用了 ${intel} 个, 通常保留一个即可"
+        fi
+    }
 
-    # Codex
+    if find_bin claude >/dev/null 2>&1; then
+        report_client_mcps claude claude "$HOME/.claude.json"
+    fi
     if find_bin codex >/dev/null 2>&1; then
-        CODEX_MCP="$(codex mcp list 2>/dev/null | awk 'NR>1 && NF {print $1}')"
-        for m in $EXPECTED_MCPS; do
-            if printf '%s\n' "$CODEX_MCP" | grep -qx "$m"; then
-                record ok "codex: $m"
-            else
-                record fail "codex: $m" "运行 ./install.sh mcp $m"
-            fi
-        done
+        report_client_mcps codex toml "$HOME/.codex/config.toml"
     fi
-
-    # MiMo Code
-    MIMO_CFG="$HOME/.config/mimocode/mimocode.jsonc"
-    if [ -f "$MIMO_CFG" ]; then
-        for m in $EXPECTED_MCPS; do
-            if grep -q "\"$m\"" "$MIMO_CFG" 2>/dev/null; then
-                record ok "mimo: $m"
-            else
-                record fail "mimo: $m" "运行 ./install.sh mcp $m"
-            fi
-        done
+    if find_bin mimo >/dev/null 2>&1; then
+        report_client_mcps mimo mimo "$HOME/.config/mimocode/mimocode.jsonc"
+    fi
+    if find_bin gemini >/dev/null 2>&1; then
+        report_client_mcps gemini gemini "$HOME/.gemini/settings.json"
+    fi
+    if find_bin opencode >/dev/null 2>&1; then
+        opencode_cfg="$HOME/.config/opencode/opencode.json"
+        if [ -f "$HOME/.config/opencode/opencode.jsonc" ] && [ ! -f "$opencode_cfg" ]; then
+            opencode_cfg="$HOME/.config/opencode/opencode.jsonc"
+        fi
+        report_client_mcps opencode opencode "$opencode_cfg"
+    fi
+    if find_bin grok >/dev/null 2>&1; then
+        report_client_mcps grok toml "$HOME/.grok/config.toml"
+    fi
+    if find_bin zed >/dev/null 2>&1 || [ -x "$HOME/.local/bin/zed" ]; then
+        report_client_mcps zed zed "$HOME/.config/zed/settings.json"
+    fi
+    if find_bin code >/dev/null 2>&1; then
+        report_client_mcps vscode vscode "$HOME/.config/Code/User/mcp.json"
+    fi
+    if ! find_bin claude >/dev/null 2>&1 && ! find_bin codex >/dev/null 2>&1 \
+        && ! find_bin mimo >/dev/null 2>&1 && ! find_bin gemini >/dev/null 2>&1 \
+        && ! find_bin opencode >/dev/null 2>&1 && ! find_bin grok >/dev/null 2>&1 \
+        && ! find_bin zed >/dev/null 2>&1 \
+        && ! { [ -x "$HOME/.local/bin/zed" ] || find_bin code >/dev/null 2>&1; }; then
+        record skip "MCP 客户端" "未安装支持的 AI 客户端, 跳过 MCP 检查"
     fi
 fi
 
@@ -324,12 +462,14 @@ if $CHECK_MCP_CONN; then
         section "MCP 连接测试 (claude, 较慢)"
         MCP_OUT="$(timeout 600 claude mcp list 2>/dev/null || true)"
         CONNECTED="$(printf '%s\n' "$MCP_OUT" | grep -c '✔ Connected' || true)"
-        TOTAL="$(printf '%s\n' "$EXPECTED_MCPS" | wc -w)"
-        if [ "${CONNECTED:-0}" -ge "${TOTAL:-0}" ] && [ "${TOTAL:-0}" -gt 0 ]; then
-            record ok "MCP 连接" "${CONNECTED}/${TOTAL} 已连接"
+        FAILED_CONN="$(printf '%s\n' "$MCP_OUT" | grep -E '✘|Failed' || true)"
+        if [ -n "$FAILED_CONN" ]; then
+            record fail "MCP 连接" "${CONNECTED:-0} 个已连接, 有服务器连接失败"
+            printf '%s\n' "$FAILED_CONN" | head -5 | sed 's/^/      /'
+        elif [ "${CONNECTED:-0}" -gt 0 ]; then
+            record ok "MCP 连接" "${CONNECTED} 个已连接"
         else
-            record fail "MCP 连接" "仅 ${CONNECTED:-0}/${TOTAL:-0} 已连接"
-            printf '%s\n' "$MCP_OUT" | grep -E '✘|Failed' | head -5 | sed 's/^/      /'
+            record warn "MCP 连接" "没有已连接的 MCP"
         fi
     fi
 fi
@@ -343,11 +483,15 @@ if [ -z "$EXPECTED_SKILLS" ]; then
     record warn "技能清单" "skills/ 下没有技能"
 else
     for d in $(skill_dirs); do
+        label="$(echo "$d" | sed "s|$HOME/||")"
+        if [ ! -d "$d" ]; then
+            record skip "$label" "未安装技能（可选）"
+            continue
+        fi
         missing=""
         for s in $EXPECTED_SKILLS; do
             [ -f "$d/$s/SKILL.md" ] || missing="$missing $s"
         done
-        label="$(echo "$d" | sed "s|$HOME/||")"
         if [ -z "$missing" ]; then
             record ok "$label" "$(printf '%s' "$EXPECTED_SKILLS" | wc -w) 个技能就绪"
         else
@@ -393,11 +537,12 @@ fi
 # 汇总
 # ---------------------------------------------------------------------------
 if $JSON; then
-    printf '{"pass":%d,"warn":%d,"fail":%d,"items":[%s]}\n' \
-        "$PASS" "$WARN" "$FAIL" "$(IFS=,; echo "${JSON_ITEMS[*]}")"
+    printf '{"pass":%d,"skip":%d,"warn":%d,"fail":%d,"items":[%s]}\n' \
+        "$PASS" "$SKIP" "$WARN" "$FAIL" "$(IFS=,; echo "${JSON_ITEMS[*]}")"
 else
     printf '\n%s\n' "$(c_b '── 汇总 ──')"
-    printf '  %s 通过   %s 警告   %s 失败\n' "$(c_g "$PASS")" "$(c_y "$WARN")" "$(c_r "$FAIL")"
+    printf '  %s 通过   %s 跳过   %s 警告   %s 失败\n' \
+        "$(c_g "$PASS")" "$(c_d "$SKIP")" "$(c_y "$WARN")" "$(c_r "$FAIL")"
     if [ "$FAIL" -gt 0 ]; then
         printf '\n%s\n' "$(c_r '需要处理:')"
         for i in "${FAILED_ITEMS[@]}"; do printf '  • %s\n' "$i"; done

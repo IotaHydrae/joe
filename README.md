@@ -39,7 +39,7 @@ cd joe
 
 - **Node.js**：nvm + LTS 版本
 - **Python**：pyenv（不预装 Python，你自己选版本）
-- **AI CLI**：Claude Code、Codex
+- **AI CLI**：Claude Code、Codex（`--ai` 只装这两个）、Gemini CLI、OpenCode、GitHub Copilot CLI、Grok Build
 - **编辑器**：Zed、VS Code
 - **终端**：Ghostty
 - **其他**：MiMo Code、ChatGPT、CC Switch
@@ -49,7 +49,13 @@ cd joe
 ./install.sh devtools --list       # 列出所有组件
 ./install.sh devtools --node       # 只装 Node.js
 ./install.sh devtools --python     # 只装 pyenv
-./install.sh devtools --ai         # 只装 AI CLI
+./install.sh devtools --claude     # 只装 Claude Code
+./install.sh devtools --codex      # 只装 Codex CLI
+./install.sh devtools --ai         # 同时装 Claude Code 和 Codex
+./install.sh devtools --gemini     # 只装 Gemini CLI
+./install.sh devtools --opencode   # 只装 OpenCode
+./install.sh devtools --copilot    # 只装 GitHub Copilot CLI
+./install.sh devtools --grok       # 只装 Grok Build
 ```
 
 ### 3. MCP 服务器（MCP）
@@ -59,6 +65,8 @@ cd joe
 - **memory**：对话记忆
 - **context7**：实时文档查询
 - **代码智能**：codebase-memory-mcp、codegraph、serena（三选一）
+
+已安装的 Gemini CLI、OpenCode、Grok Build、Zed 和 VS Code 会写入同一套 MCP。Copilot CLI 用 `copilot mcp add` 自行添加。`filesystem` 必须用 `FILESYSTEM_DIRS` 指定可访问目录。重复运行 `./install.sh mcp <id>` 会在命令变化时更新配置。
 
 ```bash
 ./install.sh mcp                   # TUI 交互选择
@@ -85,6 +93,8 @@ cd joe
 ```
 
 技能菜单分为「原有/本地技能（8 个）」和「low-level-dev-skills（142 个、25 个分类）」。后者先选分类，再勾选该分类的技能；默认不勾选任何项。编号进入，`b`/`q` 返回上一级；安装完成或退出勾选列表后返回当前菜单，可继续选择其他分类。指定 `--category` 则直接打开过滤后的列表，完成后退出安装器。非交互安装须指定技能名或显式使用 `--all`。
+
+技能只在 `~/.agents/skills` 保留一份实体副本。Claude Code、Codex、Gemini、OpenCode、Grok Build、MiMo 和 Copilot 的技能目录使用指向它的符号链接。
 
 ## 常用命令
 
@@ -122,7 +132,13 @@ cd joe
 --list                 # 列出所有组件及状态
 --node                 # 只装 Node.js 工具链
 --python               # 只装 Python 工具链
---ai                   # 只装 AI CLI
+--claude               # 只装 Claude Code
+--codex                # 只装 Codex CLI
+--ai                   # 同时装 Claude Code 和 Codex
+--gemini               # 只装 Gemini CLI
+--opencode             # 只装 OpenCode
+--copilot              # 只装 GitHub Copilot CLI
+--grok                 # 只装 Grok Build
 --zed                  # 只装 Zed 编辑器
 --vscode               # 只装 VS Code
 ```

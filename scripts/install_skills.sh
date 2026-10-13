@@ -18,12 +18,10 @@
 # TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
 #           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
 #
-# 安装位置 (按已安装的代理自动选择):
-#   ~/.agents/skills/          通用 (跨工具约定, 总是安装)
-#   ~/.claude/skills/          Claude Code
-#   ~/.codex/skills/           Codex CLI
-#   ~/.config/mimocode/skills/ MiMo Code (原生)
-#   ~/.copilot/skills/         GitHub Copilot (目录存在时)
+# 安装位置:
+#   ~/.agents/skills/<name>/   唯一的实体副本
+#   其他已安装代理的 skills 目录放指向该副本的符号链接
+#   (Claude Code / Codex / Gemini / OpenCode / Grok Build / MiMo / 已安装的 Copilot)
 #
 # 说明:
 #   - 默认菜单分为原有/本地技能和 low-level-dev-skills; 后者按分类进入勾选
@@ -78,6 +76,7 @@ _has_bin() {
     command -v "$name" >/dev/null 2>&1 && return 0
     [ -x "$HOME/.local/bin/$name" ] && return 0
     [ -x "$HOME/.mimocode/bin/$name" ] && return 0
+    [ -x "$HOME/.grok/bin/$name" ] && return 0
     local f
     for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
         [ -x "$f" ] && return 0
@@ -92,8 +91,13 @@ skill_targets() {
     echo "$HOME/.agents/skills"                       # 通用, 总是装
     _has_bin claude && echo "$HOME/.claude/skills"
     _has_bin codex  && echo "$HOME/.codex/skills"
+    _has_bin gemini && echo "$HOME/.gemini/skills"
+    _has_bin opencode && echo "$HOME/.config/opencode/skills"
+    _has_bin grok && echo "$HOME/.grok/skills"
     _has_bin mimo   && echo "$HOME/.config/mimocode/skills"
-    [ -d "$HOME/.copilot" ] && echo "$HOME/.copilot/skills"
+    if _has_bin copilot || [ -d "$HOME/.copilot" ]; then
+        echo "$HOME/.copilot/skills"
+    fi
     return 0
 }
 
@@ -159,20 +163,22 @@ skill_field() {
     ' "$f"
 }
 
-# 技能是否已在所有目标目录中为最新
+canonical_skill_dir() {
+    printf '%s\n' "$HOME/.agents/skills/$1"
+}
+
+# 实体副本与源一致, 且其他目标都是指向该副本的符号链接
 skill_installed() {
-    local name="$1" srcdir="$SKILLS_SRC/$1" dir found_any=0
+    local name="$1" srcdir="$SKILLS_SRC/$1" dir canon
+    canon="$(canonical_skill_dir "$name")"
     [ -f "$srcdir/SKILL.md" ] || return 1
+    [ -f "$canon/SKILL.md" ] && diff -rq "$srcdir" "$canon" >/dev/null 2>&1 || return 1
     while IFS= read -r dir; do
         [ -n "$dir" ] || continue
-        # 整个技能目录(含 references/scripts/assets)必须完全一致
-        if [ -f "$dir/$name/SKILL.md" ] && diff -rq "$srcdir" "$dir/$name" >/dev/null 2>&1; then
-            found_any=1
-        else
-            return 1   # 任一目标缺失/过旧 -> 视为未安装(需更新)
-        fi
+        [ "$dir" = "$HOME/.agents/skills" ] && continue
+        [ -L "$dir/$name" ] || return 1
+        [ "$(readlink -f "$dir/$name")" = "$(readlink -f "$canon")" ] || return 1
     done < <(skill_targets)
-    [ "$found_any" = "1" ]
 }
 
 # 校验 frontmatter 必填字段
@@ -189,7 +195,7 @@ validate_skill() {
 # 安装单个技能
 # ---------------------------------------------------------------------------
 install_skill() {
-    local name="$1" srcdir="$SKILLS_SRC/$1" dir updated=0
+    local name="$1" srcdir="$SKILLS_SRC/$1" dir canon dest updated=0
 
     validate_skill "$name" || die "技能 $name 校验失败"
     local declared
@@ -198,20 +204,39 @@ install_skill() {
         warn "$name: frontmatter name($declared) 与目录名不一致 (以 frontmatter 为准)"
     fi
 
+    canon="$(canonical_skill_dir "$name")"
+    if [ -f "$canon/SKILL.md" ] && diff -rq "$srcdir" "$canon" >/dev/null 2>&1; then
+        :
+    else
+        if [ -L "$canon" ]; then
+            rm -f "$canon"
+        elif [ -d "$canon" ]; then
+            rm -rf "$canon"
+        fi
+        mkdir -p "$canon"
+        cp -R "$srcdir/." "$canon/"
+        updated=$((updated + 1))
+    fi
+
     while IFS= read -r dir; do
         [ -n "$dir" ] || continue
-        # 整个目录已一致 -> 跳过
-        if [ -f "$dir/$name/SKILL.md" ] && diff -rq "$srcdir" "$dir/$name" >/dev/null 2>&1; then
+        [ "$dir" = "$HOME/.agents/skills" ] && continue
+        dest="$dir/$name"
+        if [ -L "$dest" ] && [ "$(readlink -f "$dest")" = "$(readlink -f "$canon")" ]; then
             continue
         fi
-        mkdir -p "$dir/$name"
-        # 复制整个技能目录 (SKILL.md + references/ + scripts/ + assets/ ...)
-        cp -R "$srcdir/." "$dir/$name/"
+        mkdir -p "$dir"
+        if [ -L "$dest" ]; then
+            rm -f "$dest"
+        elif [ -e "$dest" ]; then
+            rm -rf "$dest"
+        fi
+        ln -s "$canon" "$dest"
         updated=$((updated + 1))
     done < <(skill_targets)
 
     if [ "$updated" -gt 0 ]; then
-        ok "$name: 已安装/更新 ($updated 个目录)"
+        ok "$name: 已安装/更新 (实体副本 ~/.agents/skills, 其余为符号链接)"
     else
         info "$name: 已是最新, 跳过"
     fi
