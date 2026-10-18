@@ -52,6 +52,8 @@ There is no formal test framework; verify changes with shell harnesses in `/tmp`
 
 ## Security & Configuration Tips
 
+- Do not install Firefox; use Brave when a browser is needed.
+- To expose Ultra in ChatGPT Desktop, enable Clash TUN and ensure the desktop app itself starts with its traffic routed through Clash. Ultra can delegate work to subagents, improving throughput on tasks that can run in parallel; check TUN and app proxy routing before changing model or CC Switch settings.
 - The `curl | bash` bootstrap clones the repo to `~/.joe`; review any change to clone URLs or remote sources.
 - New CLI flags must be added to the owning script's parser, the help text, and both README option tables; add new launcher commands to dispatch, the menu and both READMEs.
 - Backups use `*.bak.<timestamp>` and cleanup keeps the last 5; keep the pattern stable.
