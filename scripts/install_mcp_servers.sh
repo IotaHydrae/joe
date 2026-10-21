@@ -15,6 +15,11 @@
 #   ./install.sh mcp filesystem       # 只装 filesystem MCP
 #   ./install.sh mcp git memory       # 装多个 MCP
 #
+# 新语法别名 (由 scripts/commands/mcp.sh 转换, 行为与上面的旧写法一致):
+#   ./install.sh mcp list                    # = --list
+#   ./install.sh mcp install git memory      # = git memory
+#   ./install.sh mcp update filesystem       # = filesystem (重跑即刷新配置)
+#
 # TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
 #           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
 #

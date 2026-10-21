@@ -6,6 +6,13 @@
 
 ## 快速开始
 
+> **版本 2.0 新特性** 🎉  
+> - 更清晰的命令结构：`tools install <组件>`  
+> - 自动依赖处理：不再需要手动记顺序  
+> - 改进的 TUI：显示状态、版本和依赖  
+> - 向后兼容：旧命令仍然工作  
+> - 详见 [迁移指南](docs/MIGRATION.md)
+
 ### 一行安装
 ```bash
 curl -fsSL https://raw.githubusercontent.com/IotaHydrae/joe/main/install.sh | bash
@@ -26,6 +33,7 @@ cd joe
 - **zsh** + **Oh My Zsh** 自动安装配置
 - **powerlevel10k** 主题（优雅的命令行提示符）
 - **常用插件**：自动补全、语法高亮、fzf 模糊搜索等
+- **Ghostty 配置**：包含 `term = xterm-256color` 修复常见问题
 - **自动备份**：修改前备份原配置，保留最近 5 个
 
 ```bash
@@ -45,18 +53,25 @@ cd joe
 - **其他**：MiMo Code、ChatGPT、CC Switch
 
 ```bash
-./install.sh devtools              # TUI 交互选择
-./install.sh devtools --list       # 列出所有组件
-./install.sh devtools --node       # 只装 Node.js
-./install.sh devtools --python     # 只装 pyenv
-./install.sh devtools --claude     # 只装 Claude Code
-./install.sh devtools --codex      # 只装 Codex CLI
-./install.sh devtools --ai         # 同时装 Claude Code 和 Codex
-./install.sh devtools --gemini     # 只装 Gemini CLI
-./install.sh devtools --opencode   # 只装 OpenCode
-./install.sh devtools --copilot    # 只装 GitHub Copilot CLI
-./install.sh devtools --grok       # 只装 Grok Build
+# ===== 新版命令（推荐）=====
+./install.sh tools                     # TUI 交互选择
+./install.sh tools list                # 列出所有工具及状态
+./install.sh tools install node        # 装 Node.js
+./install.sh tools install claude      # 装 Claude Code（自动提示依赖）
+./install.sh tools install --ai        # 装 AI 工具组（Claude + Codex）
+./install.sh tools install claude codex gemini  # 一次装多个
+
+# ===== 旧命令（仍然可用）=====
+./install.sh devtools                  # = tools
+./install.sh devtools --list           # = tools list
+./install.sh devtools --node           # = tools install node
+./install.sh devtools --ai             # = tools install --ai
 ```
+
+**新特性**：
+- 自动依赖检测和提示（不用手动记住顺序）
+- 位置参数支持（`install claude codex` 更简洁）
+- 改进的状态显示（显示版本、依赖关系）
 
 ### 3. MCP 服务器（MCP）
 为 AI 编程助手安装 Model Context Protocol 服务器：
@@ -69,9 +84,15 @@ cd joe
 已安装的 Gemini CLI、OpenCode、Grok Build、Zed 和 VS Code 会写入同一套 MCP。Copilot CLI 用 `copilot mcp add` 自行添加。`filesystem` 必须用 `FILESYSTEM_DIRS` 指定可访问目录。重复运行 `./install.sh mcp <id>` 会在命令变化时更新配置。
 
 ```bash
-./install.sh mcp                   # TUI 交互选择
-./install.sh mcp --list            # 列出所有 MCP
-./install.sh mcp filesystem git    # 只装指定的
+# ===== 新版命令（推荐）=====
+./install.sh mcp                       # TUI 交互选择
+./install.sh mcp list                  # 列出所有 MCP 及状态
+./install.sh mcp install memory git    # 装指定服务
+./install.sh mcp update filesystem     # 重跑安装器刷新该服务配置
+
+# ===== 旧命令（仍然可用）=====
+./install.sh mcp --list                # = mcp list
+./install.sh mcp memory git            # 仍然工作
 ```
 
 **使用提示**：首次使用代码智能 MCP 时，在项目里说"索引这个项目"。
@@ -88,7 +109,10 @@ cd joe
 
 ```bash
 ./install.sh skills                # 技能组 → 分类 → 按需勾选
-./install.sh skills gdb            # 只装 GDB 技能
+./install.sh skills list           # 列出技能及安装状态
+./install.sh skills categories     # 列出分类及技能数量
+./install.sh skills install gdb    # 只装 GDB 技能
+./install.sh skills gdb            # 旧写法, 同样有效
 ./install.sh skills --category kernel-dev --tui  # 直接打开内核驱动分类
 ```
 
@@ -99,18 +123,41 @@ cd joe
 ## 常用命令
 
 ```bash
-# 一键全装（新机器推荐）
-./install.sh shell devtools mcp skills
+./install.sh                   # 主菜单
+./install.sh tools list        # 列出工具
+./install.sh mcp list          # 列出 MCP 服务
+./install.sh doctor            # 环境检查
+./install.sh --help            # 帮助信息
+```
+
+## 故障排除
+
+遇到问题？查看：
+- [故障排除指南](docs/TROUBLESHOOTING.md) - 常见问题和解决方案
+- [Ghostty 终端修复](docs/GHOSTTY_FIX.md) - Ghostty 按键问题修复
+- [迁移指南](docs/MIGRATION.md) - 1.x → 2.0 迁移
+
+**快速修复 Ghostty**：
+```bash
+bash scripts/fix_ghostty_term.sh  # 修复 TERM=dumb 问题
+```
+
+## 维护命令
+
+```bash
+# 一键全装（新机器推荐, 会先确认）
+./install.sh install-all
 
 # 环境检查
-./doctor.sh                        # 检查安装状态
-./doctor.sh --quiet                # 只显示问题
+./install.sh doctor                  # 检查安装状态
+./install.sh doctor --quiet          # 只显示问题
 
 # 更新
-./update-all.sh                    # 更新所有组件
+./install.sh update                  # 更新已安装组件
 
 # 配置同步
-./sync-configs.sh                  # 同步配置文件
+./install.sh config list             # 查看配置映射
+./install.sh config export           # 导出本机配置到仓库
 ```
 
 ## 选项说明
@@ -141,6 +188,11 @@ cd joe
 --grok                 # 只装 Grok Build
 --zed                  # 只装 Zed 编辑器
 --vscode               # 只装 VS Code
+--ghostty              # 只装 Ghostty 终端
+--brave                # 只装 Brave 浏览器
+--mimo                 # 只装 MiMo Code
+--chatgpt              # 只装 ChatGPT Desktop
+--ccswitch             # 只装 CC Switch
 ```
 
 ### MCP 选项
@@ -148,6 +200,7 @@ cd joe
 --tui                  # 强制进入 TUI 选择界面
 --list                 # 列出所有 MCP 服务器
 filesystem git         # 安装指定的 MCP（支持多个）
+list / install / update  # 新版动作写法, 与上面的旧选项等价
 ```
 
 ### Skills 选项
@@ -159,6 +212,7 @@ filesystem git         # 安装指定的 MCP（支持多个）
 | `--categories` | 列出分类及技能数量 |
 | `--category <name>` | 按分类过滤，可重复取并集；支持 `--list`、`--tui`、`--all` 和技能名 |
 | `--all` | 显式安装全部技能；带分类过滤时仅安装所选分类 |
+| `list` / `categories` / `install <技能>` | 新版动作写法，与 `--list` / `--categories` / 位置技能名等价 |
 
 分类与数量由 `skills/categories.tsv` 和技能目录生成；原有及自定义技能归入 `local`。完整清单见 [low-level-dev-skills](skills/low-level-dev-skills.md)。
 
@@ -207,15 +261,18 @@ cp ~/.joe/templates/CLAUDE.md /your/project/
 
 ```
 joe/
-├── install.sh              # 主入口，统一菜单
-├── doctor.sh               # 环境检查
-├── update-all.sh           # 更新工具
-├── sync-configs.sh         # 配置同步
+├── install.sh              # 主入口，命令路由与菜单
 ├── scripts/
+│   ├── commands/           # tools/mcp/skills 动作转换层
+│   ├── lib/                # 发行版 / GitHub / Node / 依赖解析库
+│   ├── ui/                 # TUI 组件
 │   ├── install_shell.sh    # Shell 环境安装
 │   ├── install_devtools.sh # 开发工具安装
 │   ├── install_mcp_servers.sh  # MCP 安装
-│   └── install_skills.sh   # 技能安装
+│   ├── install_skills.sh   # 技能安装
+│   ├── doctor.sh           # 环境检查
+│   ├── update-all.sh       # 更新工具
+│   └── sync-configs.sh     # 配置同步
 ├── skills/                 # 代理技能模板
 ├── templates/              # 项目规则文件模板
 ├── .config/                # 配置文件（Ghostty 等）

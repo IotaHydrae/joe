@@ -69,9 +69,15 @@ Install Model Context Protocol servers for AI coding assistants:
 Installed Gemini CLI, OpenCode, Grok Build, Zed, and VS Code receive the same MCP entries. Copilot CLI uses `copilot mcp add`. `filesystem` requires `FILESYSTEM_DIRS`. Running `./install.sh mcp <id>` again updates an entry when its command changes.
 
 ```bash
+# ===== New syntax (recommended) =====
 ./install.sh mcp                   # TUI interactive selection
-./install.sh mcp --list            # List all MCPs
-./install.sh mcp filesystem git    # Install specified ones
+./install.sh mcp list              # List all MCPs and their status
+./install.sh mcp install memory git  # Install specified servers
+./install.sh mcp update filesystem # Re-run the installer to refresh one entry
+
+# ===== Legacy syntax (still works) =====
+./install.sh mcp --list            # = mcp list
+./install.sh mcp memory git        # still supported
 ```
 
 **Tip**: When first using code intelligence MCPs, tell the AI to "index this project".
@@ -88,7 +94,10 @@ Add professional skill templates for AI assistants:
 
 ```bash
 ./install.sh skills                # Skill group → category → checklist
-./install.sh skills gdb            # Install GDB skill only
+./install.sh skills list           # List skills and installation status
+./install.sh skills categories     # List categories and skill counts
+./install.sh skills install gdb    # Install GDB skill only
+./install.sh skills gdb            # Legacy syntax, same result
 ./install.sh skills --category kernel-dev --tui  # Open the kernel driver category directly
 ```
 
@@ -96,21 +105,22 @@ The skills menu separates existing/local skills (8) from low-level-dev-skills (1
 
 The only real copy lives in `~/.agents/skills`. Claude Code, Codex, Gemini, OpenCode, Grok Build, MiMo, and Copilot skill directories are symlinks to that copy.
 
-## Common Commands
+## Maintenance Commands
 
 ```bash
-# Install everything (recommended for new machines)
-./install.sh shell devtools mcp skills
+# Install everything (recommended for new machines, asks for confirmation)
+./install.sh install-all
 
 # Environment check
-./doctor.sh                        # Check installation status
-./doctor.sh --quiet                # Show problems only
+./install.sh doctor                  # Check installation status
+./install.sh doctor --quiet          # Show problems only
 
 # Update
-./update-all.sh                    # Update all components
+./install.sh update                  # Update installed components
 
 # Config sync
-./sync-configs.sh                  # Sync configuration files
+./install.sh config list             # Show the config mapping
+./install.sh config export           # Export this machine's config
 ```
 
 ## Options
@@ -141,6 +151,11 @@ The only real copy lives in `~/.agents/skills`. Claude Code, Codex, Gemini, Open
 --grok                 # Install Grok Build only
 --zed                  # Install Zed editor only
 --vscode               # Install VS Code only
+--ghostty              # Install Ghostty terminal only
+--brave                # Install Brave browser only
+--mimo                 # Install MiMo Code only
+--chatgpt              # Install ChatGPT Desktop only
+--ccswitch             # Install CC Switch only
 ```
 
 ### MCP Options
@@ -148,6 +163,7 @@ The only real copy lives in `~/.agents/skills`. Claude Code, Codex, Gemini, Open
 --tui                  # Force TUI selection interface
 --list                 # List all MCP servers
 filesystem git         # Install specified MCPs (supports multiple)
+list / install / update  # New action syntax, equivalent to the options above
 ```
 
 ### Skills Options
@@ -159,6 +175,7 @@ filesystem git         # Install specified MCPs (supports multiple)
 | `--categories` | List categories and skill counts |
 | `--category <name>` | Filter by category; repeat to combine categories; supports `--list`, `--tui`, `--all` and skill names |
 | `--all` | Explicitly install all skills, limited to selected categories when filters are supplied |
+| `list` / `categories` / `install <skill>` | New action syntax, equivalent to `--list` / `--categories` / positional skill names |
 
 Categories and counts come from `skills/categories.tsv` and the skill directories. Existing and custom skills belong to `local`. See the [low-level-dev-skills catalog](skills/low-level-dev-skills.md).
 
@@ -207,15 +224,18 @@ See [`skills/code-exploration/SKILL.md`](skills/code-exploration/SKILL.md) for d
 
 ```
 joe/
-├── install.sh              # Main entry, unified menu
-├── doctor.sh               # Environment check
-├── update-all.sh           # Update tools
-├── sync-configs.sh         # Config sync
+├── install.sh              # Main entry, command router and menu
 ├── scripts/
+│   ├── commands/           # tools/mcp/skills action adapters
+│   ├── lib/                # Distro / GitHub / Node / dependency libraries
+│   ├── ui/                 # TUI components
 │   ├── install_shell.sh    # Shell environment installation
 │   ├── install_devtools.sh # Development tools installation
 │   ├── install_mcp_servers.sh  # MCP installation
-│   └── install_skills.sh   # Skills installation
+│   ├── install_skills.sh   # Skills installation
+│   ├── doctor.sh           # Environment check
+│   ├── update-all.sh       # Update tools
+│   └── sync-configs.sh     # Config sync
 ├── skills/                 # Agent skill templates
 ├── templates/              # Project rule file templates
 ├── .config/                # Config files (Ghostty, etc.)

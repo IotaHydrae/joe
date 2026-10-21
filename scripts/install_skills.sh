@@ -15,6 +15,12 @@
 #   ./install.sh skills <name> [...]   # 只装指定技能
 #   ./install.sh skills engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
 #
+# 新语法别名 (由 scripts/commands/skills.sh 转换, 行为与上面的旧写法一致):
+#   ./install.sh skills list                                  # = --list
+#   ./install.sh skills categories                            # = --categories
+#   ./install.sh skills install <name>                        # = <name>
+#   ./install.sh skills install --category kernel-dev --all   # = --category kernel-dev --all
+#
 # TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
 #           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
 #
