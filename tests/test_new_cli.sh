@@ -301,6 +301,76 @@ STUB
     rm -f "$FWD_STUB"
 }
 
+test_tools_update() {
+    test_info "测试 tools update"
+
+    local stub out
+    stub=$(mktemp)
+    cat > "$stub" <<'STUB'
+#!/usr/bin/env bash
+printf 'UPD:'
+for a in "$@"; do printf ' [%s]' "$a"; done
+printf '\n'
+STUB
+    chmod +x "$stub"
+
+    out=$(UPDATE_SCRIPT="$stub" timeout 15 bash install.sh tools update --dry-run 2>&1) || true
+    if [[ $out == *"UPD: [--dry-run]"* ]]; then
+        test_pass "tools update 把选项交给 update-all"
+    else
+        test_fail "tools update 未转发选项: $out"
+    fi
+
+    # 按组件更新不受支持, 应给出替代命令而不是调用更新器
+    out=$(UPDATE_SCRIPT="$stub" timeout 15 bash install.sh tools update node 2>&1) || true
+    if [[ $out == *"tools install node"* && $out != *UPD:* ]]; then
+        test_pass "tools update 拒绝按组件并提示重装"
+    else
+        test_fail "tools update 按组件行为不符: $out"
+    fi
+
+    rm -f "$stub"
+}
+
+test_status_summary() {
+    test_info "测试 status 汇总"
+
+    local tmp mcp skills out
+    tmp=$(mktemp -d)
+    mcp="$tmp/mcp_list.sh"
+    skills="$tmp/skills_list.sh"
+    cat > "$mcp" <<'LIST'
+#!/usr/bin/env bash
+printf '  filesystem  已配置 文件操作\n'
+printf '  git         未配置 Git 操作\n'
+LIST
+    cat > "$skills" <<'LIST'
+#!/usr/bin/env bash
+printf '  gdb         已安装 [debugging] GDB\n'
+printf '  cmake       未安装 [build] CMake\n'
+printf '  ninja       未安装 [build] Ninja\n'
+printf '\n安装位置:\n'
+printf '  /home/example/.agents/skills\n'
+LIST
+    chmod +x "$mcp" "$skills"
+
+    out=$(MCP_SCRIPT="$mcp" SKILLS_SCRIPT="$skills" timeout 60 bash install.sh status --short 2>&1) || true
+    if [[ $out == *"mcp 1/2"* && $out == *"skills 1/3"* ]]; then
+        test_pass "status 只按状态列计数 (忽略安装位置段落)"
+    else
+        test_fail "status 汇总不符: $out"
+    fi
+
+    out=$(MCP_SCRIPT="$mcp" SKILLS_SCRIPT="$skills" timeout 60 bash install.sh status --bogus 2>&1) || true
+    if [[ $out == *"未知选项: --bogus"* ]]; then
+        test_pass "status 拒绝未知选项"
+    else
+        test_fail "status 未拒绝未知选项: $out"
+    fi
+
+    rm -rf "$tmp"
+}
+
 # =============================================================================
 # 运行所有测试
 # =============================================================================
@@ -323,6 +393,8 @@ test_install_plan_uses_deps
 test_tools_list_clean_home
 test_tui_pty
 test_command_adapters
+test_tools_update
+test_status_summary
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
