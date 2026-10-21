@@ -1,6 +1,9 @@
 font-family = Fixedsys Excelsior
 font-size = 14
 
+# 终端类型（必须设置以避免 TERM=dumb 问题）
+term = xterm-256color
+
 # 粘贴和终端程序读取剪贴板时不弹确认框。
 clipboard-paste-protection = false
 clipboard-read = allow
