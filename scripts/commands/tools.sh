@@ -6,7 +6,7 @@
 #   tools                    进入 TUI 选择界面
 #   tools list               列出所有工具及状态
 #   tools install <组件...>  安装指定工具
-#   tools update [组件...]   更新工具
+#   tools update           统一更新所有工具 (--dry-run / --quiet / --system)
 #   tools check              检查系统兼容性
 
 set -euo pipefail
@@ -24,6 +24,8 @@ _ROOT_DIR="$(cd "$_SCRIPT_DIR/../.." && pwd)"
 if [ -z "${DEVTOOLS_SCRIPT:-}" ] && [ -f "$_SCRIPT_DIR/../install_devtools.sh" ]; then
     DEVTOOLS_SCRIPT="$_SCRIPT_DIR/../install_devtools.sh"
 fi
+# UPDATE_SCRIPT 同样可由测试环境覆盖
+UPDATE_SCRIPT="${UPDATE_SCRIPT:-$_SCRIPT_DIR/../update-all.sh}"
 
 usage() {
     cat <<'EOF'
@@ -36,7 +38,10 @@ usage() {
         --with-deps        自动安装依赖
         --ai               快捷安装 Claude + Codex
         --all              安装全部
-    update [组件...]   更新工具（无参数更新全部）
+    update             统一更新所有工具, 走各工具的官方自更新机制
+        --dry-run            只显示将执行什么
+        --quiet              精简输出
+        --system             额外升级系统包
     check              检查系统兼容性
 
 可用组件:
@@ -50,8 +55,9 @@ usage() {
     tools install claude codex     # 装多个
     tools install --ai             # 装 AI 组
     tools install --with-deps claude   # 自动装依赖
-    tools update                   # 更新所有
-    tools update node claude       # 更新指定
+    tools update                   # 统一更新所有工具
+    tools update --dry-run         # 预览将执行的更新
+    tools install node claude      # 重装指定组件
 
 EOF
 }
@@ -274,9 +280,39 @@ cmd_tui() {
 }
 
 cmd_update() {
-    printf "更新功能开发中...\n"
-    # TODO: 实现更新逻辑
-    # 调用 update-all.sh 或实现新逻辑
+    local -a flags=()
+    local -a ids=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run|--quiet|--system) flags+=("$1") ;;
+            -h|--help) usage; return 0 ;;
+            *)
+                if validate_component "$1"; then
+                    ids+=("$1")
+                else
+                    printf "未知组件: %s\n" "$1" >&2
+                    return 1
+                fi
+                ;;
+        esac
+        shift
+    done
+
+    # update-all.sh 靠各工具的官方自更新机制统一升级, 没有按组件选择的能力
+    if [[ ${#ids[@]} -gt 0 ]]; then
+        printf "${COLOR_YELLOW}更新不支持按组件选择, 它统一升级所有工具。${COLOR_RESET}\n" >&2
+        printf "统一更新: tools update [--dry-run]\n" >&2
+        printf "重装单项: tools install %s\n" "${ids[*]}" >&2
+        return 1
+    fi
+
+    if [ ! -f "$UPDATE_SCRIPT" ]; then
+        printf "错误: 找不到更新脚本: %s\n" "$UPDATE_SCRIPT" >&2
+        return 1
+    fi
+
+    bash "$UPDATE_SCRIPT" "${flags[@]}"
 }
 
 cmd_check() {

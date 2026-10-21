@@ -33,14 +33,14 @@ usage() {
       <无参数>           进入 TUI 选择界面
       list               列出所有工具及安装状态
       install <组件...>  安装指定工具
-      update [组件...]   更新工具
+      update             统一更新所有工具 (--dry-run/--quiet/--system)
       check              检查系统兼容性
 
   mcp                MCP 服务器管理
       <无参数>           进入 TUI 选择界面
       list               列出所有服务及状态
       install <服务...>  安装指定服务
-      update [服务...]   更新服务
+      update [服务...]   重跑安装器刷新配置
 
   skills             Claude Skills 管理
       <无参数>           进入技能组选择
@@ -57,8 +57,9 @@ usage() {
       [--json]           JSON 格式输出
 
   status             显示所有组件安装状态
+      [--short]          单行输出 (tools 13/15 | mcp 0/7 | skills 150/150)
 
-  update             更新 joe 本身
+  update             更新工具链、AI CLI 与 joe 仓库
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 快捷命令
@@ -265,9 +266,9 @@ route_command() {
         status)
             # 显示所有组件状态
             if [ -f "$COMMANDS_DIR/status.sh" ]; then
-                bash "$COMMANDS_DIR/status.sh"
+                bash "$COMMANDS_DIR/status.sh" "${COMMAND_ARGS[@]}"
             else
-                info "状态命令正在开发中，请使用以下命令查看："
+                info "未找到 status 实现, 请使用以下命令查看："
                 printf "  ./install.sh tools list\n"
                 printf "  ./install.sh mcp list\n"
                 printf "  ./install.sh doctor\n"
