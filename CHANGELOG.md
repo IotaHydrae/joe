@@ -1,6 +1,6 @@
 # Joe 更新日志
 
-## [2.0.0] - 2025-10-20
+## [2.0.0] - 2026-10-21
 
 ### 🎉 重大重构
 
@@ -14,6 +14,9 @@
 - TUI 通用库：`scripts/ui/tui_common.sh`
 - `mcp` / `skills` 动作语法转换层：`scripts/commands/{mcp,skills}.sh`（`list` / `install` / `update` / `categories`）
 - TUI pty 回归测试：`tests/tui_pty_check.py`，CLI 套件扩充到 33 项并接入 CI
+- `status` 命令：`scripts/commands/status.sh` 一屏汇总工具/MCP/技能安装数，`--short` 输出单行
+- `tools update` 接入 `scripts/update-all.sh`（`--dry-run` / `--quiet` / `--system`）
+- CLI 套件扩充到 37 项
 - 完整文档：迁移指南、技术总结
 
 #### 改进
@@ -50,10 +53,14 @@
 - 修复 Tools TUI: 界面渲染被 `$(...)` 捕获导致屏幕空白, 且转义序列被当成组件参数
 - 修复 TUI 收不到回车: 命令替换会剥掉结尾 LF, 现改用 `dd` 读取并关闭 `icrnl`
 - 修复非交互终端下依赖确认直接中止, 现输出可操作提示
+- 修复 `install.sh status` 丢弃参数导致 `--short` 失效
+- 修复 `status` 统计把安装器 `--list` 结尾的「安装位置」段落计入总数
 
 #### 文档
 - 新增 `docs/MIGRATION.md` - 详细迁移指南
 - 新增 `docs/V2_SUMMARY.md` - 技术总结文档
+- 补齐英文 README 的 `tools` 新语法、`status`、常用命令与故障排除章节
+- 重写 `AGENTS.md` 的结构、测试与 Shell 约定章节（`set -e` 捕获、空数组输出、按键读取）
 - 更新 `README.md` - 新旧命令对照
 - 新增测试套件：`tests/test_new_cli.sh`
 

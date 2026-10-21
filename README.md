@@ -60,6 +60,8 @@ cd joe
 ./install.sh tools install claude      # 装 Claude Code（自动提示依赖）
 ./install.sh tools install --ai        # 装 AI 工具组（Claude + Codex）
 ./install.sh tools install claude codex gemini  # 一次装多个
+./install.sh tools update              # 统一更新（官方自更新机制，不能按组件选）
+./install.sh tools update --dry-run    # 预览将执行的更新
 
 # ===== 旧命令（仍然可用）=====
 ./install.sh devtools                  # = tools
@@ -126,6 +128,8 @@ cd joe
 ./install.sh                   # 主菜单
 ./install.sh tools list        # 列出工具
 ./install.sh mcp list          # 列出 MCP 服务
+./install.sh status            # 一屏汇总 工具/MCP/技能 安装数
+./install.sh status --short    # 单行汇总, 便于脚本使用
 ./install.sh doctor            # 环境检查
 ./install.sh --help            # 帮助信息
 ```

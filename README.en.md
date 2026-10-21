@@ -45,6 +45,17 @@ Cross-distro development tools installation (supports apt/pacman/dnf/zypper):
 - **Others**: MiMo Code, ChatGPT, CC Switch
 
 ```bash
+# ===== New syntax (recommended) =====
+./install.sh tools                     # TUI interactive selection
+./install.sh tools list                # List all components and status
+./install.sh tools install node        # Install Node.js
+./install.sh tools install claude      # Install Claude Code (prompts for deps)
+./install.sh tools install --ai        # Install the AI group (Claude + Codex)
+./install.sh tools install claude codex gemini  # Several at once
+./install.sh tools update              # Update everything (official self-updaters)
+./install.sh tools update --dry-run    # Preview what would run
+
+# ===== Legacy syntax (still works) =====
 ./install.sh devtools              # TUI interactive selection
 ./install.sh devtools --list       # List all components
 ./install.sh devtools --node       # Install Node.js only
@@ -57,6 +68,10 @@ Cross-distro development tools installation (supports apt/pacman/dnf/zypper):
 ./install.sh devtools --copilot    # Install GitHub Copilot CLI only
 ./install.sh devtools --grok       # Install Grok Build only
 ```
+
+`tools update` has no per-component form: `update-all.sh` upgrades everything
+through each tool's official self-update path. To redo one component, reinstall
+it with `tools install <id>`.
 
 ### 3. MCP Servers
 Install Model Context Protocol servers for AI coding assistants:
@@ -104,6 +119,29 @@ Add professional skill templates for AI assistants:
 The skills menu separates existing/local skills (8) from low-level-dev-skills (142 skills in 25 categories). Choose a category, then select individual skills; nothing is preselected. Enter a number to open a submenu; `b`/`q` goes back one level. Installing or leaving a checklist returns to the current menu so you can choose another category. With `--category`, the installer opens a filtered checklist directly and exits afterward. Non-interactive installation requires skill names or an explicit `--all`.
 
 The only real copy lives in `~/.agents/skills`. Claude Code, Codex, Gemini, OpenCode, Grok Build, MiMo, and Copilot skill directories are symlinks to that copy.
+
+## Common Commands
+
+```bash
+./install.sh                   # Main menu
+./install.sh tools list        # List tools and status
+./install.sh mcp list          # List MCP servers
+./install.sh status            # One-screen summary of tools / MCP / skills
+./install.sh status --short    # Single line, for scripts
+./install.sh doctor            # Environment check
+./install.sh --help            # Help
+```
+
+## Troubleshooting
+
+- [Troubleshooting guide](docs/TROUBLESHOOTING.md) - common problems and fixes
+- [Ghostty terminal fix](docs/GHOSTTY_FIX.md) - broken key handling in Ghostty
+- [Migration guide](docs/MIGRATION.md) - 1.x to 2.0
+
+Quick Ghostty fix:
+```bash
+bash scripts/fix_ghostty_term.sh  # Fixes the TERM=dumb problem
+```
 
 ## Maintenance Commands
 
