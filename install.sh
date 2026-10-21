@@ -1,60 +1,162 @@
 #!/usr/bin/env bash
-# joe — 统一菜单入口; 安装器与维护脚本位于 scripts/。
+# =============================================================================
+# joe — 开发环境配置工具
+# =============================================================================
+# 命令路由器: ./install.sh <域> <动作> [选项] [参数...]
+# 无参数或 --tui 进入主菜单
 
 set -euo pipefail
 
+VERSION="2.0.0"
+
 usage() {
     cat <<'EOF'
-用法: ./install.sh [命令] [参数...]
+用法: ./install.sh [全局选项] [<域> <动作> [选项] [参数...]]
 
-无参数进入主菜单, 输入编号选择操作; 回车不执行操作, q 退出。
-开发工具、MCP 和 skills 的安装菜单默认不勾选任何项目。
-skills 先选择技能组; low-level-dev-skills 再按分类进入勾选列表。
-非交互调用须显式指定命令, 安装项须按需指定或明确使用 --all。
+无参数进入主菜单。
 
-命令:
-    shell           zsh / Oh My Zsh / Powerlevel10k 环境
-    devtools        开发工具安装器 (支持 --tui / --list / --all)
-    mcp             MCP 安装器 (支持 --tui / --list / --all)
-    skills          skills 安装器 (支持 --category / --categories)
-    doctor          环境体检
-    update          更新已安装的工具
-    repair-ghostty  修复 Ghostty terminfo 与桌面入口
-    configs         配置备份/恢复 (list / export / import / diff)
-    bootstrap       串行运行开发工具、MCP、skills 和体检
-    menu, --tui     打开主菜单
-    -h, --help      显示帮助
+全局选项:
+    -h, --help      显示此帮助
+    --version       显示版本信息
+    --dry-run       预览操作但不执行
 
-示例:
-    ./install.sh shell --dry-run
-    ./install.sh devtools --node
-    ./install.sh devtools --claude
-    ./install.sh mcp memory git
-    ./install.sh skills --category kernel-dev --tui
-    ./install.sh doctor --json
-    ./install.sh update --dry-run
-    ./install.sh configs export --check
-    ./install.sh bootstrap --only mcp,skills
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+主命令
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-子命令帮助: ./install.sh <命令> --help
-兼容原 Shell 参数: --dry-run/-n, --no-fonts, --no-config, --no-p10k,
---no-fastfetch, --no-default-plugins, --no-ghostty-ime, --clean-backups, --update/-u。
-一行安装仍克隆到 ~/.joe (可设置 JOE_INSTALL_DIR), 随后进入菜单。
+  shell              安装 zsh + Oh My Zsh + Powerlevel10k
+      --dry-run          预览操作
+      --no-fonts         跳过字体安装
+      --minimal          最小安装（无插件）
+
+  tools              开发工具管理
+      <无参数>           进入 TUI 选择界面
+      list               列出所有工具及安装状态
+      install <组件...>  安装指定工具
+      update [组件...]   更新工具
+      check              检查系统兼容性
+
+  mcp                MCP 服务器管理
+      <无参数>           进入 TUI 选择界面
+      list               列出所有服务及状态
+      install <服务...>  安装指定服务
+      update [服务...]   更新服务
+
+  skills             Claude Skills 管理
+      <无参数>           进入技能组选择
+      list               列出所有技能组
+      install <组>       安装技能组
+
+  config             配置文件管理
+      list               查看配置映射
+      export             导出配置到仓库
+      import             从仓库恢复配置
+      diff               对比配置差异
+
+  doctor             环境检查
+      [--json]           JSON 格式输出
+
+  status             显示所有组件安装状态
+
+  update             更新 joe 本身
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+快捷命令
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  quick-start        新手引导式安装
+  install-all        安装所有组件（需确认）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+示例
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ./install.sh                          # 主菜单
+  ./install.sh shell                    # 安装 shell 环境
+  ./install.sh tools                    # 进入工具选择 TUI
+  ./install.sh tools list               # 列出所有工具
+  ./install.sh tools install node       # 安装 Node.js
+  ./install.sh tools install claude codex   # 安装多个工具
+  ./install.sh tools install --ai       # 安装 AI 工具组
+  ./install.sh mcp install memory git   # 安装 MCP 服务
+  ./install.sh doctor                   # 环境检查
+  ./install.sh status                   # 查看状态
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+向后兼容 (旧命令)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  devtools [选项]    = tools [选项]
+  mcp [旧参数]       兼容旧格式
+  configs <动作>     = config <动作>
+  repair-ghostty     = tools install ghostty --repair
+  bootstrap          = quick-start
+
 EOF
 }
 
+
 die() {
-    printf '[ERROR] %s\n' "$*" >&2
+    printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2
     exit 1
 }
 
-# 在准备仓库前检查命令, --help 与无效参数均不触发克隆。
-case "${1:-menu}" in
-    -h|--help) usage; exit 0 ;;
-    shell|devtools|mcp|skills|doctor|update|repair-ghostty|configs|bootstrap|menu|--tui) ;;
-    -n|--dry-run|--no-fonts|--no-config|--no-p10k|--no-fastfetch|--no-default-plugins|--no-ghostty-ime|--clean-backups|-u|--update) ;;
-    *) die "未知命令: $1 (查看 --help)" ;;
-esac
+info() {
+    printf '\033[0;34m[INFO]\033[0m %s\n' "$*"
+}
+
+# 检测命令类型和参数
+detect_command() {
+    case "${1:-}" in
+        -h|--help) usage; exit 0 ;;
+        --version) printf "joe v%s\n" "$VERSION"; exit 0 ;;
+        '') COMMAND="menu" ;;
+        shell|tools|mcp|skills|config|doctor|status|update) COMMAND="$1" ;;
+
+        # 快捷命令
+        quick-start|install-all) COMMAND="$1" ;;
+
+        # 向后兼容
+        devtools) COMMAND="tools"; LEGACY_DEVTOOLS=true ;;
+        configs) COMMAND="config" ;;
+        menu|--tui) COMMAND="menu" ;;
+        repair-ghostty) COMMAND="repair"; REPAIR_TARGET="ghostty" ;;
+        bootstrap) COMMAND="quick-start" ;;  # 映射到新命令
+
+        # 旧 Shell 参数（向后兼容）: 参数本身就是选项, 不能 shift 掉
+        -n|--dry-run|--no-fonts|--no-config|--no-p10k|--no-fastfetch|--no-default-plugins|--no-ghostty-ime|--clean-backups|-u)
+            COMMAND="shell"
+            COMMAND_ARGS=("$@")
+            return 0
+            ;;
+
+        *) die "未知命令: $1 (查看 --help)" ;;
+    esac
+
+    shift 2>/dev/null || true
+    COMMAND_ARGS=("$@")
+
+    # 旧 devtools 参数: --list 映射为 list 动作, 其余选项映射为 install 动作
+    if [ "$LEGACY_DEVTOOLS" = true ] && [ $# -gt 0 ]; then
+        case "$1" in
+            --list) COMMAND_ARGS=(list) ;;
+            -h|--help)
+                # 帮助由旧脚本从文件头注释渲染 (含「依赖」「说明」两节)
+                exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/install_devtools.sh" --help
+                ;;
+            --tui) ;;
+            *) COMMAND_ARGS=(install "$@") ;;
+        esac
+    fi
+}
+
+# 在准备仓库前检查命令
+COMMAND=""
+COMMAND_ARGS=()
+REPAIR_TARGET=""
+LEGACY_DEVTOOLS=false
+
+detect_command "$@"
 
 ROOT_DIR=""
 if [ -f "${BASH_SOURCE[0]:-}" ]; then
@@ -84,40 +186,209 @@ else
     exec bash "$JOE_INSTALL_DIR/install.sh" "$@"
 fi
 
-SCRIPTS_DIR="$ROOT_DIR/scripts"
 
-script_for() {
-    case "$1" in
-        shell) printf '%s/install_shell.sh\n' "$SCRIPTS_DIR" ;;
-        devtools) printf '%s/install_devtools.sh\n' "$SCRIPTS_DIR" ;;
-        mcp) printf '%s/install_mcp_servers.sh\n' "$SCRIPTS_DIR" ;;
-        skills) printf '%s/install_skills.sh\n' "$SCRIPTS_DIR" ;;
-        doctor) printf '%s/doctor.sh\n' "$SCRIPTS_DIR" ;;
-        update) printf '%s/update-all.sh\n' "$SCRIPTS_DIR" ;;
-        repair-ghostty) printf '%s/repair_ghostty.sh\n' "$SCRIPTS_DIR" ;;
-        configs) printf '%s/sync-configs.sh\n' "$SCRIPTS_DIR" ;;
-        bootstrap) printf '%s/bootstrap.sh\n' "$SCRIPTS_DIR" ;;
-        *) return 1 ;;
+SCRIPTS_DIR="$ROOT_DIR/scripts"
+COMMANDS_DIR="$SCRIPTS_DIR/commands"
+UI_DIR="$SCRIPTS_DIR/ui"
+
+# 加载库函数
+load_libs() {
+    local lib_dir="$SCRIPTS_DIR/lib"
+    for lib in distro.sh github.sh ghostty.sh node.sh deps.sh; do
+        if [ -f "$lib_dir/$lib" ]; then
+            # shellcheck disable=SC1090
+            . "$lib_dir/$lib"
+        fi
+    done
+}
+
+# 命令路由
+route_command() {
+    case "$COMMAND" in
+        menu)
+            # 主菜单
+            [ -t 0 ] && [ -t 1 ] || die "菜单需要交互式终端; 请指定命令 (查看 --help)"
+            if [ -f "$UI_DIR/menu_main.sh" ]; then
+                bash "$UI_DIR/menu_main.sh"
+            else
+                # 回退到旧菜单
+                main_menu_legacy
+            fi
+            exit 0
+            ;;
+
+        shell)
+            # Shell 环境安装
+            local script="$SCRIPTS_DIR/install_shell.sh"
+            [ -f "$script" ] || die "脚本不存在: $script"
+            exec bash "$script" "${COMMAND_ARGS[@]}"
+            ;;
+
+        tools)
+            # 开发工具管理
+            if [ -f "$COMMANDS_DIR/tools.sh" ]; then
+                bash "$COMMANDS_DIR/tools.sh" "${COMMAND_ARGS[@]}"
+            else
+                # 回退到旧脚本
+                exec bash "$SCRIPTS_DIR/install_devtools.sh" "${COMMAND_ARGS[@]}"
+            fi
+            ;;
+
+        mcp)
+            # MCP 服务器管理
+            if [ -f "$COMMANDS_DIR/mcp.sh" ]; then
+                bash "$COMMANDS_DIR/mcp.sh" "${COMMAND_ARGS[@]}"
+            else
+                exec bash "$SCRIPTS_DIR/install_mcp_servers.sh" "${COMMAND_ARGS[@]}"
+            fi
+            ;;
+
+        skills)
+            # Skills 管理
+            if [ -f "$COMMANDS_DIR/skills.sh" ]; then
+                bash "$COMMANDS_DIR/skills.sh" "${COMMAND_ARGS[@]}"
+            else
+                exec bash "$SCRIPTS_DIR/install_skills.sh" "${COMMAND_ARGS[@]}"
+            fi
+            ;;
+
+        config)
+            # 配置管理
+            exec bash "$SCRIPTS_DIR/sync-configs.sh" "${COMMAND_ARGS[@]}"
+            ;;
+
+        doctor)
+            # 环境检查
+            exec bash "$SCRIPTS_DIR/doctor.sh" "${COMMAND_ARGS[@]}"
+            ;;
+
+        status)
+            # 显示所有组件状态
+            if [ -f "$COMMANDS_DIR/status.sh" ]; then
+                bash "$COMMANDS_DIR/status.sh"
+            else
+                info "状态命令正在开发中，请使用以下命令查看："
+                printf "  ./install.sh tools list\n"
+                printf "  ./install.sh mcp list\n"
+                printf "  ./install.sh doctor\n"
+            fi
+            ;;
+
+        update)
+            # 更新工具
+            exec bash "$SCRIPTS_DIR/update-all.sh" "${COMMAND_ARGS[@]}"
+            ;;
+
+        repair)
+            # 修复特定组件
+            case "$REPAIR_TARGET" in
+                ghostty)
+                    exec bash "$SCRIPTS_DIR/repair_ghostty.sh"
+                    ;;
+                *)
+                    die "未知的修复目标: $REPAIR_TARGET"
+                    ;;
+            esac
+            ;;
+
+        quick-start)
+            # 新手引导/一键安装
+            if [ -f "$COMMANDS_DIR/quickstart.sh" ]; then
+                bash "$COMMANDS_DIR/quickstart.sh"
+            else
+                # 回退到 bootstrap
+                exec bash "$SCRIPTS_DIR/bootstrap.sh" "${COMMAND_ARGS[@]}"
+            fi
+            ;;
+
+        install-all)
+            # 全部安装（带确认）
+            printf '\033[1;33m警告:\033[0m 将安装所有组件，这可能需要较长时间。\n'
+            read -p "确认继续？[y/N] " -r confirm
+            if [[ $confirm =~ ^[Yy]$ ]]; then
+                bash "$SCRIPTS_DIR/bootstrap.sh" --all
+            else
+                info "已取消"
+            fi
+            ;;
+
+        *)
+            die "未实现的命令: $COMMAND"
+            ;;
     esac
 }
 
-run_action() {
-    local command="$1" script status
-    shift
-    script="$(script_for "$command")"
-    if [ ! -f "$script" ]; then
-        printf '[ERROR] 脚本不存在: %s\n' "$script" >&2
-        return 1
-    fi
-    if bash "$script" "$@"; then
-        printf '\n操作完成, 返回菜单。\n'
-    else
-        status=$?
-        printf '\n[ERROR] 操作失败 (退出码 %d), 可重新选择操作。\n' "$status" >&2
-    fi
+
+# 旧版主菜单（向后兼容，新版在 ui/menu_main.sh）
+main_menu_legacy() {
+    [ -t 0 ] && [ -t 1 ] || die "菜单需要交互式终端; 请指定命令 (查看 --help)"
+    local choice
+
+    run_action_legacy() {
+        local command="$1" script status
+        shift
+        case "$command" in
+            shell) script="$SCRIPTS_DIR/install_shell.sh" ;;
+            devtools) script="$SCRIPTS_DIR/install_devtools.sh" ;;
+            mcp) script="$SCRIPTS_DIR/install_mcp_servers.sh" ;;
+            skills) script="$SCRIPTS_DIR/install_skills.sh" ;;
+            doctor) script="$SCRIPTS_DIR/doctor.sh" ;;
+            update) script="$SCRIPTS_DIR/update-all.sh" ;;
+            repair-ghostty) script="$SCRIPTS_DIR/repair_ghostty.sh" ;;
+            configs) configs_menu_legacy; return ;;
+            bootstrap) script="$SCRIPTS_DIR/bootstrap.sh" ;;
+            *) printf '[ERROR] 未知命令: %s\n' "$command" >&2; return 1 ;;
+        esac
+
+        if [ ! -f "$script" ]; then
+            printf '[ERROR] 脚本不存在: %s\n' "$script" >&2
+            return 1
+        fi
+        if bash "$script" "$@"; then
+            printf '\n操作完成, 返回菜单。\n'
+        else
+            status=$?
+            printf '\n[ERROR] 操作失败 (退出码 %d), 可重新选择操作。\n' "$status" >&2
+        fi
+    }
+
+    while true; do
+        printf '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+        printf '        Joe 开发环境配置\n'
+        printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
+        printf '  1) 终端美化      zsh + Oh My Zsh\n'
+        printf '  2) 开发工具      Node/Python/AI CLI/编辑器\n'
+        printf '  3) MCP 服务器    代码智能/文件系统/浏览器\n'
+        printf '  4) Claude Skills 技能包管理\n'
+        printf '\n'
+        printf '  5) 环境检查      系统兼容性诊断\n'
+        printf '  6) 配置管理      备份/恢复/同步\n'
+        printf '  7) 更新工具      检查并更新已安装组件\n'
+        printf '\n'
+        printf '  8) 新手引导      推荐配置快速安装\n'
+        printf '\n'
+        printf '  q) 退出\n\n'
+        printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
+        printf '选择 [1-8/q]: '
+
+        IFS= read -r choice || return 0
+        case "$choice" in
+            1) run_action_legacy shell ;;
+            2) run_action_legacy devtools --tui ;;
+            3) run_action_legacy mcp --tui ;;
+            4) run_action_legacy skills --tui ;;
+            5) run_action_legacy doctor ;;
+            6) configs_menu_legacy ;;
+            7) run_action_legacy update ;;
+            8) run_action_legacy bootstrap ;;
+            q|Q|0) return 0 ;;
+            '') continue ;;
+            *) printf '请输入有效编号或 q。\n' ;;
+        esac
+    done
 }
 
-configs_menu() {
+configs_menu_legacy() {
     local choice
     while true; do
         printf '\n── 配置备份与恢复 ──\n'
@@ -126,11 +397,11 @@ configs_menu() {
         printf '选择操作 [1-5/b]: '
         IFS= read -r choice || return 0
         case "$choice" in
-            1) run_action configs list ;;
-            2) run_action configs export --check ;;
-            3) run_action configs export ;;
-            4) run_action configs import ;;
-            5) run_action configs diff ;;
+            1) bash "$SCRIPTS_DIR/sync-configs.sh" list ;;
+            2) bash "$SCRIPTS_DIR/sync-configs.sh" export --check ;;
+            3) bash "$SCRIPTS_DIR/sync-configs.sh" export ;;
+            4) bash "$SCRIPTS_DIR/sync-configs.sh" import ;;
+            5) bash "$SCRIPTS_DIR/sync-configs.sh" diff ;;
             b|B|q|Q) return 0 ;;
             '') continue ;;
             *) printf '请输入有效编号或 b。\n' ;;
@@ -138,44 +409,6 @@ configs_menu() {
     done
 }
 
-main_menu() {
-    [ -t 0 ] && [ -t 1 ] || die "菜单需要交互式终端; 请指定命令 (查看 --help)"
-    local choice
-    while true; do
-        printf '\n── joe 开发环境 ──\n'
-        printf '  1) Shell 环境 (zsh / Oh My Zsh / Powerlevel10k)\n'
-        printf '  2) 开发工具 (按需勾选)\n  3) MCP 服务器 (按需勾选)\n'
-        printf '  4) skills (技能组 / 分类子菜单)\n  5) 环境体检\n'
-        printf '  6) 更新已安装工具\n  7) Ghostty 兼容修复\n'
-        printf '  8) 配置备份与恢复\n  9) 全流程部署 (各阶段按需勾选)\n'
-        printf '  q) 退出\n选择操作 [1-9/q]: '
-        IFS= read -r choice || return 0
-        case "$choice" in
-            1) run_action shell ;;
-            2) run_action devtools --tui ;;
-            3) run_action mcp --tui ;;
-            4) run_action skills --tui ;;
-            5) run_action doctor ;;
-            6) run_action update ;;
-            7) run_action repair-ghostty ;;
-            8) configs_menu ;;
-            9) run_action bootstrap ;;
-            q|Q|0) return 0 ;;
-            '') continue ;;
-            *) printf '请输入有效编号或 q。\n' ;;
-        esac
-    done
-}
-
-case "${1:-menu}" in
-    menu|--tui)
-        [ "$#" -le 1 ] || die "主菜单不接受额外参数"
-        main_menu ;;
-    -n|--dry-run|--no-fonts|--no-config|--no-p10k|--no-fastfetch|--no-default-plugins|--no-ghostty-ime|--clean-backups|-u|--update)
-        exec bash "$SCRIPTS_DIR/install_shell.sh" "$@" ;;
-    *)
-        script="$(script_for "$1")"
-        shift
-        [ -f "$script" ] || die "脚本不存在: $script"
-        exec bash "$script" "$@" ;;
-esac
+# 主入口
+load_libs
+route_command
