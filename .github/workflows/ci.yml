@@ -17,7 +17,7 @@ jobs:
         run: |
           set -e
           fail=0
-          for f in install.sh scripts/*.sh .github/**/*.sh; do
+          for f in install.sh scripts/*.sh scripts/*/*.sh tests/*.sh .github/**/*.sh; do
             [ -f "$f" ] || continue
             echo "::group::bash -n $f"
             if bash -n "$f"; then
@@ -41,7 +41,7 @@ jobs:
         run: |
           set -e
           fail=0
-          for f in install.sh scripts/install_shell.sh scripts/install_devtools.sh scripts/install_mcp_servers.sh scripts/install_skills.sh scripts/repair_ghostty.sh scripts/doctor.sh scripts/bootstrap.sh scripts/update-all.sh scripts/sync-configs.sh; do
+          for f in install.sh scripts/install_shell.sh scripts/install_devtools.sh scripts/install_mcp_servers.sh scripts/install_skills.sh scripts/repair_ghostty.sh scripts/doctor.sh scripts/bootstrap.sh scripts/update-all.sh scripts/sync-configs.sh scripts/commands/tools.sh scripts/ui/tui_tools.sh tests/test_new_cli.sh; do
             [ -f "$f" ] || { echo "::error file=$f::缺少必需脚本"; fail=1; continue; }
             if [ ! -x "$f" ]; then
               echo "::error file=$f::$f 缺少可执行权限 (chmod +x)"
@@ -49,6 +49,9 @@ jobs:
             fi
           done
           exit $fail
+
+      - name: CLI 测试套件 (含 TUI pty 回归)
+        run: bash tests/test_new_cli.sh
 
   skills:
     name: 技能定义校验
