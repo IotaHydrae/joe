@@ -27,7 +27,11 @@ usage() {
   shell              安装 zsh + Oh My Zsh + Powerlevel10k
       --dry-run          预览操作
       --no-fonts         跳过字体安装
-      --minimal          最小安装（无插件）
+      --no-config        跳过 .config 复制
+      --no-p10k          跳过 powerlevel10k
+      --no-fastfetch     跳过 fastfetch
+      --no-default-plugins  不启用默认 OMZ 插件
+      --clean-backups    清理旧备份 (保留最近 5 个)
 
   tools              开发工具管理
       <无参数>           进入 TUI 选择界面
@@ -42,10 +46,11 @@ usage() {
       install <服务...>  安装指定服务
       update [服务...]   重跑安装器刷新配置
 
-  skills             Claude Skills 管理
-      <无参数>           进入技能组选择
-      list               列出所有技能组
-      install <组>       安装技能组
+  skills             代理技能管理
+      <无参数>           进入技能组 / 分类选择
+      list               列出技能及安装状态
+      categories         列出分类及技能数量
+      install <技能...>  安装指定技能 (可配 --category / --all)
 
   config             配置文件管理
       list               查看配置映射

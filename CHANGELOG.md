@@ -17,6 +17,8 @@
 - `status` 命令：`scripts/commands/status.sh` 一屏汇总工具/MCP/技能安装数，`--short` 输出单行
 - `tools update` 接入 `scripts/update-all.sh`（`--dry-run` / `--quiet` / `--system`）
 - CLI 套件扩充到 37 项
+- 主菜单实现在 `scripts/ui/menu_main.sh`：菜单项回调 `install.sh` 路由，删除了 `install.sh` 里的两份旧菜单实现
+- 主菜单 pty 回归：`tests/menu_pty_check.py`，套件扩充到 38 项
 - 完整文档：迁移指南、技术总结
 
 #### 改进
@@ -55,6 +57,7 @@
 - 修复非交互终端下依赖确认直接中止, 现输出可操作提示
 - 修复 `install.sh status` 丢弃参数导致 `--short` 失效
 - 修复 `status` 统计把安装器 `--list` 结尾的「安装位置」段落计入总数
+- 修复 `--help` 列出不存在的 `shell --minimal` 选项, 并改正 `skills list/install` 的措辞（列的是技能而非技能组）
 
 #### 文档
 - 新增 `docs/MIGRATION.md` - 详细迁移指南
