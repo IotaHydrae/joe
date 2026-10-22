@@ -30,6 +30,19 @@ test_info() {
     printf "${YELLOW}ℹ${RESET} %s\n" "$1"
 }
 
+# 失败/崩溃退出时也要清理测试创建的临时目录与文件
+TEST_TMPS=()
+cleanup_test_tmps() {
+    [ ${#TEST_TMPS[@]} -gt 0 ] && rm -rf "${TEST_TMPS[@]}"
+}
+trap cleanup_test_tmps EXIT
+# 结果写入 TMP_PATH: 在 $(...) 里调用时数组注册会丢在子 shell 中
+TMP_PATH=""
+make_tmp() {
+    TMP_PATH=$(mktemp "$@")
+    TEST_TMPS+=("$TMP_PATH")
+}
+
 # 断言转换层把参数原样交给底层安装器 (FWD_STUB 打印 "FWD|<args>")
 assert_forward() {
     local label="$1" expected="$2"
@@ -216,8 +229,8 @@ test_install_plan_uses_deps() {
     test_info "测试安装计划自动补依赖 (stub 安装器)"
 
     local tmp_home stub out
-    tmp_home=$(mktemp -d)
-    stub=$(mktemp)
+    make_tmp -d; tmp_home=$TMP_PATH
+    make_tmp; stub=$TMP_PATH
     printf '#!/usr/bin/env bash\nprintf "STUB_ARGS %%s\\n" "$*"\n' > "$stub"
     chmod +x "$stub"
 
@@ -244,7 +257,7 @@ test_tools_list_clean_home() {
     test_info "测试全新环境的 tools list"
 
     local tmp_home out rows
-    tmp_home=$(mktemp -d)
+    make_tmp -d; tmp_home=$TMP_PATH
     out=$(HOME="$tmp_home" timeout 15 bash install.sh tools list 2>&1)
     rows=$(grep -cE '^  [a-z]+ ' <<<"$out")
     rm -rf "$tmp_home"
@@ -283,7 +296,7 @@ test_tui_pty() {
 test_command_adapters() {
     test_info "测试 mcp/skills 语法转换层"
 
-    FWD_STUB=$(mktemp)
+    make_tmp; FWD_STUB=$TMP_PATH
     cat > "$FWD_STUB" <<'STUB'
 #!/usr/bin/env bash
 printf 'FWD|%s\n' "$*"
@@ -314,7 +327,7 @@ test_tools_update() {
     test_info "测试 tools update"
 
     local stub out
-    stub=$(mktemp)
+    make_tmp; stub=$TMP_PATH
     cat > "$stub" <<'STUB'
 #!/usr/bin/env bash
 printf 'UPD:'
@@ -345,7 +358,7 @@ test_status_summary() {
     test_info "测试 status 汇总"
 
     local tmp mcp skills out
-    tmp=$(mktemp -d)
+    make_tmp -d; tmp=$TMP_PATH
     mcp="$tmp/mcp_list.sh"
     skills="$tmp/skills_list.sh"
     cat > "$mcp" <<'LIST'
@@ -437,7 +450,7 @@ test_quickstart_stages() {
     test_info "测试 quick-start 阶段编排"
 
     local box s out
-    box=$(mktemp -d)
+    make_tmp -d; box=$TMP_PATH
     mkdir -p "$box/home"
     if ! cp -a "$ROOT_DIR/." "$box/"; then
         test_fail "无法复制仓库到沙箱"
@@ -502,7 +515,7 @@ test_tools_list_version_failure() {
     test_info "测试版本探测失败时的 tools list"
 
     local tmp_home out rows
-    tmp_home=$(mktemp -d)
+    make_tmp -d; tmp_home=$TMP_PATH
     mkdir -p "$tmp_home/.local/bin"
     touch "$tmp_home/.local/bin/zed"   # 判定为已装, 但 PATH 里没有 zed
 
@@ -521,7 +534,7 @@ test_repair_forwards_args() {
     test_info "测试 repair-ghostty 参数转发"
 
     local box out
-    box=$(mktemp -d)
+    make_tmp -d; box=$TMP_PATH
     if ! cp -a "$ROOT_DIR/." "$box/"; then
         test_fail "无法复制仓库到沙箱"
         rm -rf "$box"
@@ -547,7 +560,7 @@ test_ghostty_backup_convention() {
     test_info "测试 Ghostty 修复脚本的备份约定"
 
     local tmp_home backups
-    tmp_home=$(mktemp -d)
+    make_tmp -d; tmp_home=$TMP_PATH
     mkdir -p "$tmp_home/.config/ghostty"
     printf 'term=xterm-256color\n' > "$tmp_home/.config/ghostty/config"
 

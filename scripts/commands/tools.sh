@@ -262,6 +262,8 @@ cmd_tui() {
     # 命令替换会把整屏 ANSI 输出一起捕获, 再喂给 cmd_install 就是垃圾参数。
     local result_file
     result_file=$(mktemp)
+    # TUI 被信号打断时也要删除临时文件
+    trap 'rm -f "$result_file"' EXIT
     TUI_RESULT_FILE="$result_file" bash "$tui_script" || true
 
     local -a selected=()
@@ -270,6 +272,7 @@ cmd_tui() {
         [[ -n $line ]] && selected+=("$line")
     done < "$result_file"
     rm -f "$result_file"
+    trap - EXIT
 
     if [[ ${#selected[@]} -eq 0 ]]; then
         printf "\n未选择任何组件\n"
