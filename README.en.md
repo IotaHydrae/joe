@@ -148,6 +148,9 @@ bash scripts/fix_ghostty_term.sh  # Fixes the TERM=dumb problem
 ```bash
 # Install everything (recommended for new machines, asks for confirmation)
 ./install.sh install-all
+./install.sh quick-start            # Guided deploy: shell/tools/MCP/skills/doctor
+./install.sh quick-start --yes      # Non-interactive, install everything
+./install.sh quick-start --skip shell   # Drop one stage
 
 # Environment check
 ./install.sh doctor                  # Check installation status

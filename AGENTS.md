@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 
 - `install.sh` — the only top-level shell script; routes `./install.sh <domain> <action> [options] [args...]` and provides the curl bootstrap. The interactive menu lives in `scripts/ui/menu_main.sh` and calls back into this router, so there is a single command surface.
-- `scripts/commands/` — the 2.0 action layer. `tools.sh` owns the tools domain; `mcp.sh`, `skills.sh` and `status.sh` stay thin: they translate action words into the legacy installer flags and forward everything else verbatim. Never duplicate an id or skill list here.
+- `scripts/commands/` — the 2.0 action layer. `tools.sh` owns the tools domain; `mcp.sh`, `skills.sh` and `status.sh` stay thin: they translate action words into the legacy installer flags and forward everything else verbatim. Never duplicate an id or skill list here. `quickstart.sh` is the guided pipeline (moved from `scripts/bootstrap.sh`) and must locate the repo root by walking up for `install.sh`, because a hard-coded depth silently falls back to cloning.
 - `scripts/lib/` — shared libraries. `deps.sh` holds `COMPONENT_GROUPS`, `COMPONENT_NAMES` and `COMPONENT_DEPS` for the tools domain; `distro.sh`, `ghostty.sh`, `github.sh`, `node.sh` are symlinks to the `lib_*.sh` files at `scripts/`.
 - `scripts/ui/` — `tui_common.sh` (colors, cursor, key reading), `tui_tools.sh` (the grouped tools TUI) and `menu_main.sh` (the main menu).
 - `scripts/install_shell.sh` — zsh + Oh My Zsh installer, invoked by `./install.sh shell`.

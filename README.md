@@ -151,6 +151,9 @@ bash scripts/fix_ghostty_term.sh  # 修复 TERM=dumb 问题
 ```bash
 # 一键全装（新机器推荐, 会先确认）
 ./install.sh install-all
+./install.sh quick-start            # 引导式部署 shell/工具/MCP/技能/体检
+./install.sh quick-start --yes      # 非交互全部安装 (脚本/CI)
+./install.sh quick-start --skip shell   # 跳过某个阶段
 
 # 环境检查
 ./install.sh doctor                  # 检查安装状态

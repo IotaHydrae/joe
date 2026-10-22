@@ -19,6 +19,11 @@
 - CLI 套件扩充到 37 项
 - 主菜单实现在 `scripts/ui/menu_main.sh`：菜单项回调 `install.sh` 路由，删除了 `install.sh` 里的两份旧菜单实现
 - 主菜单 pty 回归：`tests/menu_pty_check.py`，套件扩充到 38 项
+- `quick-start` 成为唯一实现：`scripts/commands/quickstart.sh`（由 `scripts/bootstrap.sh` 移入，旧名 `bootstrap` 仍映射）
+- quick-start 补上 `shell` 阶段——此前的"一键全装"根本不含 zsh/OMZ 环境
+- 修正 `install-all` 传引擎不接受的 `--all`（此前必然失败）；非交互读不到确认时按取消处理
+- 修正仓库根推导少一层导致改为从 GitHub 克隆的问题（`--only/--skip` 支持 `shell`，doctor 纳入 `[n/5]` 编号）
+- quick-start 沙箱回归：断言复用当前仓库不重克隆、shell 阶段不加 `--all`、`--only` 阶段裁剪，套件扩充到 44 项
 - 完整文档：迁移指南、技术总结
 
 #### 改进
@@ -105,11 +110,13 @@ scripts/
 无
 
 ### 未来计划
-- [ ] MCP 命令重构
-- [ ] Skills 命令重构
-- [ ] 新主菜单实现
-- [ ] Quick-start 引导流程
-- [ ] 完整测试套件
+- [x] MCP / Skills 命令接口（2026-10-21：转换层，只做语法映射）
+- [x] 新主菜单实现（2026-10-21：`scripts/ui/menu_main.sh`）
+- [x] Quick-start 引导流程（2026-10-21：`scripts/commands/quickstart.sh`）
+- [x] CLI 测试套件 + CI（44 项，含两个 pty 回归）
+- [ ] MCP 侧：TUI 改进与"某些 MCP 需要 Node"的依赖管理
+- [ ] 组件安装逻辑模块化（每个组件独立模块，取代 `install_devtools.sh` 单体）
+- [ ] 按组件的选择性更新（需要 `update-all.sh` 先支持）
 
 ---
 
