@@ -42,7 +42,7 @@ ACTION="${1:-}"
 case "$ACTION" in
     '')          forward ;;
     -h|--help)   usage; forward --help ;;
-    list|status) forward --list ;;
+    list|status) shift; forward --list "$@" ;;
     tui)         forward --tui ;;
     install|update)
         shift

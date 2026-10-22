@@ -43,8 +43,8 @@ ACTION="${1:-}"
 case "$ACTION" in
     '')          forward ;;
     -h|--help)   usage; forward --help ;;
-    list|status) forward --list ;;
-    categories)  forward --categories ;;
+    list|status) shift; forward --list "$@" ;;
+    categories)  shift; forward --categories "$@" ;;
     tui)         forward --tui ;;
     install|update)
         shift
