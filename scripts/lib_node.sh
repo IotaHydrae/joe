@@ -11,6 +11,18 @@ load_node() {
     fi
 }
 
+# 命令探测: 优先 PATH, 其次 nvm 的 current 与各版本目录。
+# 非交互 shell 的 PATH 往往不含 nvm, 只用 command -v 会误判为"未安装"。
+node_has_bin() {
+    local name="$1" nvm_dir="${NVM_DIR:-$HOME/.nvm}" f
+    command -v "$name" >/dev/null 2>&1 && return 0
+    [ -x "$nvm_dir/current/bin/$name" ] && return 0
+    for f in "$nvm_dir"/versions/node/*/bin/"$name"; do
+        [ -x "$f" ] && return 0
+    done
+    return 1
+}
+
 # 把旧的 nvm 自动加载片段迁移成 PATH, 保留其余配置及符号链接。
 configure_node_shell() (
     set -euo pipefail

@@ -798,16 +798,9 @@ install_serena_mcp() {
 }
 
 # ---------------------------------------------------------------------------
-# TUI 相关 (复用 tui_module.sh 通用库)
+# TUI 相关: 交互选择由 scripts/ui/tui_mcp.sh 提供, 本文件只负责安装
 # ---------------------------------------------------------------------------
-load_tui_module() {
-    local module="$SCRIPT_DIR/tui_module.sh"
-    [ -f "$module" ] || return 1
-    # shellcheck disable=SC1091
-    . "$module"
-}
-
-# MCP 组件定义 (覆盖 tui_module.sh 默认)
+# MCP 组件定义 (供 --list 与调用方使用)
 MCP_IDS_AVAILABLE=(filesystem git memory codebase-memory-mcp context7 codegraph serena)
 
 claude_has_mcp() {
@@ -941,12 +934,20 @@ tui_component_name() {
     esac
 }
 
+# 交互选择委托给 MCP TUI; 选择结果经临时文件回填到 TUI_SELECTED
 tui_select() {
-    TUI_IDS=("${MCP_IDS_AVAILABLE[@]}")
-    TUI_TITLE="joe MCP 服务器安装选择"
-    load_tui_module || die "未找到 tui_module.sh (与脚本同目录)"
-    tui_available || die "当前不是交互式终端, 请指定 MCP 服务器或使用 --all (查看 --help)"
-    run_tui
+    local tui="$SCRIPT_DIR/ui/tui_mcp.sh" result rc=0
+    [ -f "$tui" ] || die "未找到 MCP TUI: $tui"
+    result=$(mktemp)
+    trap 'rm -f "$result"' EXIT
+    TUI_RESULT_FILE="$result" MCP_SCRIPT="$0" bash "$tui" || rc=$?
+    if [ "$rc" -eq 2 ]; then
+        exit 1   # 终端不可用或列表读取失败, TUI 已打印原因
+    fi
+    TUI_SELECTED="$(tr '\n' ' ' < "$result")"
+    rm -f "$result"
+    trap - EXIT
+    return 0
 }
 
 # ---------------------------------------------------------------------------
