@@ -37,7 +37,7 @@ There is no build step. Key commands:
 - Functions use `snake_case()`; flags and constants use `UPPER_SNAKE_CASE`.
 - Always quote variable expansions; prefer `printf` over `echo` when writing to `.zshrc`.
 - Avoid `eval` and string-concatenated shell commands (single quotes break them).
-- GNU-only utilities (`find -printf`, `readlink -f`) are assumed; the script targets Linux.
+- GNU-only utilities (`find -printf`, `readlink -f`) and bash >= 4.4 are assumed (empty-array expansion under `set -u` relies on it); the script targets Linux.
 - Under `set -e`, a plain `var=$(helper)` aborts the script when the helper returns non-zero. Capture with `if ! var=$(helper); then` or `var=$(helper) || true` — this matters for `resolve_deps`, which returns 1 whenever it adds a dependency, which is a normal signal rather than an error.
 - `printf '%s\n' "${arr[@]}"` on an empty array still emits one blank line, and that blank becomes an empty argument downstream. Guard with `[[ ${#arr[@]} -gt 0 ]]` and skip blank tokens when reading lists.
 - Command substitution strips trailing newlines, so a key read via `read -n1` inside `$()` can never see Enter. Use `dd bs=1 count=1` with `stty -icrnl -ixon` (see `scripts/tui_module.sh` and `scripts/ui/tui_common.sh`), and never run a UI that renders to stdout inside `$(...)` — hand its result back through a file.

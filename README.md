@@ -225,6 +225,8 @@ list / install / update  # 新版动作写法, 与上面的旧选项等价
 
 ## 系统支持
 
+需要 bash ≥ 4.4（空数组在 `set -u` 下的展开行为）以及 GNU coreutils/findutils。
+
 已验证的发行版：
 
 | 发行版 | 包管理器 | 状态 |

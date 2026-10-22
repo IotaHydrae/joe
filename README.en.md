@@ -222,6 +222,8 @@ Categories and counts come from `skills/categories.tsv` and the skill directorie
 
 ## System Support
 
+Requires bash >= 4.4 (empty-array expansion under `set -u`) plus GNU coreutils/findutils.
+
 Verified distributions:
 
 | Distribution | Package Manager | Status |
