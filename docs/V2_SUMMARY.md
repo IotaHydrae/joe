@@ -434,7 +434,8 @@ $ ./install.sh tools install --ai gemini
 4. ✅ 实现新主菜单（2026-10-21：`scripts/ui/menu_main.sh`，菜单项回调 `install.sh`）
 5. ✅ 编写 CLI 测试（40 项 + tools TUI/主菜单两个 pty 回归，接入 CI）
 6. ✅ 更新英文 README
-7. ⏳ Quick-start：`install.sh quick-start` 仍直接回落 `scripts/bootstrap.sh`
+7. ✅ Quick-start：实现移到 `scripts/commands/quickstart.sh`（旧名 `bootstrap` 仍映射），
+   阶段补上 `shell`，并修正 `install-all` 传递引擎不接受的 `--all`
 
 ---
 

@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # =============================================================================
-# joe bootstrap — 新机器一键部署
+# joe quick-start — 新机器一键部署 (旧名 bootstrap)
 # =============================================================================
-# 把"克隆 joe → 装开发工具 → 配 MCP → 装技能 → 体检"串成一条命令。
+# 把"准备仓库 → 配 shell → 装开发工具 → 配 MCP → 装技能 → 体检"串成一条命令。
 #
 # 用法:
-#   ./install.sh bootstrap                    # 交互模式: 各阶段进入 TUI, 不预选任何项
-#   ./install.sh bootstrap --yes              # 非交互: 全部安装 (适合脚本/CI)
-#   ./install.sh bootstrap --only mcp,skills  # 只跑指定阶段
-#   ./install.sh bootstrap --skip devtools    # 跳过指定阶段
-#   ./install.sh bootstrap --dir ~/joe        # 指定克隆目录
+#   ./install.sh quick-start                     # 交互模式: 各阶段进入 TUI, 不预选任何项
+#   ./install.sh quick-start --yes               # 非交互: 全部安装 (适合脚本/CI)
+#   ./install.sh quick-start --only shell,devtools  # 只跑指定阶段
+#   ./install.sh quick-start --skip shell        # 跳过指定阶段
+#   ./install.sh quick-start --dir ~/joe         # 指定克隆目录
 #
-# 阶段: devtools | mcp | skills | doctor   (默认全部)
+# 阶段: shell | devtools | mcp | skills | doctor   (默认全部)
+#   shell    直接执行 install_shell.sh (无勾选项, --yes 时也不加 --all)
+#   其余三个阶段 --yes 时传 --all; doctor 只报告, 失败不计入阶段失败
 #
 # 环境变量:
 #   JOE_DIR    克隆/使用目录 (默认 ~/iotahydrae/joe)
@@ -19,7 +21,8 @@
 #   PROXY_URL  代理, 如 http://host:7890
 #
 # 也可直接管道运行(此时会先克隆到自己):
-#   curl -fsSL <raw-url>/install.sh | bash -s -- bootstrap
+#   curl -fsSL <raw-url>/install.sh | bash -s -- quick-start
+#   ./install.sh bootstrap ... 仍然可用, 映射到 quick-start
 # =============================================================================
 
 set -uo pipefail
@@ -70,7 +73,7 @@ want() {
     return 0
 }
 
-printf '%s\n' "$(c_b 'joe bootstrap — 开发环境一键部署')"
+printf '%s\n' "$(c_b 'joe quick-start — 开发环境一键部署')"
 
 # ---------------------------------------------------------------------------
 # 1. 前置依赖 (git / curl)
@@ -108,16 +111,25 @@ printf '  %s git %s / curl %s\n' "$(c_g '✓')" "$(git --version 2>/dev/null | a
 # ---------------------------------------------------------------------------
 step "准备 joe 仓库"
 
+# 从脚本自身位置向上找仓库根: 本文件在 scripts/commands/, 旧版 bootstrap.sh 在
+# scripts/。写死 ../.. 会在目录调整时静默失效并改为克隆仓库。
 SELF="${BASH_SOURCE[0]:-}"
 SRC_DIR=""
 if [ -n "$SELF" ] && [ -f "$SELF" ]; then
-    SRC_DIR="$(cd "$(dirname "$SELF")/.." && pwd)"
+    dir="$(cd "$(dirname "$SELF")" && pwd)"
+    while [ "$dir" != "/" ]; do
+        if [ -f "$dir/install.sh" ]; then
+            SRC_DIR="$dir"
+            break
+        fi
+        dir="$(dirname "$dir")"
+    done
 fi
 
-if [ -n "$SRC_DIR" ] && [ -f "$SRC_DIR/scripts/install_devtools.sh" ]; then
+if [ -n "$SRC_DIR" ]; then
     JOE_DIR="$SRC_DIR"
     printf '  %s 已在仓库内: %s\n' "$(c_g '✓')" "$JOE_DIR"
-elif [ -f "$JOE_DIR/scripts/install_devtools.sh" ]; then
+elif [ -f "$JOE_DIR/install.sh" ]; then
     printf '  %s 复用已有仓库: %s\n' "$(c_g '✓')" "$JOE_DIR"
     git -C "$JOE_DIR" pull --ff-only 2>/dev/null | tail -1 || true
 else
@@ -153,6 +165,7 @@ FAILED_STAGES=()
 
 # 计算总阶段数
 TOTAL_STAGES=0
+want shell && TOTAL_STAGES=$((TOTAL_STAGES + 1))
 want devtools && TOTAL_STAGES=$((TOTAL_STAGES + 1))
 want mcp && TOTAL_STAGES=$((TOTAL_STAGES + 1))
 want skills && TOTAL_STAGES=$((TOTAL_STAGES + 1))
@@ -160,8 +173,10 @@ want doctor && TOTAL_STAGES=$((TOTAL_STAGES + 1))
 
 CURRENT_STAGE=0
 
+# run_stage <阶段键> <显示名> <脚本> [非交互参数]
+# 只有 devtools/mcp/skills 有 --all; install_shell.sh 没有该项, 传空即可。
 run_stage() {
-    local stage="$1" label="$2" script="$3"
+    local stage="$1" label="$2" script="$3" yes_args="${4:-}"
     want "$stage" || return 0
     if [ ! -f "$script" ]; then
         printf '  %s %s: 脚本不存在 %s\n' "$(c_y '!')" "$label" "$script"
@@ -173,14 +188,14 @@ run_stage() {
 
     if $ASSUME_YES; then
         # --yes 是调用者显式选择全部安装, 不依赖安装器的默认行为。
-        if bash "$script" --all < /dev/null; then
+        if bash "$script" $yes_args < /dev/null; then
             printf '  %s %s 完成\n' "$(c_g '✓')" "$label"
         else
             printf '  %s %s 失败\n' "$(c_r '✗')" "$label"
             FAILED_STAGES+=("$label")
         fi
     else
-        # 交互: 进入各自 TUI
+        # 交互: 进入各自 TUI (shell 安装器本身就是完整流程)
         if bash "$script"; then
             printf '  %s %s 完成\n' "$(c_g '✓')" "$label"
         else
@@ -190,26 +205,28 @@ run_stage() {
     fi
 }
 
-run_stage devtools "开发工具"    ./scripts/install_devtools.sh
-run_stage mcp      "MCP 服务器" ./scripts/install_mcp_servers.sh
-run_stage skills   "代理技能"   ./scripts/install_skills.sh
+run_stage shell     "终端美化 (zsh/OMZ)" ./scripts/install_shell.sh
+run_stage devtools  "开发工具"           ./scripts/install_devtools.sh --all
+run_stage mcp       "MCP 服务器"         ./scripts/install_mcp_servers.sh --all
+run_stage skills    "代理技能"           ./scripts/install_skills.sh --all
 
 # ---------------------------------------------------------------------------
 # 4. 体检
 # ---------------------------------------------------------------------------
 if want doctor; then
-    step "环境体检 (doctor.sh)"
+    CURRENT_STAGE=$((CURRENT_STAGE + 1))
+    step "[$CURRENT_STAGE/$TOTAL_STAGES] 环境体检"
     if [ -f ./scripts/doctor.sh ]; then
         bash ./scripts/doctor.sh || true
     else
-        printf '  %s doctor.sh 不存在\n' "$(c_y '!')"
+        printf '  %s scripts/doctor.sh 不存在\n' "$(c_y '!')"
     fi
 fi
 
 # ---------------------------------------------------------------------------
 # 汇总
 # ---------------------------------------------------------------------------
-printf '\n%s\n' "$(c_b '── bootstrap 完成 ──')"
+printf '\n%s\n' "$(c_b '── quick-start 完成 ──')"
 if [ "${#FAILED_STAGES[@]}" -gt 0 ]; then
     printf '%s\n' "$(c_r '有阶段失败:')"
     for s in "${FAILED_STAGES[@]}"; do printf '  • %s\n' "$s"; done

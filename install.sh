@@ -70,7 +70,10 @@ usage() {
 快捷命令
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  quick-start        新手引导式安装
+  quick-start        一键部署 shell/工具/MCP/技能/体检
+      --yes                非交互全部安装 (适合脚本/CI)
+      --only|--skip <阶段>  选择阶段: shell,devtools,mcp,skills,doctor
+
   install-all        安装所有组件（需确认）
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -293,24 +296,23 @@ route_command() {
             ;;
 
         quick-start)
-            # 新手引导/一键安装
-            if [ -f "$COMMANDS_DIR/quickstart.sh" ]; then
-                bash "$COMMANDS_DIR/quickstart.sh"
-            else
-                # 回退到 bootstrap
-                exec bash "$SCRIPTS_DIR/bootstrap.sh" "${COMMAND_ARGS[@]}"
-            fi
+            # 新手引导/一键部署 (旧名 bootstrap, 仍映射到这里)
+            [ -f "$COMMANDS_DIR/quickstart.sh" ] || die "缺少 quick-start 实现: $COMMANDS_DIR/quickstart.sh"
+            exec bash "$COMMANDS_DIR/quickstart.sh" "${COMMAND_ARGS[@]}"
             ;;
 
         install-all)
-            # 全部安装（带确认）
-            printf '\033[1;33m警告:\033[0m 将安装所有组件，这可能需要较长时间。\n'
-            read -p "确认继续？[y/N] " -r confirm
-            if [[ $confirm =~ ^[Yy]$ ]]; then
-                bash "$SCRIPTS_DIR/bootstrap.sh" --all
-            else
-                info "已取消"
+            # 全部安装（带确认）; 读不到输入 (非交互) 时按取消处理
+            printf '\033[1;33m警告:\033[0m 将安装所有组件（shell/工具/MCP/技能），这可能需要较长时间。\n'
+            confirm=""
+            if ! read -p "确认继续？[y/N] " -r confirm; then
+                info "已取消 (未读取到确认输入); 非交互环境请直接使用 ./install.sh quick-start --yes"
+                exit 0
             fi
+            if [[ $confirm =~ ^[Yy]$ ]]; then
+                exec bash "$COMMANDS_DIR/quickstart.sh" --yes
+            fi
+            info "已取消"
             ;;
 
         *)
