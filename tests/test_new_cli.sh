@@ -254,21 +254,28 @@ test_tools_list_clean_home() {
     fi
 }
 
-test_tui_pty() {
-    test_info "测试 TUI 交互 (pty)"
-
+# 运行 pty 回归脚本; 脚本用退出码 2 表示环境不支持
+run_pty_check() {
+    local label="$1" script="$2"
     if ! command -v python3 >/dev/null 2>&1; then
-        test_info "缺少 python3, 跳过 pty 测试"
+        test_info "缺少 python3, 跳过 $label"
         return
     fi
 
     local rc=0
-    timeout 90 python3 tests/tui_pty_check.py >/dev/null 2>&1 || rc=$?
+    timeout 90 python3 "$script" >/dev/null 2>&1 || rc=$?
     case $rc in
-        0) test_pass "TUI 渲染/回车确认/选择回传" ;;
-        2) test_info "无 pty 支持, 跳过" ;;
-        *) test_fail "TUI pty 检查失败 (rc=$rc)" ;;
+        0) test_pass "$label" ;;
+        2) test_info "无 pty 支持, 跳过 $label" ;;
+        *) test_fail "$label 失败 (rc=$rc)" ;;
     esac
+}
+
+test_tui_pty() {
+    test_info "测试交互界面 (pty)"
+
+    run_pty_check "TUI 渲染/回车确认/选择回传" tests/tui_pty_check.py
+    run_pty_check "主菜单浏览不触发安装" tests/menu_pty_check.py
 }
 
 test_command_adapters() {

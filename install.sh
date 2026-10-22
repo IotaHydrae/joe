@@ -207,15 +207,10 @@ load_libs() {
 route_command() {
     case "$COMMAND" in
         menu)
-            # 主菜单
+            # 主菜单实现在 scripts/ui/menu_main.sh, 菜单项一律回到本路由执行
             [ -t 0 ] && [ -t 1 ] || die "菜单需要交互式终端; 请指定命令 (查看 --help)"
-            if [ -f "$UI_DIR/menu_main.sh" ]; then
-                bash "$UI_DIR/menu_main.sh"
-            else
-                # 回退到旧菜单
-                main_menu_legacy
-            fi
-            exit 0
+            [ -f "$UI_DIR/menu_main.sh" ] || die "缺少主菜单实现: $UI_DIR/menu_main.sh"
+            exec bash "$UI_DIR/menu_main.sh"
             ;;
 
         shell)
@@ -319,96 +314,6 @@ route_command() {
     esac
 }
 
-
-# 旧版主菜单（向后兼容，新版在 ui/menu_main.sh）
-main_menu_legacy() {
-    [ -t 0 ] && [ -t 1 ] || die "菜单需要交互式终端; 请指定命令 (查看 --help)"
-    local choice
-
-    run_action_legacy() {
-        local command="$1" script status
-        shift
-        case "$command" in
-            shell) script="$SCRIPTS_DIR/install_shell.sh" ;;
-            devtools) script="$SCRIPTS_DIR/install_devtools.sh" ;;
-            mcp) script="$SCRIPTS_DIR/install_mcp_servers.sh" ;;
-            skills) script="$SCRIPTS_DIR/install_skills.sh" ;;
-            doctor) script="$SCRIPTS_DIR/doctor.sh" ;;
-            update) script="$SCRIPTS_DIR/update-all.sh" ;;
-            repair-ghostty) script="$SCRIPTS_DIR/repair_ghostty.sh" ;;
-            configs) configs_menu_legacy; return ;;
-            bootstrap) script="$SCRIPTS_DIR/bootstrap.sh" ;;
-            *) printf '[ERROR] 未知命令: %s\n' "$command" >&2; return 1 ;;
-        esac
-
-        if [ ! -f "$script" ]; then
-            printf '[ERROR] 脚本不存在: %s\n' "$script" >&2
-            return 1
-        fi
-        if bash "$script" "$@"; then
-            printf '\n操作完成, 返回菜单。\n'
-        else
-            status=$?
-            printf '\n[ERROR] 操作失败 (退出码 %d), 可重新选择操作。\n' "$status" >&2
-        fi
-    }
-
-    while true; do
-        printf '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-        printf '        Joe 开发环境配置\n'
-        printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
-        printf '  1) 终端美化      zsh + Oh My Zsh\n'
-        printf '  2) 开发工具      Node/Python/AI CLI/编辑器\n'
-        printf '  3) MCP 服务器    代码智能/文件系统/浏览器\n'
-        printf '  4) Claude Skills 技能包管理\n'
-        printf '\n'
-        printf '  5) 环境检查      系统兼容性诊断\n'
-        printf '  6) 配置管理      备份/恢复/同步\n'
-        printf '  7) 更新工具      检查并更新已安装组件\n'
-        printf '\n'
-        printf '  8) 新手引导      推荐配置快速安装\n'
-        printf '\n'
-        printf '  q) 退出\n\n'
-        printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-        printf '选择 [1-8/q]: '
-
-        IFS= read -r choice || return 0
-        case "$choice" in
-            1) run_action_legacy shell ;;
-            2) run_action_legacy devtools --tui ;;
-            3) run_action_legacy mcp --tui ;;
-            4) run_action_legacy skills --tui ;;
-            5) run_action_legacy doctor ;;
-            6) configs_menu_legacy ;;
-            7) run_action_legacy update ;;
-            8) run_action_legacy bootstrap ;;
-            q|Q|0) return 0 ;;
-            '') continue ;;
-            *) printf '请输入有效编号或 q。\n' ;;
-        esac
-    done
-}
-
-configs_menu_legacy() {
-    local choice
-    while true; do
-        printf '\n── 配置备份与恢复 ──\n'
-        printf '  1) 查看配置映射\n  2) 预览导出脱敏结果\n  3) 导出本机配置到仓库\n'
-        printf '  4) 从仓库恢复配置 (备份现有文件)\n  5) 对比配置\n  b) 返回主菜单\n'
-        printf '选择操作 [1-5/b]: '
-        IFS= read -r choice || return 0
-        case "$choice" in
-            1) bash "$SCRIPTS_DIR/sync-configs.sh" list ;;
-            2) bash "$SCRIPTS_DIR/sync-configs.sh" export --check ;;
-            3) bash "$SCRIPTS_DIR/sync-configs.sh" export ;;
-            4) bash "$SCRIPTS_DIR/sync-configs.sh" import ;;
-            5) bash "$SCRIPTS_DIR/sync-configs.sh" diff ;;
-            b|B|q|Q) return 0 ;;
-            '') continue ;;
-            *) printf '请输入有效编号或 b。\n' ;;
-        esac
-    done
-}
 
 # 主入口
 load_libs
