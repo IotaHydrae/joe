@@ -43,6 +43,18 @@ make_tmp() {
     TEST_TMPS+=("$TMP_PATH")
 }
 
+# 仓库副本不能落在仓库里, 否则 cp 会递归复制自己 (TMPDIR 指向 checkout 时会踩到)
+make_repo_box() {
+    make_tmp -d
+    case "$TMP_PATH/" in
+        "$ROOT_DIR"/*)
+            rm -rf "$TMP_PATH"
+            TMP_PATH=$(mktemp -d "$(dirname "$ROOT_DIR")/joe-sbx.XXXXXX")
+            TEST_TMPS+=("$TMP_PATH")
+            ;;
+    esac
+}
+
 # 断言转换层把参数原样交给底层安装器 (FWD_STUB 打印 "FWD|<args>")
 assert_forward() {
     local label="$1" expected="$2"
@@ -450,7 +462,7 @@ test_quickstart_stages() {
     test_info "测试 quick-start 阶段编排"
 
     local box s out
-    make_tmp -d; box=$TMP_PATH
+    make_repo_box; box=$TMP_PATH
     mkdir -p "$box/home"
     if ! cp -a "$ROOT_DIR/." "$box/"; then
         test_fail "无法复制仓库到沙箱"
@@ -534,7 +546,7 @@ test_repair_forwards_args() {
     test_info "测试 repair-ghostty 参数转发"
 
     local box out
-    make_tmp -d; box=$TMP_PATH
+    make_repo_box; box=$TMP_PATH
     if ! cp -a "$ROOT_DIR/." "$box/"; then
         test_fail "无法复制仓库到沙箱"
         rm -rf "$box"
