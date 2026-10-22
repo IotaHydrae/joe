@@ -28,6 +28,9 @@
 - MCP 安装器与 `mcp` 动作统一委托新 TUI；缺 npx 时安装前给出先装 Node 的命令
 - 共用 `node_has_bin()` 探测 npx（PATH → nvm current → nvm 版本目录），避免两处各写一份
 - 新增 `tests/mcp_tui_pty_check.py`，套件扩充到 53 项
+- 组件安装逻辑模块化：15 个实现移入 `scripts/components/<id>.sh`，统一接口 `component_<id>_install`
+- 安装器改用 `COMPONENT_ORDER` + `WANT` 关联数组派发，删掉了 15 个布尔标志与 TUI 里重复的 15 分支映射（1131 → 427 行）
+- 套件新增模块接口、派发顺序与「无交叉调用」断言，以及 stub 模块的派发回归
 - 完整文档：迁移指南、技术总结
 
 #### 改进
@@ -119,7 +122,7 @@ scripts/
 - [x] Quick-start 引导流程（2026-10-21：`scripts/commands/quickstart.sh`）
 - [x] CLI 测试套件 + CI（44 项，含两个 pty 回归）
 - [x] MCP 侧：TUI 改进与 Node/npx 依赖门禁（2026-10-21）
-- [ ] 组件安装逻辑模块化（每个组件独立模块，取代 `install_devtools.sh` 单体）
+- [x] 组件安装逻辑模块化（`scripts/components/`，2026-10-22）
 - [ ] 按组件的选择性更新（需要 `update-all.sh` 先支持）
 
 ---

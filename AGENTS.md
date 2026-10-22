@@ -7,8 +7,9 @@
 - `scripts/lib/` — shared libraries. `deps.sh` holds `COMPONENT_GROUPS`, `COMPONENT_NAMES` and `COMPONENT_DEPS` for the tools domain; `distro.sh`, `ghostty.sh`, `github.sh`, `node.sh` are symlinks to the `lib_*.sh` files at `scripts/`.
 - `scripts/ui/` — `tui_common.sh` (colors, cursor, key reading), `tui_tools.sh` (the grouped tools TUI), `tui_mcp.sh` (the grouped MCP TUI) and `menu_main.sh` (the main menu).
 - `scripts/install_shell.sh` — zsh + Oh My Zsh installer, invoked by `./install.sh shell`.
-- `scripts/install_devtools.sh` — optional cross-distro devtools installer (apt/dnf/pacman/zypper), invoked by `./install.sh tools install …` or the legacy `devtools`.
+- `scripts/install_devtools.sh` — optional cross-distro devtools installer (apt/dnf/pacman/zypper), invoked by `./install.sh tools install …` or the legacy `devtools`. It owns the shared helpers, prerequisite checks and dispatch; the component implementations live in `scripts/components/`.
 - `scripts/tui_module.sh` — the legacy checkbox selector still used by `install_devtools.sh` and `install_skills.sh`; the MCP installer delegates to `scripts/ui/tui_mcp.sh` instead. `TUI_IDS` and the `scripts/lib/deps.sh` component lists are two views of the same ids; the CLI suite fails if they drift or if a component lacks its `install_devtools.sh` flag.
+- `scripts/components/` — one module per devtools component (`<id>.sh`) exposing `component_<id>_install()`; modules may use the installer's shared helpers but must not call each other. Adding a component means adding the module, the `--<id>` flag and both id lists — the CLI suite fails if they disagree.
 - `scripts/` — all component installers and maintenance scripts (`doctor.sh`, `update-all.sh`, `sync-configs.sh` live here, not at the root); repository assets remain at the root, so distinguish script paths from repository paths.
 - `tests/` — `test_new_cli.sh` (CLI suite), plus pty checks for the tools TUI, the MCP TUI and the main menu; CI runs all of them.
 - `docs/` — migration, troubleshooting and design guides.
