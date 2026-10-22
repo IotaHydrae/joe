@@ -414,6 +414,55 @@ test_component_id_lists_agree() {
     fi
 }
 
+test_quickstart_stages() {
+    test_info "测试 quick-start 阶段编排"
+
+    local box s out
+    box=$(mktemp -d)
+    mkdir -p "$box/home"
+    if ! cp -a "$ROOT_DIR/." "$box/"; then
+        test_fail "无法复制仓库到沙箱"
+        rm -rf "$box"
+        return
+    fi
+    for s in install_shell install_devtools install_mcp_servers install_skills doctor; do
+        printf '#!/usr/bin/env bash\nprintf "STAGE:%s ARGS:[%%s]\\n" "$*"\n' "$s" > "$box/scripts/$s.sh"
+        chmod +x "$box/scripts/$s.sh"
+    done
+
+    out=$(cd "$box" && HOME="$box/home" timeout 60 bash install.sh quick-start --yes 2>&1) || true
+
+    # 仓库根推导失败会静默改为从 GitHub 克隆, 阶段脚本也就绕开本地改动
+    if [[ $out == *"已在仓库内: $box"* ]]; then
+        test_pass "quick-start 复用当前仓库, 不重新克隆"
+    else
+        test_fail "quick-start 走了克隆/复用分支: $(grep -m1 -E '克隆|复用' <<<"$out")"
+    fi
+
+    # install_shell.sh 没有 --all 选项
+    if [[ $out == *"STAGE:install_shell ARGS:[]"* && $out == *"STAGE:install_devtools ARGS:[--all]"* ]]; then
+        test_pass "shell 阶段不加 --all, 工具阶段加 --all"
+    else
+        test_fail "阶段参数不符: $(grep -c STAGE: <<<"$out") 个阶段被调用"
+    fi
+
+    out=$(cd "$box" && HOME="$box/home" timeout 60 bash install.sh quick-start --yes --only shell,doctor 2>&1) || true
+    if [[ $out == *"[1/2]"* && $out != *"STAGE:install_devtools"* ]]; then
+        test_pass "--only 只跑指定阶段"
+    else
+        test_fail "--only 行为不符"
+    fi
+
+    # install-all 必须传引擎接受的参数 (曾误传 --all 导致必然失败)
+    if ! grep -qE 'quickstart\.sh" --all|bootstrap\.sh" --all' install.sh; then
+        test_pass "install-all 不再传未支持的 --all"
+    else
+        test_fail "install-all 仍在传 --all"
+    fi
+
+    rm -rf "$box"
+}
+
 # =============================================================================
 # 运行所有测试
 # =============================================================================
@@ -439,6 +488,7 @@ test_command_adapters
 test_tools_update
 test_status_summary
 test_component_id_lists_agree
+test_quickstart_stages
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
