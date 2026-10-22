@@ -247,6 +247,8 @@ commands/<domain>.sh      # 执行具体逻辑
 
 ### 短期（下一个版本）
 
+> 2026-10-21 更新：本节 1–3 的命令接口与主菜单已完成，剩余项标注在各条下方。
+
 1. **MCP 命令重构**
    - 类似 tools 的结构
    - 改进 MCP TUI
@@ -425,26 +427,32 @@ $ ./install.sh tools install --ai gemini
 
 ## 下一步
 
-1. ✅ 完成 tools 命令（已完成）
-2. ⏳ 实现 mcp 命令重构
-3. ⏳ 实现 skills 命令重构
-4. ⏳ 实现新主菜单
-5. ⏳ 编写完整测试
-6. ⏳ 更新英文 README
+1. ✅ 完成 tools 命令
+2. ✅ 完成 mcp / skills 命令接口（2026-10-21：`scripts/commands/{mcp,skills}.sh`，
+   仅做语法转换；MCP TUI 与 MCP 依赖管理仍未做）
+3. ✅ 完成 status 与 tools update（2026-10-21）
+4. ✅ 实现新主菜单（2026-10-21：`scripts/ui/menu_main.sh`，菜单项回调 `install.sh`）
+5. ✅ 编写 CLI 测试（40 项 + tools TUI/主菜单两个 pty 回归，接入 CI）
+6. ✅ 更新英文 README
+7. ⏳ Quick-start：`install.sh quick-start` 仍直接回落 `scripts/bootstrap.sh`
 
 ---
 
 **版本**: 2.0.0  
-**日期**: 2025-10-20  
-**状态**: 第一阶段完成（tools 命令）
+**日期**: 2026-10-21  
+**状态**: 第二阶段完成（mcp / skills / status / update / 主菜单），quick-start 待实现
 
 ---
 
 ## 修复记录
 
-### 2025-10-20 后续修复
+### 2026-10-20 后续修复
 
 #### 问题：主菜单按 q 无法退出
+
+> 2026-10-21 更新：本条记录的 `menu` 分支已被替换——旧版主菜单函数随
+> `scripts/ui/menu_main.sh` 落地而删除，菜单项统一回调 `install.sh` 路由。
+
 **原因**：`route_command` 中 `menu` 分支调用 `main_menu_legacy` 后没有显式 `exit 0`，导致函数返回后脚本继续执行（虽然没有后续代码，但进程未正常结束）。
 
 **修复**：在 `menu` 分支添加 `exit 0`
@@ -467,3 +475,24 @@ menu)
 - ✅ 按 `0` 退出
 - ✅ 连续回车后按 `q` 退出
 
+---
+
+### 2026-10-21 修复（2.0 首次实测）
+
+2.0 的 tools 路径在真机上第一次跑通时暴露出 4 个缺陷，都不是理论风险：
+
+1. `tools install --with-deps <AI CLI>` 静默退出 1，无任何输出。
+   `resolve_deps` 用返回 1 表示"补入了依赖"，调用方用简单赋值捕获，
+   `set -e` 直接中止——README 主打的自动依赖处理整条路径失效。
+2. 依赖列表为空时 `printf '%s\n' "${arr[@]}"` 仍输出一个空行，空白 id 传进
+   `COMPONENT_NAMES[$comp]` 触发 `bad array subscript`。
+3. `tools` 的 TUI 用 `selected=$(bash tui_tools.sh)` 取结果，整屏 ANSI 渲染被
+   吞进变量：终端什么都不显示，转义序列还被当成组件 id 交给安装器。
+4. 按回车无法确认选择。命令替换会剥掉结尾换行，`read -n1` 永远取不到 Enter；
+   沿用旧版 `tui_module.sh` 的写法解决：`dd bs=1 count=1` + `stty -icrnl -ixon`。
+
+另外：界面渲染占用 stdout，选择结果改用 `TUI_RESULT_FILE` 临时文件回传；
+非交互终端下的依赖确认从静默中止改为给出 `--with-deps` 提示。
+
+回归由 `tests/tui_pty_check.py` 承担：在修复前的快照上它报
+`FAIL: TUI 界面未渲染到终端`，修复后通过。

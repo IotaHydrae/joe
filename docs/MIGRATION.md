@@ -123,9 +123,12 @@ Joe 2.0 重构了命令结构，提供更清晰的 CLI 体验，同时保持向�
 
 #### 更新
 ```bash
-./install.sh tools update              # 更新全部
-./install.sh tools update node claude  # 更新指定
+./install.sh tools update              # 统一更新全部工具
+./install.sh tools update --dry-run    # 预览将执行的更新
 ```
+
+更新走各工具的官方自更新机制，`update-all.sh` 没有按组件选择的能力，
+所以 `tools update <组件>` 会直接拒绝并提示改用重装：`tools install <组件>`。
 
 #### 检查
 ```bash
@@ -160,7 +163,8 @@ Joe 2.0 重构了命令结构，提供更清晰的 CLI 体验，同时保持向�
 ./install.sh doctor                    # 环境检查
 ./install.sh doctor --json             # JSON 输出
 ./install.sh status                    # 所有组件状态
-./install.sh update                    # 更新 joe 本身
+./install.sh status --short            # 单行汇总, 便于脚本
+./install.sh update                    # 更新工具链与 joe 仓库
 ```
 
 ### 快捷命令

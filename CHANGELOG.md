@@ -64,6 +64,8 @@
 - 新增 `docs/V2_SUMMARY.md` - 技术总结文档
 - 补齐英文 README 的 `tools` 新语法、`status`、常用命令与故障排除章节
 - 重写 `AGENTS.md` 的结构、测试与 Shell 约定章节（`set -e` 捕获、空数组输出、按键读取）
+- 校正 `docs/MIGRATION.md` 的 `tools update <组件>` 示例（更新不支持按组件选择）
+- 更新 `docs/V2_SUMMARY.md` 路线图与修复记录，修正 2.0 的日期年份
 - 更新 `README.md` - 新旧命令对照
 - 新增测试套件：`tests/test_new_cli.sh`
 

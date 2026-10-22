@@ -8,7 +8,7 @@
 - `scripts/ui/` — `tui_common.sh` (colors, cursor, key reading), `tui_tools.sh` (the grouped tools TUI) and `menu_main.sh` (the main menu).
 - `scripts/install_shell.sh` — zsh + Oh My Zsh installer, invoked by `./install.sh shell`.
 - `scripts/install_devtools.sh` — optional cross-distro devtools installer (apt/dnf/pacman/zypper), invoked by `./install.sh tools install …` or the legacy `devtools`.
-- `scripts/tui_module.sh` — the legacy checkbox selector shared by the three installers. Its `TUI_IDS` and `scripts/lib/deps.sh` component lists are two views of the same ids and must stay in sync with the install flags and both READMEs.
+- `scripts/tui_module.sh` — the legacy checkbox selector shared by the three installers. Its `TUI_IDS` and `scripts/lib/deps.sh` component lists are two views of the same ids; the CLI suite fails if they drift or if a component lacks its `install_devtools.sh` flag, so keep all three in sync at once.
 - `scripts/` — all component installers and maintenance scripts (`doctor.sh`, `update-all.sh`, `sync-configs.sh` live here, not at the root); repository assets remain at the root, so distinguish script paths from repository paths.
 - `tests/` — `test_new_cli.sh` (CLI suite), `tui_pty_check.py` (tools TUI) and `menu_pty_check.py` (main menu); CI runs all of them.
 - `docs/` — migration, troubleshooting and design guides.
