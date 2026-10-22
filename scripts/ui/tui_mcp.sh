@@ -59,7 +59,8 @@ load_mcps() {
     local -a groups=("文件与仓库:filesystem git"
                      "记忆与文档:memory context7"
                      "代码智能（三选一）:codebase-memory-mcp codegraph serena")
-    local spec placed_ids=" "
+    local spec
+    local -A placed=()
     MCP_ITEMS=()
     for spec in "${groups[@]}"; do
         group="${spec%%:*}"
@@ -67,7 +68,7 @@ load_mcps() {
         for id in ${spec#*:}; do
             if [ -n "${MCP_NAME[$id]:-}" ]; then
                 MCP_ITEMS+=("$id")
-                placed_ids+="$id "
+                placed[$id]=1
             fi
         done
     done
@@ -75,10 +76,9 @@ load_mcps() {
     # 列表里出现但分组表没覆盖的 id 也要显示, 避免新服务被静默隐藏
     local -a leftovers=()
     for id in "${MCP_IDS[@]}"; do
-        case "$placed_ids" in
-            *" $id "*) ;;
-            *) leftovers+=("$id") ;;
-        esac
+        if [[ -z ${placed[$id]:-} ]]; then
+            leftovers+=("$id")
+        fi
     done
     if [ "${#leftovers[@]}" -gt 0 ]; then
         MCP_ITEMS+=("GROUP:其他")
@@ -87,14 +87,6 @@ load_mcps() {
         done
     fi
     return 0
-}
-
-picked_count() {
-    local n=0 id
-    for id in "${!MCP_PICKED[@]}"; do
-        [[ -n ${MCP_PICKED[$id]:-} ]] && n=$((n + 1))
-    done
-    printf '%d' "$n"
 }
 
 is_code_intel() {
@@ -107,7 +99,7 @@ is_code_intel() {
 draw_row() {
     local idx="$1" is_cursor="$2"
     local item="${MCP_ITEMS[$idx]}"
-    local prefix="  " attr=""
+    local prefix="  "
 
     if [[ $item == GROUP:* ]]; then
         if [[ $is_cursor -eq 1 ]]; then
@@ -132,7 +124,7 @@ draw_row() {
     fi
 
     [[ $is_cursor -eq 1 ]] && prefix="> "
-    printf "%b%-2s[%b] %b %-24s %b\n" "$attr" "$prefix" "$box" "$mark" "$name" "$extra"
+    printf "%-2s[%b] %b %-24s %b\n" "$prefix" "$box" "$mark" "$name" "$extra"
 }
 
 draw_list() {
@@ -148,8 +140,7 @@ draw_list() {
 }
 
 draw_status() {
-    local count deps code_picks=0 id
-    count=$(picked_count)
+    local count=${#MCP_PICKED[@]} code_picks=0 id
     for id in "${!MCP_PICKED[@]}"; do
         is_code_intel "$id" && code_picks=$((code_picks + 1))
     done
@@ -279,12 +270,7 @@ run_mcp_tui() {
         return 2
     fi
 
-    local old_stty
-    old_stty=$(stty -g)
-    # 正常退出、Ctrl-C 或被杀都要恢复回显与光标
-    trap 'printf "\033[?25h"; stty "$old_stty" 2>/dev/null || true' EXIT
-    trap 'printf "\033[?25h"; stty "$old_stty" 2>/dev/null || true; exit 130' INT TERM
-    stty -echo -icanon -icrnl -ixon min 1 time 0
+    tui_enter_raw
 
     cursor_hide
     clear_screen
@@ -307,9 +293,7 @@ run_mcp_tui() {
         esac
     done
 
-    cursor_show
-    stty "$old_stty"
-    trap - EXIT INT TERM
+    tui_leave_raw
     clear_screen
     printf '\n'
 

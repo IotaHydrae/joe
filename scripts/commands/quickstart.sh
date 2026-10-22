@@ -186,11 +186,11 @@ FAILED_STAGES=()
 
 # 计算总阶段数
 TOTAL_STAGES=0
-want shell && TOTAL_STAGES=$((TOTAL_STAGES + 1))
-want devtools && TOTAL_STAGES=$((TOTAL_STAGES + 1))
-want mcp && TOTAL_STAGES=$((TOTAL_STAGES + 1))
-want skills && TOTAL_STAGES=$((TOTAL_STAGES + 1))
-want doctor && TOTAL_STAGES=$((TOTAL_STAGES + 1))
+for stage in $ALL_STAGES; do
+    if want "$stage"; then
+        TOTAL_STAGES=$((TOTAL_STAGES + 1))
+    fi
+done
 
 # 0 阶段时不能继续: 否则会打印"全部阶段完成 ✓"并退出 0
 [ "$TOTAL_STAGES" -gt 0 ] || die "没有要执行的阶段 (检查 --only/--skip)"
@@ -210,22 +210,19 @@ run_stage() {
     CURRENT_STAGE=$((CURRENT_STAGE + 1))
     step "[$CURRENT_STAGE/$TOTAL_STAGES] $label"
 
+    local rc=0
     if $ASSUME_YES; then
         # --yes 是调用者显式选择全部安装, 不依赖安装器的默认行为。
-        if bash "$script" $yes_args < /dev/null; then
-            printf '  %s %s 完成\n' "$(c_g '✓')" "$label"
-        else
-            printf '  %s %s 失败\n' "$(c_r '✗')" "$label"
-            FAILED_STAGES+=("$label")
-        fi
+        bash "$script" $yes_args < /dev/null || rc=$?
     else
-        # 交互: 进入各自 TUI (shell 安装器本身就是完整流程)
-        if bash "$script"; then
-            printf '  %s %s 完成\n' "$(c_g '✓')" "$label"
-        else
-            printf '  %s %s 失败\n' "$(c_r '✗')" "$label"
-            FAILED_STAGES+=("$label")
-        fi
+        bash "$script" || rc=$?
+    fi
+
+    if [ "$rc" -eq 0 ]; then
+        printf '  %s %s 完成\n' "$(c_g '✓')" "$label"
+    else
+        printf '  %s %s 失败\n' "$(c_r '✗')" "$label"
+        FAILED_STAGES+=("$label")
     fi
 }
 

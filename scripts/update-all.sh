@@ -64,19 +64,16 @@ done
 if [ -n "$ONLY" ]; then
     for _only_id in ${ONLY//,/ }; do
         case " $UPDATE_KEYS " in
-            *" $_only_id "*) ;;
-            *)
-                case " $NO_SELF_UPDATE " in
-                    *" $_only_id "*)
-                        echo "$_only_id 没有自更新机制; 请用 ./install.sh tools install $_only_id 重装" >&2 ;;
-                    *)
-                        echo "未知更新项: $_only_id (可用: ${UPDATE_KEYS// /,})" >&2 ;;
-                esac
-                exit 2
-                ;;
+            *" $_only_id "*) continue ;;
         esac
+        case " $NO_SELF_UPDATE " in
+            *" $_only_id "*)
+                echo "$_only_id 没有自更新机制; 请用 ./install.sh tools install $_only_id 重装" >&2 ;;
+            *)
+                echo "未知更新项: $_only_id (可用: ${UPDATE_KEYS// /,})" >&2 ;;
+        esac
+        exit 2
     done
-    unset _only_id
     if [[ ",$ONLY," == *",system,"* ]] && ! $WITH_SYSTEM; then
         echo "system 需要与 --system 一起使用" >&2
         exit 2
@@ -92,9 +89,10 @@ c_d() { printf '\033[2m%s\033[0m' "$1"; }
 OK=0; SKIP=0; FAILED=0; DRY=0; FAILED_ITEMS=()
 
 section() {
-    $QUIET && return 0
     # --only 时只列实际执行的条目, 不打印可能为空的分组标题
-    [ -n "$ONLY" ] && return 0
+    if $QUIET || [ -n "$ONLY" ]; then
+        return 0
+    fi
     printf '\n%s\n' "$(c_b "── $* ──")"
 }
 
@@ -107,20 +105,25 @@ export PATH="$HOME/.grok/bin:$HOME/.mimocode/bin:$HOME/.local/bin:$PYENV_ROOT/bi
 
 # 命令探测
 find_bin() {
-    local name="$1" f
+    local name="$1" dir f
     command -v "$name" >/dev/null 2>&1 && { command -v "$name"; return 0; }
-    [ -x "$HOME/.local/bin/$name" ] && { echo "$HOME/.local/bin/$name"; return 0; }
-    [ -x "$HOME/.mimocode/bin/$name" ] && { echo "$HOME/.mimocode/bin/$name"; return 0; }
-    [ -x "$HOME/.grok/bin/$name" ] && { echo "$HOME/.grok/bin/$name"; return 0; }
+    for dir in "$HOME/.local/bin" "$HOME/.mimocode/bin" "$HOME/.grok/bin"; do
+        if [ -x "$dir/$name" ]; then
+            printf '%s\n' "$dir/$name"
+            return 0
+        fi
+    done
     for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
-        [ -x "$f" ] && { echo "$f"; return 0; }
+        [ -x "$f" ] && { printf '%s\n' "$f"; return 0; }
     done
     return 1
 }
 
 # 该项是否被 --only 选中; ONLY 为空表示全部
 want_item() {
-    [ -z "$ONLY" ] && return 0
+    if [ -z "$ONLY" ]; then
+        return 0
+    fi
     case ",$ONLY," in
         *",$1,"*) return 0 ;;
         *) return 1 ;;

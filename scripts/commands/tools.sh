@@ -70,14 +70,9 @@ cmd_list() {
     printf "%-15s %-25s %-10s %s\n" "组件" "名称" "状态" "版本/依赖"
     printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
 
-    local -a groups=(runtime ai-cli editor terminal browser desktop utility)
-    local -a group_names=("环境管理" "AI 编程助手" "编辑器" "终端" "浏览器" "桌面应用" "实用工具")
-
-    for i in "${!groups[@]}"; do
-        local group="${groups[$i]:-}"
-        local group_name="${group_names[$i]:-}"
-
-        printf "\n${COLOR_BOLD}%s:${COLOR_RESET}\n" "$group_name"
+    local group comp
+    for group in "${COMPONENT_GROUP_ORDER[@]}"; do
+        printf "\n${COLOR_BOLD}%s:${COLOR_RESET}\n" "${COMPONENT_GROUP_NAMES[$group]:-}"
 
         for comp in ${COMPONENT_GROUPS[$group]:-}; do
             local name="${COMPONENT_NAMES[$comp]:-}"
@@ -106,7 +101,6 @@ cmd_list() {
 cmd_install() {
     local -a components=()
     local with_deps=false
-    local auto_deps=true  # 默认询问是否安装依赖
 
     # 解析参数
     while [[ $# -gt 0 ]]; do
@@ -123,21 +117,12 @@ cmd_install() {
                 done <<< "$expanded"
                 shift
                 ;;
-            --*)
+            *)
                 local comp="${1#--}"
                 if validate_component "$comp"; then
                     components+=("$comp")
                 else
                     printf "未知组件: %s\n" "$comp" >&2
-                    return 1
-                fi
-                shift
-                ;;
-            *)
-                if validate_component "$1"; then
-                    components+=("$1")
-                else
-                    printf "未知组件: %s\n" "$1" >&2
                     return 1
                 fi
                 shift
@@ -152,60 +137,52 @@ cmd_install() {
     fi
 
     # 解析依赖
-    local -a install_list
-    local missing_deps_found=false
+    local full_list
+    local has_missing_deps=false
+    if ! full_list=$(resolve_deps "${components[@]}"); then
+        has_missing_deps=true
+    fi
 
+    local -a resolved=()
+    local comp
+    while IFS= read -r comp; do
+        if [[ -n $comp ]]; then
+            resolved+=("$comp")
+        fi
+    done <<< "$full_list"
+
+    local -a install_list=("${components[@]}")
     if $with_deps; then
-        # 自动补全依赖; resolve_deps 补入依赖时返回 1 是正常信号
-        local full_list
-        full_list=$(resolve_deps "${components[@]}") || true
-        while IFS= read -r comp; do
-            [[ -n $comp ]] && install_list+=("$comp")
-        done <<< "$full_list"
-    else
-        # 检查是否有缺失依赖
-        local full_list
-        if ! full_list=$(resolve_deps "${components[@]}"); then
-            missing_deps_found=true
-        fi
-
-        # 询问用户
-        if $missing_deps_found; then
-            local -a missing=()
-            while IFS= read -r comp; do
-                [[ -n $comp ]] || continue
-                local is_requested=false
-                for req in "${components[@]}"; do
-                    [[ $comp == "$req" ]] && is_requested=true && break
-                done
-                $is_requested || missing+=("$comp")
-            done <<< "$full_list"
-
-            if [[ ${#missing[@]} -gt 0 ]]; then
-                printf "\n${COLOR_YELLOW}警告:${COLOR_RESET} 以下组件需要依赖:\n"
-                for dep in "${missing[@]}"; do
-                    printf "  - %s (%s)\n" "$dep" "${COMPONENT_NAMES[$dep]:-}"
-                done
-                printf "\n"
-
-                if ! read -p "是否自动安装依赖？[Y/n] " -r answer; then
-                    printf "非交互环境无法确认依赖, 请改用: tools install --with-deps %s\n" "${components[*]}" >&2
-                    return 1
-                fi
-                if [[ $answer =~ ^[Nn]$ ]]; then
-                    printf "已取消安装\n"
-                    return 1
-                fi
-
-                while IFS= read -r comp; do
-                    [[ -n $comp ]] && install_list+=("$comp")
-                done <<< "$full_list"
-            else
-                install_list=("${components[@]}")
+        # resolve_deps 补入依赖时返回 1 是正常信号, 上面的 if 已经吞掉了
+        install_list=("${resolved[@]}")
+    elif $has_missing_deps; then
+        local -A requested=()
+        local -a missing_deps=()
+        for comp in "${components[@]}"; do
+            requested[$comp]=1
+        done
+        for comp in "${resolved[@]}"; do
+            if [[ -z ${requested[$comp]:-} ]]; then
+                missing_deps+=("$comp")
             fi
-        else
-            install_list=("${components[@]}")
+        done
+
+        printf "\n${COLOR_YELLOW}警告:${COLOR_RESET} 以下组件需要依赖:\n"
+        for dep in "${missing_deps[@]}"; do
+            printf "  - %s (%s)\n" "$dep" "${COMPONENT_NAMES[$dep]:-}"
+        done
+        printf "\n"
+
+        if ! read -p "是否自动安装依赖？[Y/n] " -r answer; then
+            printf "非交互环境无法确认依赖, 请改用: tools install --with-deps %s\n" "${components[*]}" >&2
+            return 1
         fi
+        if [[ $answer =~ ^[Nn]$ ]]; then
+            printf "已取消安装\n"
+            return 1
+        fi
+
+        install_list=("${resolved[@]}")
     fi
 
     # 过滤已安装的组件
@@ -259,21 +236,10 @@ cmd_tui() {
         return
     fi
 
-    # TUI 占用 stdout 渲染界面, 选择结果只能用临时文件回传;
-    # 命令替换会把整屏 ANSI 输出一起捕获, 再喂给 cmd_install 就是垃圾参数。
-    local result_file
-    result_file=$(mktemp)
-    # TUI 被信号打断时也要删除临时文件
-    trap 'rm -f "$result_file"' EXIT
-    TUI_RESULT_FILE="$result_file" bash "$tui_script" || true
-
+    # TUI 占用 stdout 渲染界面, 选择结果只能用临时文件回传
     local -a selected=()
-    local line
-    while IFS= read -r line; do
-        [[ -n $line ]] && selected+=("$line")
-    done < "$result_file"
-    rm -f "$result_file"
-    trap - EXIT
+    collect_tui_selection "$tui_script" || true
+    selected=("${TUI_PICKS[@]}")
 
     if [[ ${#selected[@]} -eq 0 ]]; then
         printf "\n未选择任何组件\n"
@@ -335,7 +301,7 @@ cmd_check() {
 
 # 主入口
 ACTION="${1:-}"
-shift 2>/dev/null || true
+shift || true
 
 case "$ACTION" in
     ''|tui|--tui)

@@ -19,29 +19,11 @@ declare -i TUI_PAGE_SIZE=15
 
 # 初始化 TUI 项目列表
 init_tui_items() {
-    # 按分组组织
-    local -a groups=(runtime ai-cli editor terminal browser desktop utility)
-    local -a group_names=(
-        "环境管理"
-        "AI 编程助手"
-        "编辑器"
-        "终端"
-        "浏览器"
-        "桌面应用"
-        "实用工具"
-    )
+    local group comp
 
     TUI_ITEMS=()
-    local idx=0
-
-    for i in "${!groups[@]}"; do
-        local group="${groups[$i]:-}"
-        local group_name="${group_names[$i]:-}"
-
-        # 添加分组标题
-        TUI_ITEMS+=("GROUP:$group_name")
-
-        # 添加该分组的组件
+    for group in "${COMPONENT_GROUP_ORDER[@]}"; do
+        TUI_ITEMS+=("GROUP:${COMPONENT_GROUP_NAMES[$group]:-}")
         for comp in ${COMPONENT_GROUPS[$group]:-}; do
             TUI_ITEMS+=("$comp")
         done
@@ -297,14 +279,7 @@ run_tools_tui() {
     init_tui_items
 
     # 设置终端
-    local old_stty
-    old_stty=$(stty -g)
-    # 正常退出、Ctrl-C 或被杀都要恢复回显与光标, 否则终端会留在 raw 状态
-    trap 'printf "\033[?25h"; stty "$old_stty" 2>/dev/null || true' EXIT
-    trap 'printf "\033[?25h"; stty "$old_stty" 2>/dev/null || true; exit 130' INT TERM
-    # -icrnl: 回车保持 CR, 否则 LF 会被命令替换剥掉, 永远收不到 Enter
-    # -ixon: 避免 Ctrl-Q/S 流量控制吞掉按键
-    stty -echo -icanon -icrnl -ixon min 1 time 0
+    tui_enter_raw
 
     cursor_hide
     clear_screen
@@ -352,9 +327,7 @@ run_tools_tui() {
     done
 
     # 恢复终端
-    cursor_show
-    stty "$old_stty"
-    trap - EXIT INT TERM
+    tui_leave_raw
 
     # 界面渲染占用 stdout, 选择结果写入 TUI_RESULT_FILE 回传给调用方
     if [[ ${#TUI_SELECTED[@]} -eq 0 ]]; then

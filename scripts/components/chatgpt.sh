@@ -15,11 +15,11 @@ component_chatgpt_install() {
         return 0
     fi
 
-    local arch arch_suffix
+    local arch arch_suffix deb_arch
     arch=$(uname -m)
     case "$arch" in
-        x86_64)  arch_suffix="x86_64" ;;
-        aarch64|arm64) arch_suffix="aarch64" ;;
+        x86_64)  arch_suffix="x86_64";  deb_arch="amd64" ;;
+        aarch64|arm64) arch_suffix="aarch64"; deb_arch="arm64" ;;
         *) die "不支持的架构: $arch" ;;
     esac
 
@@ -27,11 +27,7 @@ component_chatgpt_install() {
     case "$PM" in
         dnf|zypper)
             local rpm_url
-            if [ "$arch_suffix" = "x86_64" ]; then
-                rpm_url="https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.x86_64.rpm"
-            else
-                rpm_url="https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.aarch64.rpm"
-            fi
+            rpm_url="https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.${arch_suffix}.rpm"
             info "下载 ChatGPT rpm (约 530MB)..."
             make_tmp tmp_pkg .rpm
             curl -fsSL --connect-timeout 15 -o "$tmp_pkg" "$rpm_url"
@@ -44,11 +40,7 @@ component_chatgpt_install() {
             ;;
         apt)
             local deb_url
-            if [ "$arch_suffix" = "x86_64" ]; then
-                deb_url="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb"
-            else
-                deb_url="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb"
-            fi
+            deb_url="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_${deb_arch}.deb"
             info "下载 ChatGPT deb (约 530MB)..."
             make_tmp tmp_pkg .deb
             curl -fsSL --connect-timeout 15 -o "$tmp_pkg" "$deb_url"

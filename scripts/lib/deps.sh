@@ -65,43 +65,39 @@ declare -A COMPONENT_NAMES=(
     [ccswitch]="CC Switch"
 )
 
+# 列表与 TUI 共用的分组顺序和标题
+COMPONENT_GROUP_ORDER=(runtime ai-cli editor terminal browser desktop utility)
+declare -A COMPONENT_GROUP_NAMES=(
+    [runtime]="环境管理"
+    [ai-cli]="AI 编程助手"
+    [editor]="编辑器"
+    [terminal]="终端"
+    [browser]="浏览器"
+    [desktop]="桌面应用"
+    [utility]="实用工具"
+)
+
 # 解析快捷组和位置参数
 # 输入: "ai gemini --all" 或 "claude codex"
 # 输出: 展开后的组件列表（去重）
 expand_components() {
     local -a expanded=()
     local -A seen=()
+    local arg name comp
 
     for arg in "$@"; do
-        case "$arg" in
-            --all)
-                for comp in ${SHORTCUT_GROUPS[all]}; do
-                    [[ -z ${seen[$comp]:-} ]] && expanded+=("$comp") && seen[$comp]=1
-                done
-                ;;
-            --ai)
-                for comp in ${SHORTCUT_GROUPS[ai]}; do
-                    [[ -z ${seen[$comp]:-} ]] && expanded+=("$comp") && seen[$comp]=1
-                done
-                ;;
-            --*)
-                # 移除前缀的选项标志
-                local comp="${arg#--}"
-                if [[ -n ${COMPONENT_NAMES[$comp]:-} ]]; then
-                    [[ -z ${seen[$comp]:-} ]] && expanded+=("$comp") && seen[$comp]=1
-                fi
-                ;;
-            *)
-                # 位置参数
-                if [[ -n ${COMPONENT_NAMES[$arg]:-} ]]; then
-                    [[ -z ${seen[$arg]:-} ]] && expanded+=("$arg") && seen[$arg]=1
-                elif [[ -n ${SHORTCUT_GROUPS[$arg]:-} ]]; then
-                    for comp in ${SHORTCUT_GROUPS[$arg]:-}; do
-                        [[ -z ${seen[$comp]:-} ]] && expanded+=("$comp") && seen[$comp]=1
-                    done
-                fi
-                ;;
-        esac
+        name="${arg#--}"
+        if [[ -n ${COMPONENT_NAMES[$name]:-} ]]; then
+            [[ -n ${seen[$name]:-} ]] && continue
+            expanded+=("$name")
+            seen[$name]=1
+        elif [[ -n ${SHORTCUT_GROUPS[$name]:-} ]]; then
+            for comp in ${SHORTCUT_GROUPS[$name]}; do
+                [[ -n ${seen[$comp]:-} ]] && continue
+                expanded+=("$comp")
+                seen[$comp]=1
+            done
+        fi
     done
 
     [[ ${#expanded[@]} -gt 0 ]] && printf '%s\n' "${expanded[@]}"
@@ -150,11 +146,12 @@ resolve_deps() {
     local -a components=("$@")
     local -a full_list=()
     local -A seen=()
-    local -a missing_deps=()
+    local -A requested=()
+    local comp item all_deps missing=0
 
     # 收集所有组件及其依赖
     for comp in "${components[@]}"; do
-        local all_deps
+        requested[$comp]=1
         all_deps=$(get_all_deps "$comp")
         for item in $all_deps; do
             if [[ -z ${seen[$item]:-} ]]; then
@@ -166,13 +163,8 @@ resolve_deps() {
 
     # 检查是否有依赖未在原始列表中
     for item in "${full_list[@]}"; do
-        local is_requested=0
-        for comp in "${components[@]}"; do
-            [[ $item == "$comp" ]] && is_requested=1 && break
-        done
-
-        if [[ $is_requested -eq 0 ]]; then
-            missing_deps+=("$item")
+        if [[ -z ${requested[$item]:-} ]]; then
+            missing=1
         fi
     done
 
@@ -181,7 +173,7 @@ resolve_deps() {
 
     # 返回 1 是正常信号而非错误: 调用方须用 `if ! ...` 或 `|| true` 捕获,
     # 简单赋值会在 set -e 下直接中止脚本。
-    [[ ${#missing_deps[@]} -gt 0 ]] && return 1
+    [[ $missing -eq 1 ]] && return 1
     return 0
 }
 
@@ -276,18 +268,19 @@ get_version() {
     return 0
 }
 
-# 获取组件所属的分组
-get_component_group() {
-    local component="$1"
-
+# 工具域的已装计数: 只走内置判定, 不调用安装器的 --list
+# (skills 的 --list 要逐条解析 frontmatter, 数秒; 菜单渲染等不起)
+count_installed_tools() {
+    local total=0 installed=0 group comp
     for group in "${!COMPONENT_GROUPS[@]}"; do
-        if [[ " ${COMPONENT_GROUPS[$group]:-} " == *" $component "* ]]; then
-            printf '%s' "$group"
-            return 0
-        fi
+        for comp in ${COMPONENT_GROUPS[$group]:-}; do
+            total=$((total + 1))
+            if is_installed "$comp"; then
+                installed=$((installed + 1))
+            fi
+        done
     done
-
-    printf "other"
+    printf '%d/%d' "$installed" "$total"
 }
 
 # 验证组件名是否有效
@@ -298,4 +291,4 @@ validate_component() {
 
 # 导出函数和变量
 export -f expand_components get_deps get_all_deps resolve_deps
-export -f is_installed get_version get_component_group validate_component
+export -f is_installed get_version validate_component

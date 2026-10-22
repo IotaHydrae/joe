@@ -16,21 +16,6 @@ SCRIPTS_DIR="$ROOT_DIR/scripts"
 # shellcheck disable=SC1091
 . "$SCRIPTS_DIR/ui/tui_common.sh"
 
-# 只统计工具域: 走 deps.sh 的内置判定, 毫秒级。
-# 安装器的 --list 要 2-9 秒 (skills 要逐个解析 frontmatter), 不能放进菜单渲染。
-tools_count() {
-    local total=0 installed=0 group comp
-    for group in "${!COMPONENT_GROUPS[@]}"; do
-        for comp in ${COMPONENT_GROUPS[$group]:-}; do
-            total=$((total + 1))
-            if is_installed "$comp"; then
-                installed=$((installed + 1))
-            fi
-        done
-    done
-    printf '%d/%d' "$installed" "$total"
-}
-
 # 交给 install.sh 路由; 非零退出码只提示, 不让菜单结束
 run_action() {
     local status=0
@@ -70,7 +55,7 @@ main_menu() {
         printf '        Joe 开发环境配置\n'
         printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
         printf '  1) 终端美化      zsh + Oh My Zsh\n'
-        printf '  2) 开发工具      Node/Python/AI CLI/编辑器  (已装 %s)\n' "$(tools_count)"
+        printf '  2) 开发工具      Node/Python/AI CLI/编辑器  (已装 %s)\n' "$(count_installed_tools)"
         printf '  3) MCP 服务器    代码智能/文件系统/浏览器\n'
         printf '  4) 代理技能      技能组与分类选择\n'
         printf '\n'

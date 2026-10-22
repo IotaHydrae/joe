@@ -13,6 +13,8 @@ MCP_SCRIPT="${MCP_SCRIPT:-$_SCRIPT_DIR/../install_mcp_servers.sh}"
 TUI_SCRIPT="${TUI_SCRIPT:-$_SCRIPT_DIR/../ui/tui_mcp.sh}"
 # shellcheck disable=SC1091
 . "$_SCRIPT_DIR/../lib/node.sh"
+# shellcheck disable=SC1091
+. "$_SCRIPT_DIR/../ui/tui_common.sh"
 MCP_NPX_BIN="${MCP_NPX_BIN:-npx}"
 
 usage() {
@@ -56,19 +58,10 @@ cmd_tui() {
     fi
 
     # 界面占用 stdout, 选择结果经临时文件回传
-    local result_file rc=0
-    result_file=$(mktemp)
-    trap 'rm -f "$result_file"' EXIT
-    TUI_RESULT_FILE="$result_file" MCP_SCRIPT="$MCP_SCRIPT" MCP_NPX_BIN="$MCP_NPX_BIN" \
-        bash "$TUI_SCRIPT" || rc=$?
-
-    local -a ids=()
-    local line
-    while IFS= read -r line; do
-        [[ -n $line ]] && ids+=("$line")
-    done < "$result_file"
-    rm -f "$result_file"
-    trap - EXIT
+    local rc=0
+    collect_tui_selection "$TUI_SCRIPT" MCP_SCRIPT="$MCP_SCRIPT" MCP_NPX_BIN="$MCP_NPX_BIN" \
+        || rc=$?
+    local -a ids=("${TUI_PICKS[@]}")
 
     if [[ $rc -eq 2 ]]; then
         return 1   # 加载失败, TUI 已打印原因

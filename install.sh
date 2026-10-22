@@ -141,7 +141,7 @@ detect_command() {
         *) die "未知命令: $1 (查看 --help)" ;;
     esac
 
-    shift 2>/dev/null || true
+    shift || true
     COMMAND_ARGS=("$@")
 
     # 旧 devtools 参数: --list 映射为 list 动作, 其余选项映射为 install 动作

@@ -133,16 +133,16 @@ make_tmp() {
 # ---------------------------------------------------------------------------
 # 支持 apt (Debian/Ubuntu/Mint) / pacman (Arch/CachyOS) / dnf (Fedora) / zypper (openSUSE)
 # 并处理版本差异, 例如 Ubuntu 24.04 的 t64 重命名 (libfuse2 -> libfuse2t64)
-_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for _lib in lib_distro.sh lib_github.sh lib_ghostty.sh lib_node.sh; do
-    if [ -f "$_LIB_DIR/$_lib" ]; then
+    if [ -f "$SCRIPT_DIR/$_lib" ]; then
         # shellcheck disable=SC1090
-        . "$_LIB_DIR/$_lib"
+        . "$SCRIPT_DIR/$_lib"
     else
         die "缺少 $_lib (应与本脚本同目录)"
     fi
 done
-unset _lib _LIB_DIR
+unset _lib
 
 # 仅在 Node 安装阶段加载 nvm; 不自动启用旧的 default 版本。
 load_nvm() {
@@ -181,61 +181,14 @@ append_shell_cfg() {
 }
 
 # ---------------------------------------------------------------------------
-# 组件: Node 工具链 (nvm)
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# 组件: Python 版本管理器 (pyenv + 编译依赖)
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# 组件: Claude Code / Codex CLI
+# AI CLI 共用提示
 # ---------------------------------------------------------------------------
 print_ai_followup() {
     local cmd="$1" root
-    root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    root="$(cd "$SCRIPT_DIR/.." && pwd)"
     printf '下一步: 运行 %s 完成登录。\n' "$cmd"
     printf '让助手使用本机 MCP: 将 %s/templates/AGENTS.md 和 CLAUDE.md 复制到项目根目录。\n' "$root"
 }
-
-
-
-
-
-
-
-# ---------------------------------------------------------------------------
-# 组件: Zed 编辑器 + JetBrains Mono 字体
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# 组件: Ghostty 终端 + Ctrl+Alt+T 快捷键
-# ---------------------------------------------------------------------------
-# Ghostty: Ubuntu 24.04 / Mint 22.3 无官方包 (官方仓库 26.04 起才有)
-# 回退顺序: 官方仓库 -> 社区 .deb (mkasberg, 已处理 Mint->Ubuntu 映射) -> snap
-
-# xdg-terminal-exec: Ubuntu/Mint/Arch/Fedora 官方仓库均有; 缺失时用上游脚本兜底
-
-
-# ---------------------------------------------------------------------------
-# 组件: Visual Studio Code 编辑器
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# 组件: Brave 浏览器
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# 组件: MiMo Code (小米 AI 编程助手)
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# 组件: ChatGPT / Codex 桌面版 (OpenAI 官方 Linux 预览版)
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# 组件: CC Switch (AI CLI 配置切换器, 桌面版)
-# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # --check: 只报告本机适配情况, 不做任何改动 (跨发行版验证用)
@@ -304,13 +257,11 @@ usage() {
 
 # 加载 TUI 模块 (--tui 与 --list 共用); 成功时可直接调用其函数
 load_tui_module() {
-    local module
-    module="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/tui_module.sh"
-    if [ ! -f "$module" ]; then
+    if [ ! -f "$SCRIPT_DIR/tui_module.sh" ]; then
         return 1
     fi
     # shellcheck disable=SC1091
-    . "$module"
+    . "$SCRIPT_DIR/tui_module.sh"
 }
 
 # --list: 列出可安装组件及当前安装状态
@@ -331,8 +282,8 @@ list_components() {
 }
 
 HAS_ARGS=false
+[ "$#" -gt 0 ] && HAS_ARGS=true
 while [[ $# -gt 0 ]]; do
-    HAS_ARGS=true
     case "$1" in
         --node|--python|--claude|--codex|--gemini|--opencode|--copilot|--grok|--zed|--ghostty|--vscode|--brave|--mimo|--chatgpt|--ccswitch)
             WANT[${1#--}]=1; shift ;;
@@ -410,7 +361,7 @@ fi
 info "joe devtools 安装开始 $(date) [包管理器: $PM]"
 
 # 每个 id 对应 scripts/components/<id>.sh 里的 component_<id>_install
-COMPONENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/components"
+COMPONENT_DIR="$SCRIPT_DIR/components"
 load_component() {
     local id="$1" file
     file="$COMPONENT_DIR/$id.sh"

@@ -63,20 +63,6 @@ count_installed() {
         END { printf "%d/%d", done + 0, total + 0 }' <<< "$listing"
 }
 
-# 工具域直接用 deps.sh 的判定
-count_tools() {
-    local total=0 done=0 group comp
-    for group in "${!COMPONENT_GROUPS[@]}"; do
-        for comp in ${COMPONENT_GROUPS[$group]:-}; do
-            total=$((total + 1))
-            if is_installed "$comp"; then
-                done=$((done + 1))
-            fi
-        done
-    done
-    printf '%d/%d' "$done" "$total"
-}
-
 SHORT=false
 for arg in "$@"; do
     case "$arg" in
@@ -86,7 +72,8 @@ for arg in "$@"; do
     esac
 done
 
-tools="$(count_tools)"
+# 工具域直接用 deps.sh 的判定
+tools="$(count_installed_tools)"
 mcp="$(count_installed '已配置' '未配置' "$MCP_SCRIPT")"
 skills="$(count_installed '已安装' '未安装' "$SKILLS_SCRIPT")"
 
