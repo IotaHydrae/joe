@@ -31,6 +31,9 @@
 - 组件安装逻辑模块化：15 个实现移入 `scripts/components/<id>.sh`，统一接口 `component_<id>_install`
 - 安装器改用 `COMPONENT_ORDER` + `WANT` 关联数组派发，删掉了 15 个布尔标志与 TUI 里重复的 15 分支映射（1131 → 427 行）
 - 套件新增模块接口、派发顺序与「无交叉调用」断言，以及 stub 模块的派发回归
+- `update-all.sh` 新增 `--only <条目...>`：按条目更新，未知名直接拒绝，`system` 必须配合 `--system`
+- `tools update <组件...>` 转发为 `--only`；无自更新机制的组件（Zed/VS Code/Ghostty/Brave）给出重装命令
+- MCP TUI pty 检查改为条件等待，消除固定 sleep 在负载下的偶发失败
 - 完整文档：迁移指南、技术总结
 
 #### 改进
@@ -123,7 +126,7 @@ scripts/
 - [x] CLI 测试套件 + CI（44 项，含两个 pty 回归）
 - [x] MCP 侧：TUI 改进与 Node/npx 依赖门禁（2026-10-21）
 - [x] 组件安装逻辑模块化（`scripts/components/`，2026-10-22）
-- [ ] 按组件的选择性更新（需要 `update-all.sh` 先支持）
+- [x] 按组件的选择性更新（`update-all.sh --only`，2026-10-22）
 
 ---
 

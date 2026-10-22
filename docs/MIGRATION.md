@@ -127,9 +127,9 @@ Joe 2.0 重构了命令结构，提供更清晰的 CLI 体验，同时保持向�
 ./install.sh tools update --dry-run    # 预览将执行的更新
 ```
 
-更新走各工具的官方自更新机制，`update-all.sh` 没有按组件选择的能力，
-所以 `tools update <组件>` 会直接拒绝并提示：单项重装需先移除工具，再
-`tools install <组件>`（直接 install 对已装组件只会跳过）。
+更新走各工具的官方自更新机制。指定组件时 `tools update <组件>` 会转成
+`update-all.sh --only <组件>`；没有自更新机制的组件（Zed、VS Code、Ghostty、
+Brave）会被拒绝并提示用 `tools install <id>` 重装。
 
 #### 检查
 ```bash

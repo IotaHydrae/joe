@@ -27,7 +27,7 @@ There is no build step. Key commands:
 - `./install.sh --dry-run` — preview what the script would do without changing anything.
 - `HOME=$(mktemp -d) ./install.sh --dry-run` — verify nothing leaks outside a temporary home.
 - `./install.sh --no-fonts --no-config --no-p10k --no-fastfetch` — isolate one feature during testing.
-- `./install.sh tools list` / `status` / `status --short` — the 2.0 read-only surface; `tools update` takes `--dry-run`, `--quiet`, `--system` and rejects per-component ids because `update-all.sh` updates everything.
+- `./install.sh tools list` / `status` / `status --short` — the 2.0 read-only surface; `tools update [ids...]` forwards `--only` to `update-all.sh` and also takes `--dry-run`, `--quiet`, `--system`.
 - `./install.sh devtools --help` / `--list` — help must print the `依赖`/`说明` sections (rendered from the header comment, never a hard-coded line range); `--list` shows every id in `TUI_IDS` with its install status.
 - `./install.sh devtools --nope` — unknown flags must exit 1 with the message on stderr.
 - `./install.sh` — opens the main menu only in an interactive terminal; Enter without a choice and quitting must not install anything.

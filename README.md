@@ -60,7 +60,8 @@ cd joe
 ./install.sh tools install claude      # 装 Claude Code（自动提示依赖）
 ./install.sh tools install --ai        # 装 AI 工具组（Claude + Codex）
 ./install.sh tools install claude codex gemini  # 一次装多个
-./install.sh tools update              # 统一更新（官方自更新机制，不能按组件选）
+./install.sh tools update              # 统一更新所有工具（官方自更新机制）
+./install.sh tools update claude node  # 只更新指定组件
 ./install.sh tools update --dry-run    # 预览将执行的更新
 
 # ===== 旧命令（仍然可用）=====

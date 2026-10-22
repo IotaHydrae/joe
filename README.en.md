@@ -53,6 +53,7 @@ Cross-distro development tools installation (supports apt/pacman/dnf/zypper):
 ./install.sh tools install --ai        # Install the AI group (Claude + Codex)
 ./install.sh tools install claude codex gemini  # Several at once
 ./install.sh tools update              # Update everything (official self-updaters)
+./install.sh tools update claude node  # Update only the given components
 ./install.sh tools update --dry-run    # Preview what would run
 
 # ===== Legacy syntax (still works) =====
@@ -69,9 +70,9 @@ Cross-distro development tools installation (supports apt/pacman/dnf/zypper):
 ./install.sh devtools --grok       # Install Grok Build only
 ```
 
-`tools update` has no per-component form: `update-all.sh` upgrades everything
-through each tool's official self-update path. To redo one component, reinstall
-it with `tools install <id>`.
+`tools update <id...>` forwards `--only` to `update-all.sh`. Components without
+a self-update path (Zed, VS Code, Ghostty, Brave) are rejected with the matching
+`tools install <id>` command instead of being silently skipped.
 
 ### 3. MCP Servers
 Install Model Context Protocol servers for AI coding assistants:
