@@ -32,6 +32,9 @@
 # TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
 #           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
 #
+# 结构: 各组件的安装实现位于 scripts/components/<id>.sh, 每个模块暴露
+#       component_<id>_install; 本脚本负责参数解析、前置检查与按 COMPONENT_ORDER 派发。
+#
 # 依赖: git, curl, sudo (非 root 时), bash/zsh
 # 说明:
 #   - nvm 装到 ~/.nvm; --node 会切换到最新 LTS, 迁移已有全局包
@@ -51,24 +54,14 @@ set -euo pipefail
 NODE_LTS="${NODE_LTS:-}"                    # 留空 = 安装时最新 LTS
 PROXY_URL="${PROXY_URL:-}"                  # 可选: http://host:7890
 
-# 标记位
-INSTALL_NODE=false
-INSTALL_PYTHON=false
-INSTALL_CLAUDE=false
-INSTALL_CODEX=false
-INSTALL_GEMINI=false
-INSTALL_OPENCODE=false
-INSTALL_COPILOT=false
-INSTALL_GROK=false
-INSTALL_ZED=false
-INSTALL_GHOSTTY=false
-INSTALL_VSCODE=false
-INSTALL_BRAVE=false
-INSTALL_MIMO=false
-INSTALL_CHATGPT=false
-INSTALL_CCSWITCH=false
+# 选中的组件: id -> 1。id 与 scripts/tui_module.sh 的 TUI_IDS、
+# scripts/lib/deps.sh 的组件表保持一致 (CLI 套件会校验三者相同)。
+declare -A WANT=()
 INSTALL_ALL=false
 TUI_MODE=false
+
+# 安装顺序也是依赖顺序: node 必须先于依赖它的 AI CLI。
+COMPONENT_ORDER=(node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch)
 
 # ---------------------------------------------------------------------------
 # 前置依赖检查
@@ -81,12 +74,12 @@ check_prerequisites() {
     command -v curl >/dev/null 2>&1 || missing+=(curl)
 
     # 如果要安装 Node 相关，检查编译依赖
-    if $INSTALL_NODE || $INSTALL_ALL; then
+    if [ -n "${WANT[node]:-}" ] || $INSTALL_ALL; then
         command -v gcc >/dev/null 2>&1 || command -v cc >/dev/null 2>&1 || missing+=(build-essential)
     fi
 
     # 如果要安装 Python 相关，检查必要依赖
-    if $INSTALL_PYTHON || $INSTALL_ALL; then
+    if [ -n "${WANT[python]:-}" ] || $INSTALL_ALL; then
         command -v python3 >/dev/null 2>&1 || missing+=(python3)
         # pyenv 需要这些包来编译 Python
         if ! pkg_installed libssl-dev 2>/dev/null && ! pkg_installed openssl-devel 2>/dev/null; then
@@ -190,105 +183,10 @@ append_shell_cfg() {
 # ---------------------------------------------------------------------------
 # 组件: Node 工具链 (nvm)
 # ---------------------------------------------------------------------------
-install_node() {
-    info "=== 安装 nvm (Node Version Manager) ==="
-    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-    if [ -d "$NVM_DIR" ]; then
-        info "nvm 已存在, 跳过安装"
-        load_nvm
-    else
-        curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | PROFILE=/dev/null bash
-        load_nvm
-    fi
-
-    # 非交互调用也先使用固定运行路径, 确保迁移的是当前版本的全局包。
-    load_node
-    local target previous
-    if [ -n "$NODE_LTS" ]; then
-        target="$(nvm version-remote "$NODE_LTS")" || die "无法解析 Node 版本, 请检查网络"
-    else
-        target="$(nvm version-remote --lts)" || die "无法解析 Node LTS 版本, 请检查网络"
-    fi
-    [[ "$target" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "无法解析 Node LTS 版本, 请检查网络"
-    if [ -e "$NVM_DIR/current" ] && [ ! -L "$NVM_DIR/current" ]; then
-        die "$NVM_DIR/current 不是符号链接, 请检查后再安装"
-    fi
-    previous="$(nvm current)" || previous=none
-    case "$previous" in
-        N/A|none|'') previous="$(nvm version default)" || previous=none ;;
-    esac
-    local args=("$target")
-    case "$previous" in
-        "$target"|N/A|none|'') ;;
-        *) args+=("--reinstall-packages-from=$previous") ;;
-    esac
-    info "安装/切换 Node: $target"
-    NVM_SYMLINK_CURRENT=true nvm install "${args[@]}"
-    nvm alias default "$target"
-    [ -x "$NVM_DIR/current/bin/node" ] || die "Node current 链接未创建"
-    configure_node_shell "$(pick_shell_rc)" "$NVM_DIR"
-    load_node
-    ok "Node 已就绪: $(node --version) (shell 只设置 PATH, 不初始化 nvm)"
-}
 
 # ---------------------------------------------------------------------------
 # 组件: Python 版本管理器 (pyenv + 编译依赖)
 # ---------------------------------------------------------------------------
-install_python() {
-    info "=== 安装 pyenv + Python 编译依赖 ==="
-
-    case "$PM" in
-        apt)
-            sudo apt-get update -qq
-            sudo apt-get install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
-                libreadline-dev libsqlite3-dev curl libncursesw5-dev xz-utils \
-                tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
-            ;;
-        pacman)
-            sudo pacman -S --needed --noconfirm base-devel openssl zlib xz tk
-            ;;
-        dnf)
-            sudo dnf install -y gcc make patch bzip2-devel readline-devel \
-                sqlite-devel openssl-devel tk-devel libffi-devel xz-devel \
-                zlib-ng-compat-devel
-            ;;
-        zypper)
-            sudo zypper install -y gcc make patch bzip2-devel readline-devel \
-                sqlite3-devel libopenssl-devel tk-devel libffi-devel xz-devel
-            ;;
-        *)
-            warn "不支持的包管理器, 请手动安装 Python 编译依赖"
-            ;;
-    esac
-
-    # pyenv
-    if [ -d "$HOME/.pyenv" ]; then
-        info "pyenv 已存在, 跳过安装"
-        load_pyenv
-    else
-        curl -fsSL https://raw.githubusercontent.com/pyenv/pyenv-installer/master/bin/pyenv-installer | bash
-        load_pyenv
-    fi
-
-    # 片段要匹配实际写入的配置文件: 写进 .bashrc 就用 bash 初始化, 否则 zsh
-    local rc shell_name=zsh
-    rc=$(pick_shell_rc)
-    case "$rc" in
-        */.bashrc|*/.bash_profile) shell_name=bash ;;
-    esac
-    append_shell_cfg "$(printf '%s\n' \
-        'export PYENV_ROOT="$HOME/.pyenv"' \
-        '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' \
-        "eval \"\$(pyenv init - $shell_name)\"" \
-        'eval "$(pyenv virtualenv-init -)"')"
-
-    ok "pyenv 配置完成"
-    info "注意: 使用以下命令安装 Python 版本:"
-    info "  pyenv install --list    # 列出可用版本"
-    info "  pyenv install 3.12.0    # 安装特定版本"
-    info "  pyenv global 3.12.0     # 设置全局版本"
-    info "  pyenv local 3.12.0      # 设置项目版本"
-}
 
 # ---------------------------------------------------------------------------
 # 组件: Claude Code / Codex CLI
@@ -300,610 +198,44 @@ print_ai_followup() {
     printf '让助手使用本机 MCP: 将 %s/templates/AGENTS.md 和 CLAUDE.md 复制到项目根目录。\n' "$root"
 }
 
-install_claude() {
-    info "=== 安装 Claude Code ==="
-    export PATH="$HOME/.local/bin:$PATH"
 
-    if command -v claude >/dev/null 2>&1; then
-        info "Claude Code 已安装: $(claude --version 2>/dev/null | head -1)"
-    else
-        # 优先官方安装脚本 (npm 方式已被官方标记 deprecated)
-        local tpl
-        make_tmp tpl .sh
-        if download_installer https://claude.ai/install.sh "$tpl"; then
-            info "安装 Claude Code (官方脚本)..."
-            if ! bash "$tpl" 2>&1 | tail -3; then
-                warn "官方安装脚本执行失败, 尝试 npm"
-            fi
-            export PATH="$HOME/.local/bin:$PATH"
-        else
-            warn "官方安装脚本不可用 (网络/区域限制), 尝试 npm"
-        fi
-        if ! command -v claude >/dev/null 2>&1; then
-            load_node
-            command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node), 官方安装脚本也未装上 Claude Code"
-            npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code \
-                || die "Claude Code npm 安装失败"
-        fi
-        command -v claude >/dev/null 2>&1 || die "Claude Code 安装失败, 请检查网络"
-    fi
 
-    ok "Claude Code 就绪: $(claude --version 2>/dev/null | head -1)"
-    print_ai_followup claude
-}
 
-install_codex() {
-    info "=== 安装 Codex CLI ==="
-    export PATH="$HOME/.local/bin:$PATH"
 
-    if command -v codex >/dev/null 2>&1; then
-        info "Codex CLI 已安装: $(codex --version 2>/dev/null | head -1)"
-    else
-        load_node
-        command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node)"
-        info "安装 Codex CLI (@openai/codex)..."
-        npm install -g @openai/codex || die "Codex CLI 安装失败"
-        command -v codex >/dev/null 2>&1 || die "Codex CLI 安装失败, 请检查网络"
-    fi
 
-    ok "Codex CLI 就绪: $(codex --version 2>/dev/null | head -1)"
-    print_ai_followup codex
-}
-
-install_gemini() {
-    info "=== 安装 Gemini CLI ==="
-    export PATH="$HOME/.local/bin:$PATH"
-
-    if command -v gemini >/dev/null 2>&1; then
-        info "Gemini CLI 已安装: $(gemini --version 2>/dev/null | head -1)"
-    else
-        load_node
-        command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node)"
-        info "安装 Gemini CLI (@google/gemini-cli)..."
-        npm install -g @google/gemini-cli || die "Gemini CLI 安装失败"
-        command -v gemini >/dev/null 2>&1 || die "Gemini CLI 安装失败, 请检查网络"
-    fi
-
-    ok "Gemini CLI 就绪: $(gemini --version 2>/dev/null | head -1)"
-    print_ai_followup gemini
-}
-
-install_opencode() {
-    info "=== 安装 OpenCode ==="
-    export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$PATH"
-    export XDG_BIN_DIR="${XDG_BIN_DIR:-$HOME/.local/bin}"
-
-    if command -v opencode >/dev/null 2>&1; then
-        info "OpenCode 已安装: $(opencode --version 2>/dev/null | head -1)"
-    else
-        local tpl
-        make_tmp tpl .sh
-        if download_installer https://opencode.ai/install "$tpl"; then
-            info "安装 OpenCode (官方脚本)..."
-            if ! bash "$tpl" 2>&1 | tail -3; then
-                warn "官方安装脚本执行失败, 尝试 npm"
-            fi
-            export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$PATH"
-        else
-            warn "官方安装脚本不可用, 尝试 npm"
-        fi
-        if ! command -v opencode >/dev/null 2>&1; then
-            load_node
-            command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node), 官方安装脚本也未装上 OpenCode"
-            npm install -g @opencode/cli@latest || die "OpenCode npm 安装失败"
-        fi
-        command -v opencode >/dev/null 2>&1 || die "OpenCode 安装失败, 请检查网络"
-    fi
-
-    ok "OpenCode 就绪: $(opencode --version 2>/dev/null | head -1)"
-    print_ai_followup opencode
-}
-
-install_copilot() {
-    info "=== 安装 GitHub Copilot CLI ==="
-    export PATH="$HOME/.local/bin:$PATH"
-
-    if command -v copilot >/dev/null 2>&1 && [ "${COPILOT_FORCE:-}" != 1 ]; then
-        info "Copilot CLI 已安装: $(copilot --version 2>/dev/null | head -1)"
-    else
-        local tpl
-        make_tmp tpl .sh
-        # 非 root 默认装到 ~/.local/bin, 显式 PREFIX 避免写到 /usr/local。
-        if download_installer https://gh.io/copilot-install "$tpl"; then
-            info "安装 Copilot CLI (官方脚本)..."
-            if ! env PREFIX="$HOME/.local" bash "$tpl" 2>&1 | tail -3; then
-                warn "官方安装脚本执行失败, 尝试 npm"
-            fi
-            export PATH="$HOME/.local/bin:$PATH"
-        else
-            warn "官方安装脚本不可用, 尝试 npm"
-        fi
-        if ! command -v copilot >/dev/null 2>&1; then
-            if [ "${COPILOT_FORCE:-}" = 1 ]; then
-                die "Copilot CLI 升级失败"
-            fi
-            load_node
-            command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node), 官方安装脚本也未装上 Copilot CLI"
-            npm install -g @github/copilot || die "Copilot CLI npm 安装失败"
-        fi
-        command -v copilot >/dev/null 2>&1 || die "Copilot CLI 安装失败, 请检查网络"
-    fi
-
-    ok "Copilot CLI 就绪: $(copilot --version 2>/dev/null | head -1)"
-    printf '下一步: 运行 copilot 完成 GitHub 登录。MCP 用 copilot mcp add 配置。\n'
-}
-
-install_grok() {
-    info "=== 安装 Grok Build ==="
-    export PATH="$HOME/.grok/bin:$HOME/.local/bin:$PATH"
-
-    if { command -v grok >/dev/null 2>&1 || [ -x "$HOME/.grok/bin/grok" ]; } \
-        && [ "${GROK_FORCE:-}" != 1 ]; then
-        info "Grok Build 已安装: $(grok --version 2>/dev/null | head -1)"
-    else
-        local tpl
-        make_tmp tpl .sh
-        if ! download_installer https://x.ai/cli/install.sh "$tpl"; then
-            die "无法下载 Grok Build 安装脚本: https://x.ai/cli/install.sh"
-        fi
-        info "安装 Grok Build (官方脚本)..."
-        if ! bash "$tpl" 2>&1 | tail -5; then
-            die "Grok Build 官方安装脚本失败"
-        fi
-        export PATH="$HOME/.grok/bin:$HOME/.local/bin:$PATH"
-        if ! command -v grok >/dev/null 2>&1 && [ ! -x "$HOME/.grok/bin/grok" ]; then
-            die "Grok Build 安装失败, 请检查网络"
-        fi
-    fi
-
-    ok "Grok Build 就绪: $(grok --version 2>/dev/null | head -1)"
-    print_ai_followup grok
-}
 
 # ---------------------------------------------------------------------------
 # 组件: Zed 编辑器 + JetBrains Mono 字体
 # ---------------------------------------------------------------------------
-install_zed() {
-    info "=== 安装 Zed 编辑器 ==="
-
-    # Vulkan (Zed 依赖 GPU 渲染) - 按发行版自动映射包名
-    if ! command -v vulkaninfo >/dev/null 2>&1; then
-        install_sys_pkg vulkan-loader vulkan-tools mesa-vulkan-drivers
-    fi
-
-    # JetBrains Mono 字体
-    if ! fc-list 2>/dev/null | grep -qi "jetbrains mono"; then
-        install_sys_pkg jetbrains-mono
-    fi
-
-    # Zed 本体 (官方安装脚本)
-    if [ ! -x "$HOME/.local/bin/zed" ]; then
-        curl -f https://zed.dev/install.sh | sh
-    else
-        info "Zed 已安装: $($HOME/.local/bin/zed --version | head -1)"
-    fi
-
-    # PATH 配置
-    local rc_file
-    rc_file=$(pick_shell_rc)
-    if ! grep -q '\.local/bin' "$rc_file" 2>/dev/null; then
-        printf '%s\n' 'export PATH=$HOME/.local/bin:$PATH' >> "$rc_file"
-        info "$rc_file 已追加 ~/.local/bin 到 PATH"
-    fi
-
-    # Zed 默认字体配置; 已有配置时保留, 不覆盖用户设置
-    if [ -f "$HOME/.config/zed/settings.json" ]; then
-        info "Zed settings.json 已存在, 保留用户配置不覆盖"
-    else
-        mkdir -p "$HOME/.config/zed"
-        cat > "$HOME/.config/zed/settings.json" << 'EOF'
-{
-  "ui_font_family": "JetBrains Mono",
-  "ui_font_size": 14,
-  "buffer_font_family": "JetBrains Mono",
-  "buffer_font_size": 14,
-  "terminal": {
-    "font_family": "JetBrains Mono",
-    "font_size": 14
-  }
-}
-EOF
-        info "已写入 Zed 默认字体配置 (JetBrains Mono)"
-    fi
-    ok "Zed 配置完成"
-}
 
 # ---------------------------------------------------------------------------
 # 组件: Ghostty 终端 + Ctrl+Alt+T 快捷键
 # ---------------------------------------------------------------------------
 # Ghostty: Ubuntu 24.04 / Mint 22.3 无官方包 (官方仓库 26.04 起才有)
 # 回退顺序: 官方仓库 -> 社区 .deb (mkasberg, 已处理 Mint->Ubuntu 映射) -> snap
-install_ghostty_apt() {
-    # 1) 官方仓库 (Ubuntu 26.04+ / 部分衍生版)
-    if pkg_available ghostty; then
-        install_sys_pkg ghostty && command -v ghostty >/dev/null 2>&1 && return 0
-    fi
-
-    # 2) 社区 .deb: 先下载脚本并校验, 再执行 —— 不做 curl | bash
-    info "官方仓库无 ghostty ($(distro_pretty)), 改用社区 .deb..."
-    local tpl=/tmp/ghostty-ubuntu-install.sh
-    if download_installer https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh "$tpl"; then
-        # 该脚本用 curl -LO 把 .deb 下到"当前目录", 必须在可写的临时目录里执行
-        local workdir
-        workdir="$(mktemp -d)"
-        if ( cd "$workdir" && bash "$tpl" ); then
-            rm -rf "$workdir" "$tpl"
-            return 0
-        fi
-        warn "社区 .deb 安装失败"
-        rm -rf "$workdir"
-    else
-        warn "无法获取/校验社区安装脚本 (可能区域受限)"
-    fi
-    rm -f "$tpl"
-
-    # 3) snap
-    if command -v snap >/dev/null 2>&1; then
-        info "尝试 snap 安装 ghostty..."
-        sudo snap install ghostty --classic && return 0
-    fi
-
-    warn "Ghostty 未能自动安装, 请参考 https://ghostty.org/docs/install/binary"
-    return 1
-}
 
 # xdg-terminal-exec: Ubuntu/Mint/Arch/Fedora 官方仓库均有; 缺失时用上游脚本兜底
-ensure_xdg_terminal_exec() {
-    command -v xdg-terminal-exec >/dev/null 2>&1 && return 0
 
-    if install_sys_pkg xdg-terminal-exec >/dev/null 2>&1 \
-       && command -v xdg-terminal-exec >/dev/null 2>&1; then
-        return 0
-    fi
-
-    info "包不可用, 从上游安装 xdg-terminal-exec 到 ~/.local/bin..."
-    local tpl=/tmp/xdg-terminal-exec.sh
-    if curl -fsSL --connect-timeout 15 -o "$tpl" \
-            https://raw.githubusercontent.com/Vladimir-csp/xdg-terminal-exec/master/xdg-terminal-exec 2>/dev/null \
-       && [ -s "$tpl" ] && head -1 "$tpl" | grep -qE '^#!'; then
-        mkdir -p "$HOME/.local/bin"
-        install -m755 "$tpl" "$HOME/.local/bin/xdg-terminal-exec"
-        rm -f "$tpl"
-        ok "xdg-terminal-exec 已装到 ~/.local/bin"
-        return 0
-    fi
-    rm -f "$tpl"
-    warn "xdg-terminal-exec 不可用 (Ctrl+Alt+T 可能不生效)"
-    return 1
-}
-
-install_ghostty() {
-    info "=== 安装 Ghostty 终端 ==="
-
-    if ! ghostty_binary >/dev/null 2>&1; then
-        case "$PM" in
-            dnf)
-                { sudo dnf copr enable -y scottames/ghostty && sudo dnf install -y ghostty; } \
-                    || die "Ghostty dnf 安装失败"
-                ;;
-            apt)
-                install_ghostty_apt || die "Ghostty apt 安装失败"
-                ;;
-            pacman)
-                sudo pacman -S --needed --noconfirm ghostty \
-                    || die "Ghostty pacman 安装失败"
-                ;;
-            zypper)
-                sudo zypper install -y ghostty || die "Ghostty zypper 安装失败"
-                ;;
-            *)
-                die "Ghostty 安装方式未知, 请手动安装"
-                ;;
-        esac
-    else
-        local bin
-        bin="$(ghostty_binary)"
-        info "Ghostty 已安装: $("$bin" --version | head -1)"
-    fi
-
-    ghostty_binary >/dev/null 2>&1 || die "Ghostty 安装后仍未找到可执行文件"
-    if ! command -v infocmp >/dev/null 2>&1 || ! command -v tic >/dev/null 2>&1; then
-        install_sys_pkg ncurses-tools
-    fi
-    repair_ghostty || die "Ghostty 兼容修复失败, 请查看上面的错误"
-
-    # xdg-terminal-exec (默认终端执行器, Budgie/labwc 的 C-A-t 依赖它)
-    # 发行版包缺失时自动回退到上游脚本, 不再直接放弃
-    ensure_xdg_terminal_exec >/dev/null 2>&1 || true
-    command -v xdg-terminal-exec >/dev/null 2>&1 \
-        || warn "未装上 xdg-terminal-exec, Ctrl+Alt+T 可能不生效"
-
-    # labwc (Budgie) Ctrl+Alt+T 快捷键: 确保绑定指向 xdg-terminal-exec
-    local rc="$HOME/.config/budgie-desktop/labwc/rc.xml"
-    if [ -f "$rc" ] && ! grep -q 'xdg-terminal-exec' "$rc"; then
-        cp "$rc" "$rc.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
-        sed -i 's|command="xfce4-terminal"|command="xdg-terminal-exec"|g; s|command="ghostty"|command="xdg-terminal-exec"|g' "$rc"
-        info "labwc rc.xml: Ctrl+Alt+T 已绑定 xdg-terminal-exec"
-        if pgrep labwc >/dev/null 2>&1; then
-            pkill -USR1 labwc 2>/dev/null || true
-        fi
-    fi
-
-    ok "Ghostty 配置完成 (terminfo 与桌面入口已修复)"
-}
 
 # ---------------------------------------------------------------------------
 # 组件: Visual Studio Code 编辑器
 # ---------------------------------------------------------------------------
-install_vscode() {
-    info "=== 安装 Visual Studio Code ==="
-
-    if command -v code >/dev/null 2>&1; then
-        info "VS Code 已安装: $(code --version | head -1)"
-    else
-        case "$PM" in
-            dnf)
-                sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-                sudo bash -c 'echo -e "[code]\nname=VS Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
-                sudo dnf install -y code
-                ;;
-            apt)
-                sudo bash -c 'curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg'
-                sudo bash -c 'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list'
-                sudo apt-get update -qq
-                sudo apt-get install -y code
-                ;;
-            pacman)
-                # Arch extra 官方仓库含 VS Code
-                sudo pacman -S --needed --noconfirm code
-                ;;
-            zypper)
-                sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-                sudo zypper addrepo -f https://packages.microsoft.com/yumrepos/vscode vscode
-                sudo zypper install -y code
-                ;;
-            *)
-                warn "VS Code 安装方式未知, 请手动安装"
-                ;;
-        esac
-    fi
-
-    ok "VS Code 配置完成"
-}
 
 # ---------------------------------------------------------------------------
 # 组件: Brave 浏览器
 # ---------------------------------------------------------------------------
-install_brave() {
-    info "=== 安装 Brave 浏览器 ==="
-
-    if command -v brave-browser >/dev/null 2>&1; then
-        info "Brave 已安装: $(brave-browser --version 2>/dev/null | head -1)"
-    else
-        case "$PM" in
-            apt)
-                # 添加 Brave GPG 密钥和 APT 源
-                sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
-                    https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
-                echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main" \
-                    | sudo tee /etc/apt/sources.list.d/brave-browser-release.list
-                sudo apt-get update -qq
-                sudo apt-get install -y brave-browser
-                ;;
-            dnf)
-                sudo dnf install -y dnf-plugins-core
-                sudo dnf config-manager --add-repo https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
-                sudo rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
-                sudo dnf install -y brave-browser
-                ;;
-            pacman)
-                # Brave 在 AUR，需要用 AUR helper
-                if command -v yay >/dev/null 2>&1; then
-                    yay -S --needed --noconfirm brave-bin
-                elif command -v paru >/dev/null 2>&1; then
-                    paru -S --needed --noconfirm brave-bin
-                else
-                    warn "Brave 在 AUR 中，请手动安装 AUR helper (yay/paru) 后再试"
-                    warn "或手动安装: https://aur.archlinux.org/packages/brave-bin"
-                    return 1
-                fi
-                ;;
-            zypper)
-                sudo rpm --import https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
-                sudo zypper addrepo https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
-                sudo zypper refresh
-                sudo zypper install -y brave-browser
-                ;;
-            *)
-                warn "Brave 安装方式未知, 请手动安装"
-                warn "访问: https://brave.com/linux/"
-                return 1
-                ;;
-        esac
-    fi
-
-    ok "Brave 浏览器配置完成"
-}
 
 # ---------------------------------------------------------------------------
 # 组件: MiMo Code (小米 AI 编程助手)
 # ---------------------------------------------------------------------------
-install_mimo() {
-    info "=== 安装 MiMo Code (小米 AI 编程助手) ==="
-
-    load_node
-    # 官方安装路径 (~/.mimocode/bin) 与用户级 bin
-    export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PATH"
-
-    if command -v mimo >/dev/null 2>&1; then
-        info "MiMo Code 已安装: $(mimo --version 2>/dev/null | head -1)"
-    else
-        # 官方脚本 (macOS/Linux 推荐; Windows 官方为 npm)
-        local tpl
-        make_tmp tpl .sh
-        if download_installer https://mimo.xiaomi.com/install "$tpl"; then
-            info "安装 MiMo Code (官方脚本)..."
-            if ! bash "$tpl" 2>&1 | tail -3; then
-                warn "官方安装脚本执行失败, 尝试 npm"
-            fi
-            export PATH="$HOME/.mimocode/bin:$HOME/.local/bin:$PATH"
-        else
-            warn "官方安装脚本不可用, 回退 npm"
-        fi
-        if ! command -v mimo >/dev/null 2>&1; then
-            command -v node >/dev/null 2>&1 || die "需要 Node (先运行 --node) 或手动安装 MiMo Code"
-            npm install -g --allow-scripts=@mimo-ai/cli @mimo-ai/cli || die "MiMo Code npm 安装失败"
-        fi
-    fi
-
-    if ! command -v mimo >/dev/null 2>&1; then
-        die "MiMo Code 安装失败, 请检查网络"
-    fi
-
-    ok "MiMo Code 配置完成: $(mimo --version 2>/dev/null | head -1)"
-}
 
 # ---------------------------------------------------------------------------
 # 组件: ChatGPT / Codex 桌面版 (OpenAI 官方 Linux 预览版)
 # ---------------------------------------------------------------------------
-install_chatgpt() {
-    info "=== 安装 ChatGPT / Codex 桌面版 ==="
-
-    if command -v chatgpt >/dev/null 2>&1; then
-        info "ChatGPT 已安装: $(chatgpt --version 2>/dev/null | head -1)"
-        return 0
-    fi
-
-    local arch arch_suffix
-    arch=$(uname -m)
-    case "$arch" in
-        x86_64)  arch_suffix="x86_64" ;;
-        aarch64|arm64) arch_suffix="aarch64" ;;
-        *) die "不支持的架构: $arch" ;;
-    esac
-
-    local tmp_pkg
-    case "$PM" in
-        dnf|zypper)
-            local rpm_url
-            if [ "$arch_suffix" = "x86_64" ]; then
-                rpm_url="https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.x86_64.rpm"
-            else
-                rpm_url="https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.aarch64.rpm"
-            fi
-            info "下载 ChatGPT rpm (约 530MB)..."
-            make_tmp tmp_pkg .rpm
-            curl -fsSL --connect-timeout 15 -o "$tmp_pkg" "$rpm_url"
-            if [ "$PM" = "dnf" ]; then
-                sudo dnf install -y "$tmp_pkg"
-            else
-                sudo zypper install -y "$tmp_pkg"
-            fi
-            rm -f -- "$tmp_pkg"
-            ;;
-        apt)
-            local deb_url
-            if [ "$arch_suffix" = "x86_64" ]; then
-                deb_url="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb"
-            else
-                deb_url="https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb"
-            fi
-            info "下载 ChatGPT deb (约 530MB)..."
-            make_tmp tmp_pkg .deb
-            curl -fsSL --connect-timeout 15 -o "$tmp_pkg" "$deb_url"
-            sudo apt-get update -qq
-            sudo apt-get install -y "$tmp_pkg"
-            rm -f -- "$tmp_pkg"
-            ;;
-        pacman)
-            local script_url="https://persistent.oaistatic.com/codex-app-prod/linux/install-arch.sh"
-            make_tmp tmp_pkg .sh
-            curl --proto '=https' --tlsv1.2 -fL -o "$tmp_pkg" "$script_url"
-            sudo bash "$tmp_pkg"
-            rm -f -- "$tmp_pkg"
-            ;;
-        *)
-            die "不支持的包管理器 ($PM), 请手动安装 ChatGPT 桌面版"
-            ;;
-    esac
-
-    command -v chatgpt >/dev/null 2>&1 || die "ChatGPT 安装失败, 请检查网络或包管理器输出"
-    ok "ChatGPT 桌面版安装完成: $(chatgpt --version 2>/dev/null | head -1)"
-}
 
 # ---------------------------------------------------------------------------
 # 组件: CC Switch (AI CLI 配置切换器, 桌面版)
 # ---------------------------------------------------------------------------
-install_ccswitch() {
-    info "=== 安装 CC Switch (AI CLI 配置切换器) ==="
-
-    export PATH="$HOME/.local/bin:$PATH"
-    local stamp="$HOME/.local/share/joe/cc-switch.version"
-    local installed_tag=""
-    [ -f "$stamp" ] && installed_tag="$(cat "$stamp")"
-
-    # 普通安装保持幂等。update-all 设置 CCSWITCH_FORCE=1 时才按最新 release 升级。
-    if command -v cc-switch >/dev/null 2>&1 && [ "${CCSWITCH_FORCE:-}" != 1 ]; then
-        info "CC Switch 已安装${installed_tag:+ ($installed_tag)}"
-        return 0
-    fi
-
-    local tag
-    tag="$(ccswitch_latest_tag)" || die "无法确定 CC Switch 版本。可设置 CCSWITCH_VERSION=vX.Y.Z 后重试, 或从 https://github.com/farion1231/cc-switch/releases 手动安装"
-    if command -v cc-switch >/dev/null 2>&1 && [ "$installed_tag" = "$tag" ]; then
-        info "CC Switch 已是 $tag"
-        return 0
-    fi
-
-    local arch arch_id
-    arch=$(uname -m)
-    case "$arch" in
-        x86_64)  arch_id="x86_64" ;;
-        aarch64|arm64) arch_id="arm64" ;;
-        *) die "不支持的架构: $arch" ;;
-    esac
-
-    local pkg_suffix=".AppImage"
-    local tmp_pkg gh_url
-
-    case "$PM" in
-        dnf|zypper) pkg_suffix=".rpm" ;;
-        apt)        pkg_suffix=".deb" ;;
-    esac
-    gh_url="https://github.com/farion1231/cc-switch/releases/download/${tag}/CC-Switch-${tag}-Linux-${arch_id}${pkg_suffix}"
-    make_tmp tmp_pkg "$pkg_suffix"
-    github_mirror_download "$gh_url" "$tmp_pkg" \
-        || die "CC Switch 下载失败, 请手动从 https://github.com/farion1231/cc-switch/releases 安装"
-
-    case "$PM" in
-        dnf)
-            sudo dnf install -y "$tmp_pkg"
-            ;;
-        zypper)
-            sudo zypper install -y "$tmp_pkg"
-            ;;
-        apt)
-            sudo apt-get update -qq
-            sudo apt-get install -y "$tmp_pkg"
-            ;;
-        pacman|*)
-            # AppImage 运行需要 FUSE (Arch: fuse2 / Ubuntu: libfuse2t64)
-            install_sys_pkg fuse2 >/dev/null 2>&1 || true
-            mkdir -p "$HOME/.local/bin"
-            install -m755 "$tmp_pkg" "$HOME/.local/bin/cc-switch"
-            ;;
-    esac
-    rm -f -- "$tmp_pkg"
-    export PATH="$HOME/.local/bin:$PATH"
-
-    if command -v cc-switch >/dev/null 2>&1 || [ -x "$HOME/.local/bin/cc-switch" ]; then
-        mkdir -p "$(dirname "$stamp")"
-        printf '%s\n' "$tag" > "$stamp"
-        ok "CC Switch 安装完成 ($tag)"
-    else
-        die "CC Switch 安装失败"
-    fi
-}
 
 # ---------------------------------------------------------------------------
 # --check: 只报告本机适配情况, 不做任何改动 (跨发行版验证用)
@@ -1002,22 +334,9 @@ HAS_ARGS=false
 while [[ $# -gt 0 ]]; do
     HAS_ARGS=true
     case "$1" in
-        --node)     INSTALL_NODE=true; shift ;;
-        --python)   INSTALL_PYTHON=true; shift ;;
-        --claude)   INSTALL_CLAUDE=true; shift ;;
-        --codex)    INSTALL_CODEX=true; shift ;;
-        --ai)       INSTALL_CLAUDE=true; INSTALL_CODEX=true; shift ;;
-        --gemini)   INSTALL_GEMINI=true; shift ;;
-        --opencode) INSTALL_OPENCODE=true; shift ;;
-        --copilot)  INSTALL_COPILOT=true; shift ;;
-        --grok)     INSTALL_GROK=true; shift ;;
-        --zed)      INSTALL_ZED=true; shift ;;
-        --ghostty)  INSTALL_GHOSTTY=true; shift ;;
-        --vscode)   INSTALL_VSCODE=true; shift ;;
-        --brave)    INSTALL_BRAVE=true; shift ;;
-        --mimo)     INSTALL_MIMO=true; shift ;;
-        --chatgpt)  INSTALL_CHATGPT=true; shift ;;
-        --ccswitch) INSTALL_CCSWITCH=true; shift ;;
+        --node|--python|--claude|--codex|--gemini|--opencode|--copilot|--grok|--zed|--ghostty|--vscode|--brave|--mimo|--chatgpt|--ccswitch)
+            WANT[${1#--}]=1; shift ;;
+        --ai)       WANT[claude]=1; WANT[codex]=1; shift ;;
         --all)      INSTALL_ALL=true; shift ;;
         --tui)      TUI_MODE=true; shift ;;
         --list)     list_components; exit 0 ;;
@@ -1069,31 +388,9 @@ if $TUI_MODE; then
         exit 0
     fi
     INSTALL_ALL=false
-    INSTALL_NODE=false; INSTALL_PYTHON=false
-    INSTALL_CLAUDE=false; INSTALL_CODEX=false
-    INSTALL_GEMINI=false; INSTALL_OPENCODE=false; INSTALL_COPILOT=false
-    INSTALL_GROK=false
-    INSTALL_ZED=false; INSTALL_GHOSTTY=false; INSTALL_VSCODE=false
-    INSTALL_BRAVE=false
-    INSTALL_MIMO=false; INSTALL_CHATGPT=false; INSTALL_CCSWITCH=false
+    WANT=()
     for comp in $TUI_SELECTED; do
-        case "$comp" in
-            node)     INSTALL_NODE=true ;;
-            python)   INSTALL_PYTHON=true ;;
-            claude)   INSTALL_CLAUDE=true ;;
-            codex)    INSTALL_CODEX=true ;;
-            gemini)   INSTALL_GEMINI=true ;;
-            opencode) INSTALL_OPENCODE=true ;;
-            copilot)  INSTALL_COPILOT=true ;;
-            grok)     INSTALL_GROK=true ;;
-            zed)      INSTALL_ZED=true ;;
-            ghostty)  INSTALL_GHOSTTY=true ;;
-            vscode)   INSTALL_VSCODE=true ;;
-            brave)    INSTALL_BRAVE=true ;;
-            mimo)     INSTALL_MIMO=true ;;
-            chatgpt)  INSTALL_CHATGPT=true ;;
-            ccswitch) INSTALL_CCSWITCH=true ;;
-        esac
+        WANT[$comp]=1
     done
     info "已选择:${TUI_SELECTED}"
 fi
@@ -1112,20 +409,22 @@ fi
 # ---------------------------------------------------------------------------
 info "joe devtools 安装开始 $(date) [包管理器: $PM]"
 
-if $INSTALL_ALL || $INSTALL_NODE; then install_node; fi
-if $INSTALL_ALL || $INSTALL_PYTHON; then install_python; fi
-if $INSTALL_ALL || $INSTALL_CLAUDE; then install_claude; fi
-if $INSTALL_ALL || $INSTALL_CODEX; then install_codex; fi
-if $INSTALL_ALL || $INSTALL_GEMINI; then install_gemini; fi
-if $INSTALL_ALL || $INSTALL_OPENCODE; then install_opencode; fi
-if $INSTALL_ALL || $INSTALL_COPILOT; then install_copilot; fi
-if $INSTALL_ALL || $INSTALL_GROK; then install_grok; fi
-if $INSTALL_ALL || $INSTALL_ZED; then install_zed; fi
-if $INSTALL_ALL || $INSTALL_GHOSTTY; then install_ghostty; fi
-if $INSTALL_ALL || $INSTALL_VSCODE; then install_vscode; fi
-if $INSTALL_ALL || $INSTALL_BRAVE; then install_brave; fi
-if $INSTALL_ALL || $INSTALL_MIMO; then install_mimo; fi
-if $INSTALL_ALL || $INSTALL_CHATGPT; then install_chatgpt; fi
-if $INSTALL_ALL || $INSTALL_CCSWITCH; then install_ccswitch; fi
+# 每个 id 对应 scripts/components/<id>.sh 里的 component_<id>_install
+COMPONENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/components"
+load_component() {
+    local id="$1" file
+    file="$COMPONENT_DIR/$id.sh"
+    [ -f "$file" ] || die "缺少组件模块: $file"
+    # shellcheck disable=SC1090
+    . "$file"
+}
+
+for _id in "${COMPONENT_ORDER[@]}"; do
+    if $INSTALL_ALL || [ -n "${WANT[$_id]:-}" ]; then
+        load_component "$_id"
+        "component_${_id}_install"
+    fi
+done
+unset _id
 
 ok "全部完成! 新开终端后生效 (或 source ~/.zshrc)"
