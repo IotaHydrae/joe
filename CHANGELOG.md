@@ -70,6 +70,8 @@
 - 修复 Tools TUI: 界面渲染被 `$(...)` 捕获导致屏幕空白, 且转义序列被当成组件参数
 - 修复 TUI 收不到回车: 命令替换会剥掉结尾 LF, 现改用 `dd` 读取并关闭 `icrnl`
 - 修复非交互终端下依赖确认直接中止, 现输出可操作提示
+- 修复组件安装脚本与 CodeGraph 引擎补拉写固定 `/tmp` 路径（可被预置或符号链接劫持）：改用 `make_tmp` / `mktemp -d` 并在退出时清理
+- 修复 CodeGraph 引擎在取不到 `.sha256` 时跳过校验：现在拒绝安装（fail closed）
 - 修复 `install.sh status` 丢弃参数导致 `--short` 失效
 - 修复 `status` 统计把安装器 `--list` 结尾的「安装位置」段落计入总数
 - 修复 `--help` 列出不存在的 `shell --minimal` 选项, 并改正 `skills list/install` 的措辞（列的是技能而非技能组）

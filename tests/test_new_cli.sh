@@ -750,6 +750,27 @@ test_update_only() {
     fi
 }
 
+test_predictable_temp_paths() {
+    test_info "测试下载临时路径"
+
+    # 下载/执行的临时文件不能写到固定 /tmp 名称: 多用户机器上可被预置或符号链接劫持
+    local hits
+    hits=$(grep -nE '/tmp/[A-Za-z0-9._-]+' scripts/components/*.sh scripts/lib_github.sh |
+        grep -vE ':[0-9]+:[[:space:]]*#' || true)
+    if [[ -z $hits ]]; then
+        test_pass "下载临时路径均为随机目录"
+    else
+        test_fail "存在固定 /tmp 路径: $hits"
+    fi
+
+    # 拿不到校验文件时必须拒绝安装, 而不是"跳过校验"继续装
+    if grep -q '跳过校验' scripts/lib_github.sh; then
+        test_fail "校验缺失时仍会跳过校验"
+    else
+        test_pass "无法获取校验文件时拒绝安装"
+    fi
+}
+
 # =============================================================================
 # 运行所有测试
 # =============================================================================
@@ -781,6 +802,7 @@ test_repair_forwards_args
 test_ghostty_backup_convention
 test_devtools_dispatch
 test_update_only
+test_predictable_temp_paths
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"

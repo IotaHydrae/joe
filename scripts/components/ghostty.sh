@@ -70,7 +70,8 @@ _ghostty_apt() {
 
     # 2) 社区 .deb: 先下载脚本并校验, 再执行 —— 不做 curl | bash
     info "官方仓库无 ghostty ($(distro_pretty)), 改用社区 .deb..."
-    local tpl=/tmp/ghostty-ubuntu-install.sh
+    local tpl
+    make_tmp tpl .sh
     if download_installer https://raw.githubusercontent.com/mkasberg/ghostty-ubuntu/HEAD/install.sh "$tpl"; then
         # 该脚本用 curl -LO 把 .deb 下到"当前目录", 必须在可写的临时目录里执行
         local workdir
@@ -105,7 +106,8 @@ _ghostty_xdg_terminal_exec() {
     fi
 
     info "包不可用, 从上游安装 xdg-terminal-exec 到 ~/.local/bin..."
-    local tpl=/tmp/xdg-terminal-exec.sh
+    local tpl
+    make_tmp tpl .sh
     if curl -fsSL --connect-timeout 15 -o "$tpl" \
             https://raw.githubusercontent.com/Vladimir-csp/xdg-terminal-exec/master/xdg-terminal-exec 2>/dev/null \
        && [ -s "$tpl" ] && head -1 "$tpl" | grep -qE '^#!'; then

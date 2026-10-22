@@ -35,6 +35,7 @@ There is no build step. Key commands:
 ## Coding Style & Naming Conventions
 
 - Bash only, with `set -euo pipefail` and 4-space indentation.
+- Never write downloads or executable temp files to a predictable `/tmp/<name>`: another local user can pre-place or symlink them. Use `make_tmp` (registered for cleanup) in installers, or `mktemp -d` with an EXIT trap in shared libraries, and fail closed when a checksum cannot be fetched.
 - Functions use `snake_case()`; flags and constants use `UPPER_SNAKE_CASE`.
 - Always quote variable expansions; prefer `printf` over `echo` when writing to `.zshrc`.
 - Avoid `eval` and string-concatenated shell commands (single quotes break them).

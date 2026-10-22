@@ -101,7 +101,8 @@ github_mirror_download() {
 
 # 通过镜像补拉 CodeGraph 引擎并校验 SHA256
 # (官方 fetch-engine 直连 GitHub releases, 在部分网络下会中途截断)
-codegraph_fetch_engine_mirror() {
+# 子 shell + EXIT 陷阱: 下载目录是随机的, 任何返回路径都会清理
+codegraph_fetch_engine_mirror() (
     local pkgdir engine_ver asset plat arch
     pkgdir="$(npm root -g 2>/dev/null)/@astudioplus/codegraph-mcp"
     [ -d "$pkgdir" ] || return 1
@@ -120,26 +121,30 @@ codegraph_fetch_engine_mirror() {
     [ -n "$engine_ver" ] || engine_ver="$(cat "$pkgdir/bin/.engine-version" 2>/dev/null)"
     [ -n "$engine_ver" ] || { warn "无法确定 CodeGraph 引擎版本"; return 1; }
 
+    local tmpdir
+    tmpdir=$(mktemp -d) || return 1
+    trap 'rm -rf "$tmpdir"' EXIT
+
     local base="https://github.com/codegraph-ai/CodeGraph/releases/download/v${engine_ver}"
-    github_mirror_download "${base}/${asset}" /tmp/cg-engine || return 1
+    github_mirror_download "${base}/${asset}" "$tmpdir/engine" || return 1
 
-    # 校验 SHA256 (校验失败则拒绝安装)
-    if curl -fsSL --connect-timeout 15 -o /tmp/cg-engine.sha256 "${base}/${asset}.sha256" 2>/dev/null; then
-        local want got
-        want="$(awk '{print $1}' /tmp/cg-engine.sha256)"
-        got="$(sha256sum /tmp/cg-engine | awk '{print $1}')"
-        if [ -n "$want" ] && [ "$want" != "$got" ]; then
-            warn "CodeGraph 引擎 SHA256 校验失败 (want=$want got=$got), 拒绝安装"
-            return 1
-        fi
-        info "CodeGraph 引擎 SHA256 校验通过"
-    else
-        warn "未能获取 .sha256, 跳过校验"
+    # 校验 SHA256; 取不到校验文件说明无法验证, 必须拒绝而不是跳过
+    if ! curl -fsSL --connect-timeout 15 -o "$tmpdir/engine.sha256" "${base}/${asset}.sha256" 2>/dev/null; then
+        warn "未能获取 .sha256, 拒绝安装 (无法校验引擎)"
+        return 1
     fi
+    local want got
+    want="$(awk '{print $1}' "$tmpdir/engine.sha256")"
+    got="$(sha256sum "$tmpdir/engine" | awk '{print $1}')"
+    if [ -z "$want" ] || [ "$want" != "$got" ]; then
+        warn "CodeGraph 引擎 SHA256 校验失败 (want=${want:-空} got=$got), 拒绝安装"
+        return 1
+    fi
+    info "CodeGraph 引擎 SHA256 校验通过"
 
-    install -m 755 /tmp/cg-engine "$pkgdir/bin/$asset" || return 1
+    install -m 755 "$tmpdir/engine" "$pkgdir/bin/$asset" || return 1
     printf '%s\n' "$engine_ver" > "$pkgdir/bin/.engine-version"
-    rm -f /tmp/cg-engine /tmp/cg-engine.sha256 "$pkgdir/bin/"*.partial 2>/dev/null || true
+    rm -f "$pkgdir/bin/"*.partial 2>/dev/null || true
     ok "CodeGraph 引擎已安装: $pkgdir/bin/$asset"
     return 0
-}
+)
