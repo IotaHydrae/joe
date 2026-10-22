@@ -92,6 +92,8 @@ def main():
         fail("TUI 组件列表为空 (检查 stty size / 分页计算)")
     if not exited:
         fail("按回车后 TUI 未退出 (Enter 按键未被识别)")
+    if "\x1b[?25h" not in out:
+        fail("退出后未恢复光标 (输出缺少 ESC[?25h)")
 
     match = re.search(r"STUB_ARGS (.*)", out)
     if not match:
