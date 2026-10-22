@@ -303,6 +303,7 @@ test_tui_pty() {
 
     run_pty_check "TUI 渲染/回车确认/选择回传" tests/tui_pty_check.py
     run_pty_check "主菜单浏览不触发安装" tests/menu_pty_check.py
+    run_pty_check "MCP TUI 渲染/选择回传/npx 门禁" tests/mcp_tui_pty_check.py
 }
 
 test_command_adapters() {
@@ -320,12 +321,33 @@ STUB
     assert_forward "mcp status" "--list" mcp status
     assert_forward "mcp install <id>" "memory git" mcp install memory git
     assert_forward "mcp update <id>" "filesystem" mcp update filesystem
-    assert_forward "mcp tui" "--tui" mcp tui
     assert_forward "skills categories" "--categories" skills categories
     assert_forward "skills install <id>" "gdb" skills install gdb
     assert_forward "skills install --category" "--category kernel-dev --all" skills install --category kernel-dev --all
 
     # 旧语法必须逐字透传 (转换层只认动作词)
+    # 交互选择走 MCP TUI; 非交互终端下应拒绝而不是转发给安装器
+    local tui_out=""
+    tui_out=$(MCP_SCRIPT="$FWD_STUB" timeout 10 bash install.sh mcp tui </dev/null 2>&1) || true
+    if [[ $tui_out == *"TUI 需要交互式终端"* && $tui_out != *FWD:* ]]; then
+        test_pass "mcp tui 在非交互终端下拒绝"
+    else
+        test_fail "mcp tui 非交互行为不符: $tui_out"
+    fi
+    tui_out=$(MCP_SCRIPT="$FWD_STUB" timeout 10 bash install.sh mcp --tui </dev/null 2>&1) || true
+    if [[ $tui_out == *"TUI 需要交互式终端"* ]]; then
+        test_pass "mcp --tui 也走新 TUI"
+    else
+        test_fail "mcp --tui 行为不符: $tui_out"
+    fi
+    # 直接调用安装器的 --tui 同样委托新 TUI (不加载旧 tui_module)
+    tui_out=$(timeout 10 bash scripts/install_mcp_servers.sh --tui </dev/null 2>&1) || true
+    if [[ $tui_out == *"TUI 需要交互式终端"* ]]; then
+        test_pass "安装器 --tui 委托新 TUI"
+    else
+        test_fail "安装器 --tui 未委托: $tui_out"
+    fi
+
     assert_forward "mcp --list 透传" "--list" mcp --list
     assert_forward "mcp --all 透传" "--all" mcp --all
     assert_forward "mcp <id> 透传" "memory git" mcp memory git
