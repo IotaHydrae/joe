@@ -25,6 +25,24 @@ def fail(msg):
     sys.exit(1)
 
 
+def wait_for(fd, buf, needle, timeout):
+    """等到输出里出现 needle; 避免固定 sleep 在慢机器上误判。"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if needle in buf.decode("utf-8", "replace"):
+            return True
+        ready, _, _ = select.select([fd], [], [], 0.2)
+        if ready:
+            try:
+                data = os.read(fd, 65536)
+            except OSError:
+                return False
+            if not data:
+                return False
+            buf.extend(data)
+    return False
+
+
 def main():
     tmpdir = tempfile.mkdtemp(prefix="joe-tui-")
     home = os.path.join(tmpdir, "home")
@@ -79,7 +97,11 @@ def main():
 
         exited = os.waitpid(pid, os.WNOHANG)[0] != 0
         if not exited:
-            os.kill(pid, 9)
+            # 子进程可能在上面的检查之后立刻退出; 这时 kill 会抛 ProcessLookupError
+            try:
+                os.kill(pid, 9)
+            except ProcessLookupError:
+                pass
             os.waitpid(pid, 0)
 
         out = b"".join(chunks).decode("utf-8", "replace")

@@ -69,7 +69,10 @@ def run_case(env_extra, keys):
 
     exited = os.waitpid(pid, os.WNOHANG)[0] != 0
     if not exited:
-        os.kill(pid, 9)
+        try:
+            os.kill(pid, 9)
+        except ProcessLookupError:
+            pass
         os.waitpid(pid, 0)
         code = None
     else:
