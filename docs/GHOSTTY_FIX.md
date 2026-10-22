@@ -49,8 +49,8 @@ Ghostty 自带专用 terminfo，确保已安装：
 # 运行 joe 的 Ghostty 修复工具
 ./install.sh repair-ghostty
 
-# 或使用新命令
-./install.sh tools install ghostty --repair
+# 只想修当前用户、不写系统 terminfo:
+./install.sh repair-ghostty --user-only
 ```
 
 ### 方案 3：临时修复（测试用）

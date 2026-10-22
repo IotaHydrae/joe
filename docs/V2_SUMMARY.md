@@ -112,7 +112,7 @@ AI 编程助手:
 | `devtools` | `tools` | ✅ 自动映射 |
 | `devtools --node` | `tools install node` | ✅ 自动转换 |
 | `configs` | `config` | ✅ 自动映射 |
-| `repair-ghostty` | `tools install ghostty --repair` | ✅ 映射 |
+| `repair-ghostty` | `repair-ghostty [--user-only]` | ✅ 保留 (独立修复命令) |
 | `bootstrap` | `quick-start` | ✅ 映射 |
 
 #### 旧参数支持

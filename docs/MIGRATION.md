@@ -42,7 +42,7 @@ Joe 2.0 重构了命令结构，提供更清晰的 CLI 体验，同时保持向�
 | `devtools --node` | `tools install node` | 更清晰的语义 |
 | `devtools --ai` | `tools install --ai` | 快捷组保留 |
 | `configs` | `config` | 单数形式 |
-| `repair-ghostty` | `tools install ghostty --repair` | 统一到 tools 域 |
+| `repair-ghostty` | 保留原命令 (`repair-ghostty [--user-only]`) | 独立修复命令, 不属于 tools 域 |
 | `bootstrap` | `quick-start` | 更清晰的名称 |
 
 ### 3. 新增功能
@@ -128,7 +128,8 @@ Joe 2.0 重构了命令结构，提供更清晰的 CLI 体验，同时保持向�
 ```
 
 更新走各工具的官方自更新机制，`update-all.sh` 没有按组件选择的能力，
-所以 `tools update <组件>` 会直接拒绝并提示改用重装：`tools install <组件>`。
+所以 `tools update <组件>` 会直接拒绝并提示：单项重装需先移除工具，再
+`tools install <组件>`（直接 install 对已装组件只会跳过）。
 
 #### 检查
 ```bash
@@ -185,7 +186,7 @@ Joe 2.0 重构了命令结构，提供更清晰的 CLI 体验，同时保持向�
 ./install.sh devtools              # → tools
 ./install.sh devtools --node       # → tools install node
 ./install.sh configs list          # → config list
-./install.sh repair-ghostty        # → tools install ghostty --repair
+./install.sh repair-ghostty        # → scripts/repair_ghostty.sh
 ./install.sh bootstrap             # → quick-start
 ```
 

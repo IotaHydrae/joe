@@ -11,14 +11,13 @@ VERSION="2.0.0"
 
 usage() {
     cat <<'EOF'
-用法: ./install.sh [全局选项] [<域> <动作> [选项] [参数...]]
+用法: ./install.sh [<域> <动作> [选项] [参数...]]
 
 无参数进入主菜单。
 
-全局选项:
+基础选项 (必须放在最前面, 后面不要跟域):
     -h, --help      显示此帮助
     --version       显示版本信息
-    --dry-run       预览操作但不执行
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 主命令
@@ -98,7 +97,7 @@ usage() {
   devtools [选项]    = tools [选项]
   mcp [旧参数]       兼容旧格式
   configs <动作>     = config <动作>
-  repair-ghostty     = tools install ghostty --repair
+  repair-ghostty     = scripts/repair_ghostty.sh (--user-only 不写系统 terminfo)
   bootstrap          = quick-start
 
 EOF
@@ -287,7 +286,7 @@ route_command() {
             # 修复特定组件
             case "$REPAIR_TARGET" in
                 ghostty)
-                    exec bash "$SCRIPTS_DIR/repair_ghostty.sh"
+                    exec bash "$SCRIPTS_DIR/repair_ghostty.sh" "${COMMAND_ARGS[@]}"
                     ;;
                 *)
                     die "未知的修复目标: $REPAIR_TARGET"

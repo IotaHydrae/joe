@@ -57,7 +57,7 @@ usage() {
     tools install --with-deps claude   # 自动装依赖
     tools update                   # 统一更新所有工具
     tools update --dry-run         # 预览将执行的更新
-    tools install node claude      # 重装指定组件
+    tools install node claude      # 安装指定组件 (已装的会跳过)
 
 EOF
 }
@@ -303,7 +303,7 @@ cmd_update() {
     if [[ ${#ids[@]} -gt 0 ]]; then
         printf "${COLOR_YELLOW}更新不支持按组件选择, 它统一升级所有工具。${COLOR_RESET}\n" >&2
         printf "统一更新: tools update [--dry-run]\n" >&2
-        printf "重装单项: tools install %s\n" "${ids[*]}" >&2
+        printf "单项重装: 先移除该工具, 再 tools install %s\n" "${ids[*]}" >&2
         return 1
     fi
 
