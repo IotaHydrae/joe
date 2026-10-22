@@ -18,8 +18,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo
 
 # 检查当前 TERM
-echo "1. 当前终端类型: $TERM"
-if [ "$TERM" != "dumb" ]; then
+echo "1. 当前终端类型: ${TERM:-<未设置>}"
+if [ "${TERM:-}" != "dumb" ]; then
     ok "TERM 正常，无需修复"
     echo
     echo "如果您在其他 Ghostty 窗口遇到问题，请在那个窗口运行此脚本。"
@@ -37,22 +37,32 @@ if [ ! -f "$CONFIG" ]; then
     touch "$CONFIG"
 fi
 
-# 备份配置
-BACKUP="$CONFIG.backup.$(date +%Y%m%d_%H%M%S)"
-cp "$CONFIG" "$BACKUP"
-info "已备份配置到: $BACKUP"
-echo
+# 备份配置: 与仓库约定一致 (*.bak.<timestamp>) 且只保留最近 5 个
+backup_config() {
+    local backup old
+    backup="$CONFIG.bak.$(date +%Y%m%d%H%M%S)"
+    cp -p "$CONFIG" "$backup"
+    info "已备份配置到: $backup"
+    while IFS= read -r old; do
+        rm -f -- "$old"
+    done < <(find "$(dirname "$CONFIG")" -maxdepth 1 -type f \
+        -name "$(basename "$CONFIG").bak.*" -printf '%T@ %p\n' |
+        sort -rn | tail -n +6 | cut -d' ' -f2-)
+}
 
 # 检查是否已有 term 设置
 echo "3. 修复配置"
-if grep -q "^term = " "$CONFIG"; then
-    current_term=$(grep "^term = " "$CONFIG" | head -1 | cut -d= -f2 | tr -d ' ')
+if grep -qE '^term[[:space:]]*=' "$CONFIG"; then
+    current_term=$(grep -m1 -E '^term[[:space:]]*=' "$CONFIG" | cut -d= -f2- | tr -d ' ')
     warn "已存在 term 设置: $current_term"
 
-    read -p "是否覆盖为 xterm-256color? [y/N] " -r answer
+    if ! read -p "是否覆盖为 xterm-256color? [y/N] " -r answer; then
+        die "非交互环境无法确认; 请手动编辑 $CONFIG"
+    fi
     if [[ $answer =~ ^[Yy]$ ]]; then
-        # 替换现有设置
-        sed -i.tmp 's/^term = .*/term = xterm-256color/' "$CONFIG"
+        backup_config
+        # term=xterm-256color 这种不带空格的写法也要覆盖; 不用 -i.tmp 以免留下 .tmp
+        sed -i 's/^term[[:space:]]*=.*/term = xterm-256color/' "$CONFIG"
         ok "已更新 term 设置"
     else
         info "跳过修改"
@@ -60,6 +70,7 @@ if grep -q "^term = " "$CONFIG"; then
     fi
 else
     # 添加新设置
+    backup_config
     {
         echo ""
         echo "# Terminal type (fixed by joe)"
