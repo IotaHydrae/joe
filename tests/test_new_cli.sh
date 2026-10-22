@@ -468,15 +468,37 @@ test_component_id_lists_agree() {
         diff <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$tui_ids") || true
     fi
 
-    # 新增组件必须同时有安装器 flag, 否则 tools install <id> 会转成无效参数
-    local id
+    # 新增组件也必须有自己的模块, 否则派发时会 die
+    local id missing_module=""
     for id in $deps_ids; do
-        grep -qE -- "^[[:space:]]*--${id}\)" scripts/install_devtools.sh || missing+=" $id"
+        if [ ! -f "scripts/components/$id.sh" ] \
+            || ! grep -q "^component_${id}_install()" "scripts/components/$id.sh"; then
+            missing_module+=" $id"
+        fi
     done
-    if [[ -z $missing ]]; then
-        test_pass "每个组件 id 都映射到 install_devtools.sh 的 flag"
+    if [[ -z $missing_module ]]; then
+        test_pass "每个组件 id 都有模块并暴露 component_<id>_install"
     else
-        test_fail "install_devtools.sh 缺少 flag:$missing"
+        test_fail "缺少组件模块或接口:$missing_module"
+    fi
+
+    # 派发顺序表 (也是依赖顺序) 必须与组件清单一致
+    local order_ids
+    order_ids=$(sed -n 's/^COMPONENT_ORDER=(\(.*\))$/\1/p' scripts/install_devtools.sh |
+        tr ' ' '\n' | sort -u)
+    if diff <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$order_ids") >/dev/null; then
+        test_pass "COMPONENT_ORDER 与组件清单一致"
+    else
+        test_fail "COMPONENT_ORDER 与组件清单不一致"
+        diff <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$order_ids") || true
+    fi
+
+    # 模块之间不应互相调用 (会重新引入隐式依赖)
+    if grep -nE 'component_[a-z_]+_install' scripts/components/*.sh |
+        grep -vE 'component_[a-z_]*_install\(\)' >/dev/null; then
+        test_fail "组件模块之间存在互相调用"
+    else
+        test_pass "组件模块之间无交叉调用"
     fi
 }
 
@@ -612,6 +634,55 @@ test_ghostty_backup_convention() {
     rm -rf "$tmp_home"
 }
 
+test_devtools_dispatch() {
+    test_info "测试组件派发 (stub 模块)"
+
+    local box out runs id
+    make_repo_box; box=$TMP_PATH
+    if ! cp -a "$ROOT_DIR/." "$box/"; then
+        test_fail "无法复制仓库到沙箱"
+        return
+    fi
+    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch; do
+        printf '#!/usr/bin/env bash\ncomponent_%s_install() { echo "RUN:%s"; }\n' "$id" "$id" \
+            > "$box/scripts/components/$id.sh"
+    done
+
+    out=$(cd "$box" && timeout 60 bash scripts/install_devtools.sh --node --brave 2>&1) || true
+    runs=$(grep -E '^RUN:' <<<"$out" | tr '\n' ' ' || true)
+    if [[ $runs == "RUN:node RUN:brave " ]]; then
+        test_pass "按选择的组件派发 (node, brave)"
+    else
+        test_fail "派发不符: $runs"
+    fi
+
+    out=$(cd "$box" && timeout 60 bash scripts/install_devtools.sh --ai 2>&1) || true
+    runs=$(grep -E '^RUN:' <<<"$out" | tr '\n' ' ' || true)
+    if [[ $runs == "RUN:claude RUN:codex " ]]; then
+        test_pass "--ai 派发 claude + codex"
+    else
+        test_fail "--ai 派发不符: $runs"
+    fi
+
+    out=$(cd "$box" && timeout 90 bash scripts/install_devtools.sh --all 2>&1) || true
+    local count
+    count=$(grep -cE '^RUN:' <<<"$out" || true)
+    if [[ $count -eq 15 ]]; then
+        test_pass "--all 派发全部 15 个模块"
+    else
+        test_fail "--all 派发数不符: $count"
+    fi
+
+    # 模块缺失必须显式失败, 不能静默跳过
+    rm -f "$box/scripts/components/brave.sh"
+    out=$(cd "$box" && timeout 60 bash scripts/install_devtools.sh --brave 2>&1) || true
+    if [[ $out == *"缺少组件模块"* ]]; then
+        test_pass "缺失模块时显式报错"
+    else
+        test_fail "缺失模块未报错"
+    fi
+}
+
 # =============================================================================
 # 运行所有测试
 # =============================================================================
@@ -641,6 +712,7 @@ test_quickstart_stages
 test_tools_list_version_failure
 test_repair_forwards_args
 test_ghostty_backup_convention
+test_devtools_dispatch
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
