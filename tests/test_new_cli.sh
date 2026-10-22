@@ -378,6 +378,42 @@ LIST
     rm -rf "$tmp"
 }
 
+test_component_id_lists_agree() {
+    test_info "测试组件 id 清单一致性"
+
+    local deps_ids tui_ids missing=""
+    deps_ids=$(timeout 10 bash -c '
+        set -euo pipefail
+        source scripts/lib/deps.sh
+        for g in "${!COMPONENT_GROUPS[@]}"; do
+            printf "%s\n" ${COMPONENT_GROUPS[$g]}
+        done | sort -u
+    ') || deps_ids=""
+    tui_ids=$(timeout 10 bash -c '
+        set -euo pipefail
+        source scripts/tui_module.sh
+        printf "%s\n" "${TUI_IDS[@]}" | sort -u
+    ') || tui_ids=""
+
+    if diff <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$tui_ids") >/dev/null; then
+        test_pass "deps.sh 组件清单与 tui_module.sh TUI_IDS 未漂移"
+    else
+        test_fail "deps.sh 与 TUI_IDS 已经不一致"
+        diff <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$tui_ids") || true
+    fi
+
+    # 新增组件必须同时有安装器 flag, 否则 tools install <id> 会转成无效参数
+    local id
+    for id in $deps_ids; do
+        grep -qE -- "^[[:space:]]*--${id}\)" scripts/install_devtools.sh || missing+=" $id"
+    done
+    if [[ -z $missing ]]; then
+        test_pass "每个组件 id 都映射到 install_devtools.sh 的 flag"
+    else
+        test_fail "install_devtools.sh 缺少 flag:$missing"
+    fi
+}
+
 # =============================================================================
 # 运行所有测试
 # =============================================================================
@@ -402,6 +438,7 @@ test_tui_pty
 test_command_adapters
 test_tools_update
 test_status_summary
+test_component_id_lists_agree
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
