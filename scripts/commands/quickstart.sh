@@ -62,6 +62,27 @@ c_d() { printf '\033[2m%s\033[0m' "$1"; }
 step() { printf '\n%s %s\n' "$(c_b '▶')" "$(c_b "$1")"; }
 die()  { printf '%s %s\n' "$(c_r '✗')" "$*" >&2; exit 1; }
 
+# 阶段名拼错时 want() 会让所有阶段都被跳过, 必须显式拒绝
+ALL_STAGES="shell devtools mcp skills doctor"
+validate_stage_list() {
+    local list="$1" flag="$2" stage
+    local IFS=,
+    [ -n "$list" ] || return 0
+    for stage in $list; do
+        case " $ALL_STAGES " in
+            *" $stage "*) ;;
+            *) die "$flag 未知阶段: $stage (可用: ${ALL_STAGES// /,})" ;;
+        esac
+    done
+}
+validate_stage_list "$ONLY" --only
+validate_stage_list "$SKIP" --skip
+
+# 非交互时各阶段的 TUI 与确认都无法进行, 直接拒绝而不是无提示地开装
+if ! $ASSUME_YES && [ ! -t 0 ]; then
+    die "非交互环境无法逐阶段确认; 请显式使用 --yes (必要时配合 --only/--skip)"
+fi
+
 want() {
     local s="$1"
     if [ -n "$ONLY" ]; then
@@ -170,6 +191,9 @@ want devtools && TOTAL_STAGES=$((TOTAL_STAGES + 1))
 want mcp && TOTAL_STAGES=$((TOTAL_STAGES + 1))
 want skills && TOTAL_STAGES=$((TOTAL_STAGES + 1))
 want doctor && TOTAL_STAGES=$((TOTAL_STAGES + 1))
+
+# 0 阶段时不能继续: 否则会打印"全部阶段完成 ✓"并退出 0
+[ "$TOTAL_STAGES" -gt 0 ] || die "没有要执行的阶段 (检查 --only/--skip)"
 
 CURRENT_STAGE=0
 
