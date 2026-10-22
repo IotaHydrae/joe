@@ -242,12 +242,15 @@ is_installed() {
 }
 
 # 获取已安装组件的版本
+# 两道保护缺一不可: 分支里的 `|| true` 让直接调用时不会因命令不存在而中止;
+# 末尾的 return 0 保证返回码为 0, 否则调用方的 `ver=$(get_version ...)` 仍会在
+# set -e 下中止 (例如 ~/.local/bin/zed 存在但不在 PATH)。
 get_version() {
     local component="$1"
 
     case "$component" in
         node)
-            node --version 2>/dev/null | tr -d 'v'
+            node --version 2>/dev/null | tr -d 'v' || true
             ;;
         python)
             if [ -d "$HOME/.pyenv" ]; then
@@ -255,21 +258,22 @@ get_version() {
             fi
             ;;
         claude)
-            claude --version 2>/dev/null | head -1 | awk '{print $1}'
+            claude --version 2>/dev/null | head -1 | awk '{print $1}' || true
             ;;
         codex)
-            codex --version 2>/dev/null | head -1
+            codex --version 2>/dev/null | head -1 || true
             ;;
         zed)
-            zed --version 2>/dev/null
+            zed --version 2>/dev/null || true
             ;;
         vscode)
-            code --version 2>/dev/null | head -1
+            code --version 2>/dev/null | head -1 || true
             ;;
         *)
             printf ""
             ;;
     esac
+    return 0
 }
 
 # 获取组件所属的分组
