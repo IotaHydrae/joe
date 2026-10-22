@@ -34,12 +34,14 @@ test_info() {
 assert_forward() {
     local label="$1" expected="$2"
     shift 2
-    local out=""
+    local out="" got
     out=$(MCP_SCRIPT="$FWD_STUB" SKILLS_SCRIPT="$FWD_STUB" timeout 10 bash install.sh "$@" 2>&1) || true
-    if [[ $out == *"FWD|$expected"* ]]; then
+    # 精确比对最后一行: 前缀匹配会放过多余或错位的参数
+    got=$(tail -n1 <<<"$out" | tr -d '\r')
+    if [[ $got == "FWD|$expected" ]]; then
         test_pass "$label"
     else
-        test_fail "$label: 期望 [FWD|$expected], 实际 [$(grep -m1 'FWD|' <<<"$out")]"
+        test_fail "$label: 期望 [FWD|$expected], 实际 [$got]"
     fi
 }
 
@@ -375,6 +377,21 @@ LIST
         test_fail "status 未拒绝未知选项: $out"
     fi
 
+    # 安装器 --list 失败时显示 n/a 并返回非零, 不能把 "n/a" 粘在计数后面
+    cat > "$tmp/mcp_fail.sh" <<'FAIL'
+#!/usr/bin/env bash
+printf '  filesystem  已配置 x\n'
+exit 1
+FAIL
+    chmod +x "$tmp/mcp_fail.sh"
+    local rc=0
+    out=$(MCP_SCRIPT="$tmp/mcp_fail.sh" SKILLS_SCRIPT="$skills" timeout 60 bash install.sh status --short 2>&1) || rc=$?
+    if [[ $rc -eq 1 && $out == *"mcp n/a"* && $out != *"/n/a"* ]]; then
+        test_pass "status 降级为 n/a 并返回 1"
+    else
+        test_fail "status 降级行为不符 (rc=$rc, 输出=$out)"
+    fi
+
     rm -rf "$tmp"
 }
 
@@ -395,7 +412,9 @@ test_component_id_lists_agree() {
         printf "%s\n" "${TUI_IDS[@]}" | sort -u
     ') || tui_ids=""
 
-    if diff <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$tui_ids") >/dev/null; then
+    if [[ -z $deps_ids || -z $tui_ids ]]; then
+        test_fail "组件清单探测为空 (deps=[$deps_ids] tui=[$tui_ids])"
+    elif diff <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$tui_ids") >/dev/null; then
         test_pass "deps.sh 组件清单与 tui_module.sh TUI_IDS 未漂移"
     else
         test_fail "deps.sh 与 TUI_IDS 已经不一致"
@@ -460,7 +479,90 @@ test_quickstart_stages() {
         test_fail "install-all 仍在传 --all"
     fi
 
+    # 非交互且未给 --yes 时必须拒绝, 否则会无提示地开装
+    out=$(cd "$box" && HOME="$box/home" timeout 30 bash install.sh quick-start < /dev/null 2>&1) || true
+    if [[ $out == *"非交互环境无法逐阶段确认"* ]]; then
+        test_pass "非交互且无 --yes 时拒绝执行"
+    else
+        test_fail "非交互 quick-start 未被拒绝"
+    fi
+
+    # 拼错阶段名不能让 want() 静默跳过全部阶段
+    out=$(cd "$box" && HOME="$box/home" timeout 30 bash install.sh quick-start --yes --only nope < /dev/null 2>&1) || true
+    if [[ $out == *"未知阶段: nope"* ]]; then
+        test_pass "--only 校验阶段名"
+    else
+        test_fail "--only 未校验阶段名: $out"
+    fi
+
     rm -rf "$box"
+}
+
+test_tools_list_version_failure() {
+    test_info "测试版本探测失败时的 tools list"
+
+    local tmp_home out rows
+    tmp_home=$(mktemp -d)
+    mkdir -p "$tmp_home/.local/bin"
+    touch "$tmp_home/.local/bin/zed"   # 判定为已装, 但 PATH 里没有 zed
+
+    out=$(HOME="$tmp_home" PATH=/usr/bin:/bin timeout 20 bash install.sh tools list 2>&1) || true
+    rows=$(grep -cE '^  [a-z]+ ' <<<"$out")
+    rm -rf "$tmp_home"
+
+    if [[ $rows -eq 15 ]]; then
+        test_pass "版本命令失败不影响 tools list 完整输出"
+    else
+        test_fail "tools list 被版本探测截断 (行数=$rows, 期望 15)"
+    fi
+}
+
+test_repair_forwards_args() {
+    test_info "测试 repair-ghostty 参数转发"
+
+    local box out
+    box=$(mktemp -d)
+    if ! cp -a "$ROOT_DIR/." "$box/"; then
+        test_fail "无法复制仓库到沙箱"
+        rm -rf "$box"
+        return
+    fi
+    cat > "$box/scripts/repair_ghostty.sh" <<'STUB'
+#!/usr/bin/env bash
+printf 'REPAIR:[%s]\n' "$*"
+STUB
+    chmod +x "$box/scripts/repair_ghostty.sh"
+
+    out=$(cd "$box" && timeout 20 bash install.sh repair-ghostty --user-only 2>&1) || true
+    if [[ $(tail -n1 <<<"$out") == "REPAIR:[--user-only]" ]]; then
+        test_pass "repair-ghostty 转发 --user-only"
+    else
+        test_fail "repair-ghostty 未转发参数: $out"
+    fi
+
+    rm -rf "$box"
+}
+
+test_ghostty_backup_convention() {
+    test_info "测试 Ghostty 修复脚本的备份约定"
+
+    local tmp_home backups
+    tmp_home=$(mktemp -d)
+    mkdir -p "$tmp_home/.config/ghostty"
+    printf 'term=xterm-256color\n' > "$tmp_home/.config/ghostty/config"
+
+    HOME="$tmp_home" TERM=dumb timeout 20 bash scripts/fix_ghostty_term.sh <<< "y" >/dev/null 2>&1 || true
+
+    backups=$(find "$tmp_home/.config/ghostty" -maxdepth 1 -name 'config.bak.*' | wc -l)
+    if [[ $backups -eq 1 ]] \
+        && [[ $(grep -c '^term = xterm-256color$' "$tmp_home/.config/ghostty/config") -eq 1 ]] \
+        && [[ ! -e "$tmp_home/.config/ghostty/config.tmp" ]]; then
+        test_pass "备份用 *.bak.* 且无空格写法被规范化"
+    else
+        test_fail "Ghostty 备份/写入不符 (backups=$backups)"
+    fi
+
+    rm -rf "$tmp_home"
 }
 
 # =============================================================================
@@ -489,6 +591,9 @@ test_tools_update
 test_status_summary
 test_component_id_lists_agree
 test_quickstart_stages
+test_tools_list_version_failure
+test_repair_forwards_args
+test_ghostty_backup_convention
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
