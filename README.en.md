@@ -95,6 +95,11 @@ Installed Gemini CLI, OpenCode, Grok Build, Zed, and VS Code receive the same MC
 ./install.sh mcp memory git        # still supported
 ```
 
+The `./install.sh mcp` TUI groups servers into files/repos, memory/docs and code
+intelligence (pick one), shows whether each entry is already configured in the
+installed AI CLIs, and reports the Node/npx dependency in the status bar. When
+npx is missing it tells you to run `./install.sh tools install node` first.
+
 **Tip**: When first using code intelligence MCPs, tell the AI to "index this project".
 
 ### 4. Agent Skills

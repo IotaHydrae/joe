@@ -97,6 +97,10 @@ cd joe
 ./install.sh mcp memory git            # 仍然工作
 ```
 
+`./install.sh mcp` 的 TUI 按「文件与仓库 / 记忆与文档 / 代码智能（三选一）」分组，
+显示每个服务是否已在已安装的 AI CLI 里配置，并在状态栏提示 Node/npx 依赖；
+缺 npx 时安装前会直接告诉你先运行 `./install.sh tools install node`。
+
 **使用提示**：首次使用代码智能 MCP 时，在项目里说"索引这个项目"。
 
 ### 4. 代理技能（Skills）

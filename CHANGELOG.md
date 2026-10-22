@@ -23,7 +23,11 @@
 - quick-start 补上 `shell` 阶段——此前的"一键全装"根本不含 zsh/OMZ 环境
 - 修正 `install-all` 传引擎不接受的 `--all`（此前必然失败）；非交互读不到确认时按取消处理
 - 修正仓库根推导少一层导致改为从 GitHub 克隆的问题（`--only/--skip` 支持 `shell`，doctor 纳入 `[n/5]` 编号）
-- quick-start 沙箱回归：断言复用当前仓库不重克隆、shell 阶段不加 `--all`、`--only` 阶段裁剪，套件扩充到 44 项
+- quick-start 沙箱回归：断言复用当前仓库不重克隆、shell 阶段不加 `--all`、`--only` 阶段裁剪
+- 新增 MCP TUI（`scripts/ui/tui_mcp.sh`）：分组显示、已配置状态、代码智能三选一标记、Node/npx 依赖状态
+- MCP 安装器与 `mcp` 动作统一委托新 TUI；缺 npx 时安装前给出先装 Node 的命令
+- 共用 `node_has_bin()` 探测 npx（PATH → nvm current → nvm 版本目录），避免两处各写一份
+- 新增 `tests/mcp_tui_pty_check.py`，套件扩充到 53 项
 - 完整文档：迁移指南、技术总结
 
 #### 改进
@@ -114,7 +118,7 @@ scripts/
 - [x] 新主菜单实现（2026-10-21：`scripts/ui/menu_main.sh`）
 - [x] Quick-start 引导流程（2026-10-21：`scripts/commands/quickstart.sh`）
 - [x] CLI 测试套件 + CI（44 项，含两个 pty 回归）
-- [ ] MCP 侧：TUI 改进与"某些 MCP 需要 Node"的依赖管理
+- [x] MCP 侧：TUI 改进与 Node/npx 依赖门禁（2026-10-21）
 - [ ] 组件安装逻辑模块化（每个组件独立模块，取代 `install_devtools.sh` 单体）
 - [ ] 按组件的选择性更新（需要 `update-all.sh` 先支持）
 

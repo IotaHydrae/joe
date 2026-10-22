@@ -5,12 +5,12 @@
 - `install.sh` — the only top-level shell script; routes `./install.sh <domain> <action> [options] [args...]` and provides the curl bootstrap. The interactive menu lives in `scripts/ui/menu_main.sh` and calls back into this router, so there is a single command surface.
 - `scripts/commands/` — the 2.0 action layer. `tools.sh` owns the tools domain; `mcp.sh`, `skills.sh` and `status.sh` stay thin: they translate action words into the legacy installer flags and forward everything else verbatim. Never duplicate an id or skill list here. `quickstart.sh` is the guided pipeline (moved from `scripts/bootstrap.sh`) and must locate the repo root by walking up for `install.sh`, because a hard-coded depth silently falls back to cloning.
 - `scripts/lib/` — shared libraries. `deps.sh` holds `COMPONENT_GROUPS`, `COMPONENT_NAMES` and `COMPONENT_DEPS` for the tools domain; `distro.sh`, `ghostty.sh`, `github.sh`, `node.sh` are symlinks to the `lib_*.sh` files at `scripts/`.
-- `scripts/ui/` — `tui_common.sh` (colors, cursor, key reading), `tui_tools.sh` (the grouped tools TUI) and `menu_main.sh` (the main menu).
+- `scripts/ui/` — `tui_common.sh` (colors, cursor, key reading), `tui_tools.sh` (the grouped tools TUI), `tui_mcp.sh` (the grouped MCP TUI) and `menu_main.sh` (the main menu).
 - `scripts/install_shell.sh` — zsh + Oh My Zsh installer, invoked by `./install.sh shell`.
 - `scripts/install_devtools.sh` — optional cross-distro devtools installer (apt/dnf/pacman/zypper), invoked by `./install.sh tools install …` or the legacy `devtools`.
-- `scripts/tui_module.sh` — the legacy checkbox selector shared by the three installers. Its `TUI_IDS` and `scripts/lib/deps.sh` component lists are two views of the same ids; the CLI suite fails if they drift or if a component lacks its `install_devtools.sh` flag, so keep all three in sync at once.
+- `scripts/tui_module.sh` — the legacy checkbox selector still used by `install_devtools.sh` and `install_skills.sh`; the MCP installer delegates to `scripts/ui/tui_mcp.sh` instead. `TUI_IDS` and the `scripts/lib/deps.sh` component lists are two views of the same ids; the CLI suite fails if they drift or if a component lacks its `install_devtools.sh` flag.
 - `scripts/` — all component installers and maintenance scripts (`doctor.sh`, `update-all.sh`, `sync-configs.sh` live here, not at the root); repository assets remain at the root, so distinguish script paths from repository paths.
-- `tests/` — `test_new_cli.sh` (CLI suite), `tui_pty_check.py` (tools TUI) and `menu_pty_check.py` (main menu); CI runs all of them.
+- `tests/` — `test_new_cli.sh` (CLI suite), plus pty checks for the tools TUI, the MCP TUI and the main menu; CI runs all of them.
 - `docs/` — migration, troubleshooting and design guides.
 - `.config/`, `fonts/`, `.p10k.zsh` — assets copied into the user's home during installation.
 - `README.md` / `README.en.md` — Chinese and English docs; keep both in sync when behavior changes.
@@ -45,7 +45,7 @@ There is no build step. Key commands:
 
 ## Testing Guidelines
 
-`bash tests/test_new_cli.sh` is the CLI suite (also run by CI in the lint job); `tests/tui_pty_check.py` drives the tools TUI and `tests/menu_pty_check.py` drives the main menu, both through a pty. Run them from a copy of the repo in `/tmp`. The command modules accept `DEVTOOLS_SCRIPT`, `UPDATE_SCRIPT`, `MCP_SCRIPT` and `SKILLS_SCRIPT` so tests can stub the installers — every test must use those seams, because the real installers download packages and write to the developer's home. When adding an adapter action, assert the translated argument list with a stub that echoes its parameters.
+`bash tests/test_new_cli.sh` is the CLI suite (also run by CI in the lint job); `tests/tui_pty_check.py`, `tests/mcp_tui_pty_check.py` and `tests/menu_pty_check.py` drive the tools TUI, the MCP TUI and the main menu through a pty. Run them from a copy of the repo in `/tmp`. The command modules accept `DEVTOOLS_SCRIPT`, `UPDATE_SCRIPT`, `MCP_SCRIPT`, `SKILLS_SCRIPT`, `TUI_SCRIPT` and `MCP_NPX_BIN` so tests can stub the installers and the Node probe — every test must use those seams, because the real installers download packages and write to the developer's home. When adding an adapter action, assert the translated argument list with a stub that echoes its parameters.
 
 For the legacy installers, keep verifying with shell harnesses in `/tmp`:
 
