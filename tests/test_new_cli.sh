@@ -289,12 +289,12 @@ run_pty_check() {
         return
     fi
 
-    local rc=0
-    timeout 90 python3 "$script" >/dev/null 2>&1 || rc=$?
+    local rc=0 out=""
+    out=$(timeout 90 python3 "$script" 2>&1) || rc=$?
     case $rc in
         0) test_pass "$label" ;;
         2) test_info "无 pty 支持, 跳过 $label" ;;
-        *) test_fail "$label 失败 (rc=$rc)" ;;
+        *) test_fail "$label 失败 (rc=$rc): $(grep -m1 '^FAIL' <<<"$out")" ;;
     esac
 }
 
@@ -377,12 +377,27 @@ STUB
         test_fail "tools update 未转发选项: $out"
     fi
 
-    # 按组件更新不受支持, 应给出替代命令而不是调用更新器
-    out=$(UPDATE_SCRIPT="$stub" timeout 15 bash install.sh tools update node 2>&1) || true
-    if [[ $out == *"tools install node"* && $out != *UPD:* ]]; then
-        test_pass "tools update 拒绝按组件并提示重装"
+    # 指定组件时转成 update-all 的 --only
+    out=$(UPDATE_SCRIPT="$stub" timeout 15 bash install.sh tools update node claude 2>&1) || true
+    if [[ $out == *"UPD: [--only] [node,claude]"* ]]; then
+        test_pass "tools update <组件...> 转成 --only"
     else
-        test_fail "tools update 按组件行为不符: $out"
+        test_fail "按组件更新转发不符: $out"
+    fi
+
+    out=$(UPDATE_SCRIPT="$stub" timeout 15 bash install.sh tools update --dry-run node 2>&1) || true
+    if [[ $out == *"UPD: [--dry-run] [--only] [node]"* ]]; then
+        test_pass "tools update 同时转发选项与 --only"
+    else
+        test_fail "选项组合转发不符: $out"
+    fi
+
+    # 适配层不判断能否更新, 交给 update-all 给出准确的拒绝信息
+    out=$(UPDATE_SCRIPT="$stub" timeout 15 bash install.sh tools update zed 2>&1) || true
+    if [[ $out == *"UPD: [--only] [zed]"* ]]; then
+        test_pass "tools update 不拦截无自更新机制的组件"
+    else
+        test_fail "zed 转发不符: $out"
     fi
 
     rm -f "$stub"
@@ -683,6 +698,58 @@ test_devtools_dispatch() {
     fi
 }
 
+test_update_only() {
+    test_info "测试 update-all --only"
+
+    local out rc
+
+    rc=0
+    out=$(timeout 20 bash scripts/update-all.sh --only bogus </dev/null 2>&1) || rc=$?
+    if [[ $rc -eq 2 && $out == *"未知更新项: bogus"* ]]; then
+        test_pass "--only 拒绝未知条目"
+    else
+        test_fail "--only 未知条目行为不符 (rc=$rc): $out"
+    fi
+
+    rc=0
+    out=$(timeout 20 bash scripts/update-all.sh --only zed </dev/null 2>&1) || rc=$?
+    if [[ $rc -eq 2 && $out == *"没有自更新机制"* && $out == *"tools install zed"* ]]; then
+        test_pass "无自更新机制的组件给出重装指引"
+    else
+        test_fail "zed 提示不符 (rc=$rc): $out"
+    fi
+
+    rc=0
+    out=$(timeout 20 bash scripts/update-all.sh --only system </dev/null 2>&1) || rc=$?
+    if [[ $rc -eq 2 && $out == *"--system"* ]]; then
+        test_pass "system 必须配合 --system"
+    else
+        test_fail "system 校验不符 (rc=$rc): $out"
+    fi
+
+    # dry-run 不执行任何命令, 可以安全断言筛选结果
+    out=$(timeout 30 bash scripts/update-all.sh --only node --dry-run 2>&1) || true
+    if [[ $out == *"只更新: node"* && $out == *"nvm"* && $out != *"claude"* ]]; then
+        test_pass "--only node 只列出 nvm 一项"
+    else
+        test_fail "--only node 筛选不符: $out"
+    fi
+
+    out=$(timeout 30 bash scripts/update-all.sh --only node,claude --dry-run 2>&1) || true
+    if [[ $out == *"nvm"* && $out == *"claude (Claude Code)"* ]]; then
+        test_pass "--only node,claude 列出两项"
+    else
+        test_fail "--only 多条目筛选不符: $out"
+    fi
+
+    out=$(timeout 30 bash scripts/update-all.sh --only joe --dry-run 2>&1) || true
+    if [[ $out == *"joe (git pull)"* && $out != *"nvm"* ]]; then
+        test_pass "--only joe 不波及其它条目"
+    else
+        test_fail "--only joe 筛选不符: $out"
+    fi
+}
+
 # =============================================================================
 # 运行所有测试
 # =============================================================================
@@ -713,6 +780,7 @@ test_tools_list_version_failure
 test_repair_forwards_args
 test_ghostty_backup_convention
 test_devtools_dispatch
+test_update_only
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
