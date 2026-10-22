@@ -8,6 +8,8 @@
 # 用法:
 #   status            汇总 工具 / MCP / 技能
 #   status --short    单行输出, 便于脚本使用
+#
+# 退出码: 0 = 各域都读到了状态; 1 = 有域的 --list 失败 (显示为 n/a)
 
 set -euo pipefail
 
@@ -45,16 +47,20 @@ EOF
 }
 
 # 只统计状态列命中两种取值的行; 安装器 --list 结尾的其它段落 (如安装位置) 不计入
+# 安装器失败时返回 n/a, 不能把 "n/a" 拼接到已经算出的计数后面
 count_installed() {
-    local yes="$1" no="$2" script="$3"
+    local yes="$1" no="$2" script="$3" listing
     if [ ! -f "$script" ]; then
         printf "n/a"
         return 0
     fi
-    bash "$script" --list 2>/dev/null |
-        awk -v yes="$yes" -v no="$no" '
-            /^  [^ ]/ { if ($2 == yes) { done++; total++ } else if ($2 == no) total++ }
-            END { printf "%d/%d", done + 0, total + 0 }' || printf "n/a"
+    if ! listing=$(bash "$script" --list 2>/dev/null); then
+        printf "n/a"
+        return 0
+    fi
+    awk -v yes="$yes" -v no="$no" '
+        /^  [^ ]/ { if ($2 == yes) { done++; total++ } else if ($2 == no) total++ }
+        END { printf "%d/%d", done + 0, total + 0 }' <<< "$listing"
 }
 
 # 工具域直接用 deps.sh 的判定
@@ -84,9 +90,14 @@ tools="$(count_tools)"
 mcp="$(count_installed '已配置' '未配置' "$MCP_SCRIPT")"
 skills="$(count_installed '已安装' '未安装' "$SKILLS_SCRIPT")"
 
+rc=0
+if [[ $mcp == n/a || $skills == n/a ]]; then
+    rc=1
+fi
+
 if $SHORT; then
     printf 'tools %s | mcp %s | skills %s\n' "$tools" "$mcp" "$skills"
-    exit 0
+    exit "$rc"
 fi
 
 printf '\n'
@@ -95,4 +106,9 @@ printf "${COLOR_BOLD}Joe 安装状态${COLOR_RESET}\n\n"
 printf '  工具   %s\n' "$tools"
 printf '  MCP    %s\n' "$mcp"
 printf '  技能   %s\n' "$skills"
-printf "\n${COLOR_DIM}逐项诊断与修复建议: ./install.sh doctor${COLOR_RESET}\n\n"
+printf "\n${COLOR_DIM}逐项诊断与修复建议: ./install.sh doctor${COLOR_RESET}\n"
+if [[ $rc -ne 0 ]]; then
+    printf "${COLOR_YELLOW}有域无法读取状态 (n/a): 对应安装器的 --list 执行失败${COLOR_RESET}\n"
+fi
+printf '\n'
+exit "$rc"
