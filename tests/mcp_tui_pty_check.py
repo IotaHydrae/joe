@@ -67,7 +67,14 @@ def run_case(env_extra, keys):
         drain(fd, buf, 0.8)
     drain(fd, buf, 1.5)
 
-    exited = os.waitpid(pid, os.WNOHANG)[0] != 0
+    # 负载下退出可能晚于固定 drain, 轮询到超时为止
+    exited = False
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        if os.waitpid(pid, os.WNOHANG)[0] != 0:
+            exited = True
+            break
+        drain(fd, buf, 0.2)
     if not exited:
         try:
             os.kill(pid, 9)
