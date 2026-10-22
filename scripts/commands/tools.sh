@@ -6,7 +6,7 @@
 #   tools                    进入 TUI 选择界面
 #   tools list               列出所有工具及状态
 #   tools install <组件...>  安装指定工具
-#   tools update           统一更新所有工具 (--dry-run / --quiet / --system)
+#   tools update [组件...] 统一更新; 指定组件时只更新这些
 #   tools check              检查系统兼容性
 
 set -euo pipefail
@@ -38,7 +38,7 @@ usage() {
         --with-deps        自动安装依赖
         --ai               快捷安装 Claude + Codex
         --all              安装全部
-    update             统一更新所有工具, 走各工具的官方自更新机制
+    update [组件...]   统一更新; 指定组件时只更新这些
         --dry-run            只显示将执行什么
         --quiet              精简输出
         --system             额外升级系统包
@@ -56,6 +56,7 @@ usage() {
     tools install --ai             # 装 AI 组
     tools install --with-deps claude   # 自动装依赖
     tools update                   # 统一更新所有工具
+    tools update claude node       # 只更新指定组件
     tools update --dry-run         # 预览将执行的更新
     tools install node claude      # 安装指定组件 (已装的会跳过)
 
@@ -289,6 +290,12 @@ cmd_update() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --dry-run|--quiet|--system) flags+=("$1") ;;
+            --only)
+                # 与 update-all 的 --only 同名, 便于偏好显式写法的用户
+                [ -n "${2:-}" ] || { printf "错误: --only 需要组件名\n" >&2; return 1; }
+                flags+=(--only "$2")
+                shift
+                ;;
             -h|--help) usage; return 0 ;;
             *)
                 if validate_component "$1"; then
@@ -302,12 +309,11 @@ cmd_update() {
         shift
     done
 
-    # update-all.sh 靠各工具的官方自更新机制统一升级, 没有按组件选择的能力
+    # 指定组件时转成 update-all 的 --only; 能更新哪些组件由 update-all 校验
     if [[ ${#ids[@]} -gt 0 ]]; then
-        printf "${COLOR_YELLOW}更新不支持按组件选择, 它统一升级所有工具。${COLOR_RESET}\n" >&2
-        printf "统一更新: tools update [--dry-run]\n" >&2
-        printf "单项重装: 先移除该工具, 再 tools install %s\n" "${ids[*]}" >&2
-        return 1
+        local only
+        only=$(IFS=,; printf '%s' "${ids[*]}")
+        flags+=(--only "$only")
     fi
 
     if [ ! -f "$UPDATE_SCRIPT" ]; then

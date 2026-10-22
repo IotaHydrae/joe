@@ -36,7 +36,7 @@ usage() {
       <无参数>           进入 TUI 选择界面
       list               列出所有工具及安装状态
       install <组件...>  安装指定工具
-      update             统一更新所有工具 (--dry-run/--quiet/--system)
+      update [组件...]   统一更新; 指定组件时只更新这些 (--dry-run/--quiet/--system)
       check              检查系统兼容性
 
   mcp                MCP 服务器管理
