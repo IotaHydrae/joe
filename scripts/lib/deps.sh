@@ -29,10 +29,11 @@ declare -A COMPONENT_DEPS=(
     [chatgpt]=""
     [wechat]=""
     [qq]=""
+    [rime]=""
 )
 
 # 日常软件列表 (主菜单日常软件项管理, 不作为开发工具列出)
-DAILY_IDS=(brave chatgpt wechat qq)
+DAILY_IDS=(brave chatgpt wechat qq rime)
 
 # 组件分组定义 (仅包含开发工具)
 declare -A COMPONENT_GROUPS=(
@@ -68,6 +69,7 @@ declare -A COMPONENT_NAMES=(
     [ccswitch]="CC Switch"
     [wechat]="微信"
     [qq]="QQ"
+    [rime]="Rime 雾凇拼音"
 )
 
 # 列表与 TUI 共用的分组顺序和标题
@@ -236,6 +238,9 @@ is_installed() {
         qq)
             command -v qq >/dev/null 2>&1 || command -v linuxqq >/dev/null 2>&1
             ;;
+        rime)
+            command -v fcitx5 >/dev/null 2>&1 && [ -f "$HOME/.local/share/fcitx5/rime/default.yaml" ]
+            ;;
         *)
             return 1
             ;;
@@ -269,6 +274,11 @@ get_version() {
             ;;
         vscode)
             code --version 2>/dev/null | head -1 || true
+            ;;
+        rime)
+            if command -v fcitx5 >/dev/null 2>&1; then
+                fcitx5 --version 2>/dev/null | head -1 | awk '{print $NF}' || true
+            fi
             ;;
         *)
             printf ""

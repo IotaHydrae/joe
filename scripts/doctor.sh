@@ -309,6 +309,11 @@ if find_bin qq >/dev/null 2>&1 || find_bin linuxqq >/dev/null 2>&1; then
 else
     record skip "QQ" "未安装（可选，./install.sh tools install qq）"
 fi
+if find_bin fcitx5 >/dev/null 2>&1 && [ -f "$HOME/.local/share/fcitx5/rime/default.yaml" ]; then
+    record ok "Rime 雾凇拼音" "Fcitx 5 + 雾凇词库"
+else
+    record skip "Rime 雾凇拼音" "未安装（可选，./install.sh tools install rime）"
+fi
 
 # ---------------------------------------------------------------------------
 # 6. MCP 服务器

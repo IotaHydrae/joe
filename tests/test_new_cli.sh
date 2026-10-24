@@ -673,7 +673,7 @@ test_devtools_dispatch() {
         test_fail "无法复制仓库到沙箱"
         return
     fi
-    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch wechat qq; do
+    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch wechat qq rime; do
         printf '#!/usr/bin/env bash\ncomponent_%s_install() { echo "RUN:%s"; }\n' "$id" "$id" \
             > "$box/scripts/components/$id.sh"
     done
@@ -702,7 +702,7 @@ test_devtools_dispatch() {
     else
         test_fail "--all 派发数不符: $count"
     fi
-    if grep -qE '^RUN:(brave|chatgpt|wechat|qq)$' <<<"$out"; then
+    if grep -qE '^RUN:(brave|chatgpt|wechat|qq|rime)$' <<<"$out"; then
         test_fail "--all 包含了日常软件"
     else
         test_pass "--all 未包含日常软件"

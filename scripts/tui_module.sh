@@ -88,6 +88,7 @@ if ! declare -F tui_component_installed >/dev/null 2>&1; then
             ccswitch) command -v cc-switch >/dev/null 2>&1 ;;
             wechat)   command -v wechat >/dev/null 2>&1 || command -v wechat-universal >/dev/null 2>&1 ;;
             qq)       command -v qq >/dev/null 2>&1 || command -v linuxqq >/dev/null 2>&1 ;;
+            rime)     command -v fcitx5 >/dev/null 2>&1 && [ -f "$HOME/.local/share/fcitx5/rime/default.yaml" ] ;;
             *)        return 1 ;;
         esac
     }
@@ -114,6 +115,7 @@ if ! declare -F tui_component_name >/dev/null 2>&1; then
             ccswitch) echo "CC Switch (AI CLI 配置切换器)" ;;
             wechat)   echo "微信 Linux 原生版" ;;
             qq)       echo "Linux QQ" ;;
+            rime)     echo "Rime 雾凇拼音输入法" ;;
             *)        echo "$1" ;;
         esac
     }

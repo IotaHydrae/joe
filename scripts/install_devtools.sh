@@ -27,6 +27,7 @@
 #   ./install.sh devtools --ccswitch # 只装 CC Switch (AI CLI 配置切换器)
 #   ./install.sh devtools --wechat   # 只装微信 Linux 原生版
 #   ./install.sh devtools --qq       # 只装 Linux QQ
+#   ./install.sh devtools --rime     # 只装 Rime 雾凇拼音输入法
 #   ./install.sh devtools --tui      # 交互式勾选界面 (TUI)
 #   ./install.sh devtools --list     # 列出可安装组件
 #   ./install.sh devtools --check    # 只报告本机适配情况 (发行版/包名解析/安装方式), 不做改动
@@ -46,7 +47,7 @@
 #   - 单独修复用 ./install.sh repair-ghostty; --user-only 不写系统 terminfo
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
-#   - brave, chatgpt, wechat, qq 为日常软件, 位于主菜单第 2 项, --all 时默认跳过
+#   - brave, chatgpt, wechat, qq, rime 为日常软件, 位于主菜单第 2 项, --all 时默认跳过
 # =============================================================================
 
 set -euo pipefail
@@ -63,10 +64,10 @@ INSTALL_ALL=false
 TUI_MODE=false
 
 # 安装顺序也是依赖顺序: node 必须先于依赖它的 AI CLI。
-COMPONENT_ORDER=(node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch wechat qq)
+COMPONENT_ORDER=(node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch wechat qq rime)
 
 # 日常软件 (不属于开发工具, --all 时跳过; 走主菜单第 2 项或显式 --<id> 参数安装)
-DAILY_IDS=(brave chatgpt wechat qq)
+DAILY_IDS=(brave chatgpt wechat qq rime)
 is_daily_app() {
     local id="$1" d
     for d in "${DAILY_IDS[@]}"; do
@@ -297,7 +298,7 @@ HAS_ARGS=false
 [ "$#" -gt 0 ] && HAS_ARGS=true
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --node|--python|--claude|--codex|--gemini|--opencode|--copilot|--grok|--zed|--ghostty|--vscode|--brave|--mimo|--chatgpt|--ccswitch|--wechat|--qq)
+        --node|--python|--claude|--codex|--gemini|--opencode|--copilot|--grok|--zed|--ghostty|--vscode|--brave|--mimo|--chatgpt|--ccswitch|--wechat|--qq|--rime)
             WANT[${1#--}]=1; shift ;;
         --ai)       WANT[claude]=1; WANT[codex]=1; shift ;;
         --all)      INSTALL_ALL=true; shift ;;

@@ -95,7 +95,7 @@ main_menu() {
         printf '        Joe 开发环境配置\n'
         printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
         printf '  1) 终端美化      zsh + Oh My Zsh\n'
-        printf '  2) 日常软件      浏览器 / ChatGPT / 微信 / QQ\n'
+        printf '  2) 日常软件      浏览器 / 微信 / QQ / Rime输入法\n'
         printf '  3) 开发工具      Node/Python/AI CLI/编辑器\n'
         printf '  4) MCP 服务器    代码智能/文件系统/浏览器\n'
         printf '  5) 代理技能      技能组与分类选择\n'

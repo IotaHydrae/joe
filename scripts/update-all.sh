@@ -43,7 +43,7 @@ ONLY=""
 # 可单独更新的条目 (key 与 devtools 组件 id 对齐: node/nvm, python/pyenv)
 UPDATE_KEYS="joe node python uv pipx claude codex gemini opencode grok copilot ccswitch chatgpt mimo codebase-memory-mcp codegraph system"
 # 没有自更新机制的组件: 明确告知改用重装
-NO_SELF_UPDATE="zed vscode ghostty brave wechat qq"
+NO_SELF_UPDATE="zed vscode ghostty brave wechat qq rime"
 
 # 用 while 而不是 for: --only 需要消费下一个参数
 while [ "$#" -gt 0 ]; do
