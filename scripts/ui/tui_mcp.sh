@@ -11,50 +11,21 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$_SCRIPT_DIR/tui_common.sh"
 # shellcheck disable=SC1091
 . "$_SCRIPT_DIR/../lib/node.sh"
+# shellcheck disable=SC1091
+. "$_SCRIPT_DIR/../lib/mcp.sh"
 
-MCP_SCRIPT="${MCP_SCRIPT:-$_SCRIPT_DIR/../install_mcp_servers.sh}"
 MCP_NPX_BIN="${MCP_NPX_BIN:-npx}"
 
 declare -a MCP_ITEMS=()
-declare -a MCP_IDS=()
-declare -A MCP_STATUS=()
-declare -A MCP_NAME=()
 declare -A MCP_PICKED=()
 declare -i MCP_CURSOR=0
 declare -i MCP_SCROLL=0
 declare -i MCP_PAGE=15
 
-# 代码智能服务三选一 (与 doctor 的判断一致)
-CODE_INTEL=" codebase-memory-mcp codegraph serena "
-
-
 # 从 --list 读取 id / 状态 / 名称, 再按展示分组排好; 未知 id 归入"其他"
 load_mcps() {
-    local listing id status name group
-    if [ ! -f "$MCP_SCRIPT" ]; then
-        printf "错误: 找不到 MCP 安装器: %s\n" "$MCP_SCRIPT" >&2
-        return 1
-    fi
-    if ! listing=$(bash "$MCP_SCRIPT" --list 2>/dev/null); then
-        printf "错误: 读取 MCP 列表失败: %s --list\n" "$MCP_SCRIPT" >&2
-        return 1
-    fi
-
-    while IFS= read -r line; do
-        [[ $line == "  "* ]] || continue
-        read -r id status name <<< "${line#  }"
-        [[ -n $id ]] || continue
-        MCP_IDS+=("$id")
-        MCP_NAME[$id]="${name:-$id}"
-        if [[ $status == "已配置" ]]; then
-            MCP_STATUS[$id]=1
-        fi
-    done <<< "$listing"
-
-    if [ "${#MCP_IDS[@]}" -eq 0 ]; then
-        printf "错误: 没有解析到任何 MCP 服务\n" >&2
-        return 1
-    fi
+    local id group
+    load_mcp_catalog || return 1
 
     local -a groups=("文件与仓库:filesystem git"
                      "记忆与文档:memory context7"
@@ -87,13 +58,6 @@ load_mcps() {
         done
     fi
     return 0
-}
-
-is_code_intel() {
-    case "$CODE_INTEL" in
-        *" $1 "*) return 0 ;;
-        *) return 1 ;;
-    esac
 }
 
 draw_row() {

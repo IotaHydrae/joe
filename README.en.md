@@ -37,6 +37,8 @@ cd joe
 ### 2. Development Tools (Devtools)
 Cross-distro development tools installation (supports apt/pacman/dnf/zypper):
 
+Main menu item 3 (development tools) uses the same numbered list as item 2 (daily apps): installed status, individual or all-component installation, and `b` to return to the main menu. After installation, the current submenu stays open.
+
 - **Node.js**: nvm + LTS version
 - **Python**: pyenv (doesn't pre-install Python, you choose the version)
 - **AI CLI**: Claude Code, Codex (`--ai` installs only these two), Gemini CLI, OpenCode, GitHub Copilot CLI, Grok Build
@@ -78,6 +80,8 @@ a self-update path (Zed, VS Code, Ghostty, Brave) are rejected with the matching
 
 ### 3. MCP Servers
 Install Model Context Protocol servers for AI coding assistants:
+
+Main menu item 4 (MCP servers) also uses a numbered list with configured status, individual or all-server installation, and `b` to return. Code intelligence services are marked as alternatives (choose one), and Node/npx is checked before installation.
 
 - **filesystem** / **git**: File and code management
 - **memory**: Conversation memory

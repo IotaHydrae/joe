@@ -45,6 +45,8 @@ cd joe
 ### 2. 开发工具（Devtools）
 跨发行版安装开发工具（支持 apt/pacman/dnf/zypper）：
 
+主菜单第 3 项「开发工具」与第 2 项「日常软件」使用相同的编号列表：显示已安装状态，输入编号安装单项，也可全部安装，`b` 返回主菜单。安装完成后留在当前子菜单。
+
 - **Node.js**：nvm + LTS 版本
 - **Python**：pyenv（不预装 Python，你自己选版本）
 - **AI CLI**：Claude Code、Codex（`--ai` 只装这两个）、Gemini CLI、OpenCode、GitHub Copilot CLI、Grok Build
@@ -80,6 +82,8 @@ cd joe
 
 ### 3. MCP 服务器（MCP）
 为 AI 编程助手安装 Model Context Protocol 服务器：
+
+主菜单第 4 项「MCP 服务器」同样使用编号列表，显示已配置状态，支持单项或全部安装，`b` 返回主菜单。代码智能服务会标记「三选一」，安装前会检查 Node/npx。
 
 - **filesystem** / **git**：文件和代码管理
 - **memory**：对话记忆

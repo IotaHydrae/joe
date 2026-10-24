@@ -14,6 +14,10 @@ SCRIPTS_DIR="$ROOT_DIR/scripts"
 # shellcheck disable=SC1091
 . "$SCRIPTS_DIR/lib/deps.sh"
 # shellcheck disable=SC1091
+. "$SCRIPTS_DIR/lib/mcp.sh"
+# shellcheck disable=SC1091
+. "$SCRIPTS_DIR/lib/node.sh"
+# shellcheck disable=SC1091
 . "$SCRIPTS_DIR/ui/tui_common.sh"
 
 # 交给 install.sh 路由; 非零退出码只提示, 不让菜单结束
@@ -27,24 +31,51 @@ run_action() {
     fi
 }
 
-apps_menu() {
-    local choice i comp name status all_idx
-    local total=${#DAILY_IDS[@]}
-    all_idx=$((total + 1))
+# 安装子菜单共用编号、状态、全部安装和返回操作。
+install_menu() {
+    local title="$1" domain="$2"
+    shift 2
+    local -a ids=("$@") selected=()
+    local choice i comp name status total all_idx
+    local refresh=true
     while true; do
-        printf '\n── 日常软件安装 ──\n'
+        if [[ $domain == mcp ]] && $refresh; then
+            load_mcp_catalog || return 0
+            ids=("${MCP_IDS[@]}")
+            refresh=false
+        fi
+        total=${#ids[@]}
+        all_idx=$((total + 1))
+        printf '\n── %s ──\n' "$title"
         for ((i=0; i<total; i++)); do
-            comp="${DAILY_IDS[i]}"
-            name="${COMPONENT_NAMES[$comp]:-$comp}"
-            if is_installed "$comp"; then
-                status=" (已安装)"
+            comp="${ids[i]}"
+            status=""
+            if [[ $domain == mcp ]]; then
+                name="${MCP_NAME[$comp]:-$comp}"
+                if [[ -n ${MCP_STATUS[$comp]:-} ]]; then
+                    status=" (已配置)"
+                fi
+                if is_code_intel "$comp"; then
+                    status+=" [三选一]"
+                fi
             else
-                status=""
+                name="${COMPONENT_NAMES[$comp]:-$comp}"
+                if is_installed "$comp"; then
+                    status=" (已安装)"
+                fi
             fi
             printf '  %d) 安装 %s%s\n' "$((i+1))" "$name" "$status"
         done
         printf '  %d) 全部安装\n' "$all_idx"
         printf '  b) 返回主菜单\n'
+        if [[ $domain == mcp ]]; then
+            if node_has_bin "${MCP_NPX_BIN:-npx}"; then
+                printf '\nNode/npx: 可用\n'
+            else
+                printf '\nNode/npx: 缺失 (请先运行 ./install.sh tools install node)\n'
+            fi
+            printf '代码智能 MCP 建议三选一。\n'
+        fi
         printf '选择操作 [1-%d/b]: ' "$all_idx"
         IFS= read -r choice || return 0
         case "$choice" in
@@ -53,11 +84,22 @@ apps_menu() {
             *)
                 if [[ "$choice" =~ ^[0-9]+$ ]]; then
                     if [ "$choice" -ge 1 ] && [ "$choice" -le "$total" ]; then
-                        run_action tools install "${DAILY_IDS[$((choice-1))]}"
+                        selected=("${ids[$((10#$choice-1))]}")
                     elif [ "$choice" -eq "$all_idx" ]; then
-                        run_action tools install "${DAILY_IDS[@]}"
+                        selected=("${ids[@]}")
                     else
                         printf '请输入有效编号或 b。\n'
+                        continue
+                    fi
+                    if [[ $domain == mcp ]]; then
+                        if ! node_has_bin "${MCP_NPX_BIN:-npx}"; then
+                            printf 'MCP 安装需要 Node/npx, 请先运行: ./install.sh tools install node\n' >&2
+                            continue
+                        fi
+                        run_action mcp install "${selected[@]}"
+                        refresh=true
+                    else
+                        run_action tools install --with-deps "${selected[@]}"
                     fi
                 else
                     printf '请输入有效编号或 b。\n'
@@ -65,6 +107,25 @@ apps_menu() {
                 ;;
         esac
     done
+}
+
+apps_menu() {
+    install_menu "日常软件安装" tools "${DAILY_IDS[@]}"
+}
+
+tools_menu() {
+    local group comp
+    local -a ids=()
+    for group in "${COMPONENT_GROUP_ORDER[@]}"; do
+        for comp in ${COMPONENT_GROUPS[$group]:-}; do
+            ids+=("$comp")
+        done
+    done
+    install_menu "开发工具安装" tools "${ids[@]}"
+}
+
+mcp_menu() {
+    install_menu "MCP 服务器安装" mcp
 }
 
 config_menu() {
@@ -115,8 +176,8 @@ main_menu() {
         case "$choice" in
             1) run_action shell ;;
             2) apps_menu ;;
-            3) run_action tools ;;
-            4) run_action mcp ;;
+            3) tools_menu ;;
+            4) mcp_menu ;;
             5) run_action skills ;;
             6) run_action status ;;
             7) run_action doctor ;;
