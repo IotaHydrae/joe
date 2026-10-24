@@ -32,13 +32,15 @@ fi
 
 # Configuration and constants
 OMZ_INSTALL_DIR=~/.oh-my-zsh
-OMZ_ZSHRC_TEMPLATE="$OMZ_INSTALL_DIR/templates/zshrc.zsh-template"
 PL10K_INSTALL_DIR=~/.powerlevel10k
 ZSH_AUTOSUGGESTIONS_DIR=~/.zsh-autosuggestions
 ZSH_SYNTAX_HIGHLIGHTING_DIR=~/.zsh-syntax-highlighting
 GHOSTTY_IMMODULE_DIR=~/.local/share/ghostty-appimage/gtk-immodules
 LOG_FILE="$SCRIPT_DIR/install.log"
 BACKUP_RETENTION=5
+
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/scripts/lib/zsh.sh"
 
 # Use sudo for privileged commands unless we are already root
 if [ "$EUID" -eq 0 ]; then
@@ -66,6 +68,7 @@ NO_GHOSTTY_IME=false
 CLEAN_BACKUPS=false
 UPDATE_MODE=false
 SHOW_HELP=false
+CONFIGURE_ONLY=false
 
 # Progress tracking
 PROGRESS_CURRENT=0
@@ -118,10 +121,9 @@ calculate_total_steps() {
     $NO_FONTS || PROGRESS_TOTAL=$((PROGRESS_TOTAL + 1))
     $NO_P10K || PROGRESS_TOTAL=$((PROGRESS_TOTAL + 2))  # powerlevel10k + config
     $NO_FASTFETCH || PROGRESS_TOTAL=$((PROGRESS_TOTAL + 1))
-    $NO_DEFAULT_PLUGINS || PROGRESS_TOTAL=$((PROGRESS_TOTAL + 1))
     $NO_GHOSTTY_IME || PROGRESS_TOTAL=$((PROGRESS_TOTAL + 1))
 
-    PROGRESS_TOTAL=$((PROGRESS_TOTAL + 3))  # zsh-autosuggestions, zsh-syntax-highlighting, fzf
+    PROGRESS_TOTAL=$((PROGRESS_TOTAL + 4))  # plugins, fzf, and final zsh configuration
 }
 
 # Function to print help message
@@ -134,6 +136,7 @@ Installs and configures zsh with Oh My Zsh, powerlevel10k, and other tools.
 Options:
     -h, --help              Show this help message and exit
     -n, --dry-run           Simulate installation without making changes
+    --configure-only       Optimize existing zsh config offline, without installing components
     --no-fonts              Skip font installation
     --no-config             Skip .config directory copying
     --no-p10k               Skip powerlevel10k configuration
@@ -156,6 +159,10 @@ parse_args() {
             -n|--dry-run)
                 DRY_RUN=true
                 log INFO "Dry run mode enabled - no changes will be made"
+                shift
+                ;;
+            --configure-only)
+                CONFIGURE_ONLY=true
                 shift
                 ;;
             --no-fonts)
@@ -366,108 +373,6 @@ copy_with_backup() {
     run_cmd cp -r -- "$src" "$dest"
 }
 
-# Add a line to ~/.zshrc if it doesn't already exist
-add_source_line() {
-    local line="$1"
-    if ! grep -qxF "$line" ~/.zshrc 2>/dev/null; then
-        log INFO "Adding '$line' to ~/.zshrc"
-        if $DRY_RUN; then
-            log INFO "Dry run: Would execute: printf '%s\\n' \"$line\" >> ~/.zshrc"
-        else
-            printf '%s\n' "$line" >> ~/.zshrc
-        fi
-    else
-        log INFO "'$line' already exists in ~/.zshrc"
-    fi
-}
-
-# Enable a plugin bundled with Oh My Zsh by adding it to plugins=() in ~/.zshrc
-enable_omz_plugin() {
-    local plugin="$1"
-    local zshrc=~/.zshrc
-
-    if [ ! -f "$zshrc" ]; then
-        log WARNING "~/.zshrc not found, cannot enable plugin '$plugin'"
-        return 1
-    fi
-
-    if ! grep -q "plugins=(" "$zshrc"; then
-        log WARNING "No plugins=(...) line found in ~/.zshrc, cannot enable plugin '$plugin'"
-        return 1
-    fi
-
-    if $DRY_RUN; then
-        log INFO "Dry run: Would ensure '$plugin' is enabled in plugins=() in ~/.zshrc"
-        return 0
-    fi
-
-    log INFO "Ensuring '$plugin' is enabled in plugins=() in ~/.zshrc"
-    OMZ_PLUGIN="$plugin" perl -i -e '
-        my $plugin = $ENV{"OMZ_PLUGIN"};
-        my $in_block = 0;
-        my $block_indent = "";
-        my $block_has_plugin = 0;
-        my $changed = 0;
-
-        while (my $line = <>) {
-            if (!$in_block) {
-                if ($line =~ /^(\s*)plugins=\(/) {
-                    $in_block = 1;
-                    $block_indent = $1;
-                    $block_has_plugin = ($line =~ /\b\Q$plugin\E\b/);
-                    if ($line =~ /\)/) {
-                        # Single-line plugins=(...): insert the plugin before the closing paren
-                        if (!$block_has_plugin) {
-                            $line =~ s/\)(\s*)$/ $plugin)$1/;
-                            $changed = 1;
-                        }
-                        $in_block = 0;
-                    }
-                }
-                print $line;
-                next;
-            }
-            # Inside a multi-line plugins=(...) block
-            if ($line =~ /\)/) {
-                if (!$block_has_plugin) {
-                    print "${block_indent}  $plugin\n";
-                    $changed = 1;
-                }
-                $in_block = 0;
-            } else {
-                $block_has_plugin = 1 if $line =~ /\b\Q$plugin\E\b/;
-            }
-            print $line;
-        }
-        exit 0;
-    ' "$zshrc"
-}
-
-# Enable a curated set of plugins that ship with Oh My Zsh
-enable_default_plugins() {
-    if $NO_DEFAULT_PLUGINS; then
-        log INFO "Skipping default plugins (--no-default-plugins)"
-        return
-    fi
-
-    if [ ! -d "$OMZ_INSTALL_DIR" ]; then
-        log WARNING "Oh My Zsh is not installed, skipping default plugins"
-        return
-    fi
-
-    local -a default_plugins=(git sudo extract colored-man-pages colorize z history aliases dirhistory web-search command-not-found you-should-use)
-    log INFO "Enabling default Oh My Zsh plugins: ${default_plugins[*]}"
-
-    local plugin
-    for plugin in "${default_plugins[@]}"; do
-        if [ -d "$OMZ_INSTALL_DIR/plugins/$plugin" ]; then
-            enable_omz_plugin "$plugin" || true
-        else
-            log WARNING "Plugin '$plugin' is not bundled with Oh My Zsh, skipping"
-        fi
-    done
-}
-
 # Clean up old backup files in a directory
 clean_backups_in_dir() {
     local dir="$1"
@@ -540,77 +445,26 @@ verify_omz_installed() {
     exit 1
 }
 
-# Minimal Oh My Zsh bootstrap used when the upstream template is unavailable
-omz_bootstrap_block() {
-    cat << 'EOF'
-export ZSH="$HOME/.oh-my-zsh"
-ZSH_THEME="robbyrussell"
-plugins=(git)
-source $ZSH/oh-my-zsh.sh
-EOF
-}
-
-# Make sure ~/.zshrc bootstraps Oh My Zsh.
-#
-# Oh My Zsh only writes its template when it creates ~/.zshrc itself, so a
-# missing file used to be replaced by an empty one that the script then filled
-# with bare `source ...` lines. An existing ~/.zshrc that never loads
-# oh-my-zsh.sh (older runs, interrupted installs) is repaired by prepending the
-# bootstrap block, keeping everything the user already had.
-ensure_zshrc() {
-    if $DRY_RUN; then
-        log INFO "Dry run: Would ensure ~/.zshrc bootstraps Oh My Zsh"
-        return 0
-    fi
-
-    if [ ! -f ~/.zshrc ]; then
-        if [ -f "$OMZ_ZSHRC_TEMPLATE" ]; then
-            log INFO "Creating ~/.zshrc from the Oh My Zsh template..."
-            cp -- "$OMZ_ZSHRC_TEMPLATE" ~/.zshrc
-        else
-            log WARNING "Oh My Zsh template not found, writing a minimal ~/.zshrc"
-            omz_bootstrap_block > ~/.zshrc
-        fi
-        return 0
-    fi
-
-    if grep -q 'oh-my-zsh\.sh' ~/.zshrc; then
-        log INFO "~/.zshrc already loads Oh My Zsh"
-        return 0
-    fi
-
-    local backup=~/.zshrc.bak.$(date +%Y%m%d%H%M%S)
-    local mode
-    local merged
-    mode=$(stat -c '%a' ~/.zshrc)
-    merged=$(mktemp)
-    log WARNING "~/.zshrc does not load Oh My Zsh; adding the bootstrap block on top (backup: $backup)"
-    cp -r -- ~/.zshrc "$backup"
-    {
-        omz_bootstrap_block
-        printf '\n'
-        cat -- ~/.zshrc
-    } > "$merged"
-    chmod "$mode" "$merged"
-    mv -- "$merged" ~/.zshrc
-}
-
-# Install a zsh plugin, preferring an Oh My Zsh bundled copy when available
+# Install optional widgets only; the shared template controls their load order.
 install_zsh_plugin() {
-    local repo_url="$1"
-    local target_dir="$2"
-    local plugin="$3"
-
+    local repo_url="$1" target_dir="$2" plugin="$3"
     if [ -d "$OMZ_INSTALL_DIR/plugins/$plugin" ] || [ -d "$OMZ_INSTALL_DIR/custom/plugins/$plugin" ]; then
-        log INFO "$plugin is bundled with Oh My Zsh; enabling it via plugins=()"
-        if enable_omz_plugin "$plugin"; then
-            return 0
-        fi
-        log WARNING "Could not enable $plugin via plugins=(); falling back to standalone install"
+        log INFO "$plugin is already provided by Oh My Zsh"
+        return 0
     fi
-
     git_clone_shallow "$repo_url" "$target_dir" "$plugin"
-    add_source_line "source $target_dir/$plugin.zsh"
+}
+
+# Keep installer messages level-prefixed while the helper also works standalone.
+apply_zsh_configuration() {
+    local result line
+    if ! result=$(configure_zshrc); then
+        log ERROR "Could not update zsh configuration; the existing file was preserved"
+        return 1
+    fi
+    while IFS= read -r line; do
+        [[ -z $line ]] || log INFO "$line"
+    done <<< "$result"
 }
 
 # Update git repo
@@ -634,7 +488,9 @@ update_components() {
     log INFO "Updating installed components..."
 
     git_update_repo "$OMZ_INSTALL_DIR" "Oh My Zsh"
-    git_update_repo "$PL10K_INSTALL_DIR" "powerlevel10k"
+    if ! $NO_P10K; then
+        git_update_repo "$PL10K_INSTALL_DIR" "powerlevel10k"
+    fi
     git_update_repo "$ZSH_AUTOSUGGESTIONS_DIR" "zsh-autosuggestions"
     git_update_repo "$ZSH_SYNTAX_HIGHLIGHTING_DIR" "zsh-syntax-highlighting"
     git_update_repo ~/.fzf "fzf" "$HOME/.fzf/install" --bin
@@ -768,6 +624,17 @@ main() {
         exit 0
     fi
 
+    if $CONFIGURE_ONLY; then
+        if $UPDATE_MODE || $CLEAN_BACKUPS; then
+            log ERROR "--configure-only cannot be combined with --update or --clean-backups"
+            return 1
+        fi
+        log INFO "Optimizing existing zsh configuration without installing components..."
+        apply_zsh_configuration
+        log SUCCESS "Zsh configuration updated; open a new terminal to use it"
+        return 0
+    fi
+
     if $CLEAN_BACKUPS; then
         clean_backups
         exit 0
@@ -796,6 +663,13 @@ main() {
     check_dependency curl
     if [ "$EUID" -ne 0 ]; then
         check_dependency sudo
+    fi
+    if ! command -v python3 >/dev/null 2>&1; then
+        log INFO "Installing python3 for safe zsh configuration migration..."
+        install_package python3
+    fi
+    if ! $DRY_RUN; then
+        check_dependency python3
     fi
     log SUCCESS "All dependencies satisfied"
 
@@ -866,29 +740,17 @@ main() {
         run_cmd $SUDO_CMD chsh "$(id -un)" -s "$(command -v zsh)"
     fi
 
-    # Make sure ~/.zshrc actually bootstraps Oh My Zsh
-    ensure_zshrc
-
-    # Enable a curated set of plugins that ship with Oh My Zsh
-    if ! $NO_DEFAULT_PLUGINS; then
-        show_progress "Enabling default plugins"
-        enable_default_plugins
-    fi
-
-    # Install powerlevel10k
-    show_progress "Installing powerlevel10k theme"
-    git_clone_shallow https://github.com/romkatv/powerlevel10k.git "$PL10K_INSTALL_DIR" "powerlevel10k theme"
-
+    # The final template loads only one prompt theme.
     if ! $NO_P10K; then
-        add_source_line "source $PL10K_INSTALL_DIR/powerlevel10k.zsh-theme"
-        add_source_line "[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh"
+        show_progress "Installing powerlevel10k theme"
+        git_clone_shallow https://github.com/romkatv/powerlevel10k.git "$PL10K_INSTALL_DIR" "powerlevel10k theme"
     fi
 
     # Install fzf
     show_progress "Installing fzf"
     git_clone_shallow https://github.com/junegunn/fzf.git ~/.fzf "fzf"
     if [ ! -f ~/.fzf/bin/fzf ]; then
-        run_cmd bash -c "yes | ~/.fzf/install"
+        run_cmd bash "$HOME/.fzf/install" --bin
     fi
 
     # Install zsh-autosuggestions (skips clone if already bundled with Oh My Zsh)
@@ -910,6 +772,9 @@ main() {
         show_progress "Applying Ghostty IME fix"
         fix_ghostty_appimage_ime
     fi
+
+    show_progress "Configuring zsh startup"
+    apply_zsh_configuration
 
     log SUCCESS "Installation complete! Please restart your terminal or log out and log back in for changes to take effect."
 

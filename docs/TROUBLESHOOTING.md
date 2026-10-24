@@ -210,20 +210,24 @@ command not found: nvm
 ```
 
 **说明**：
-这是预期行为。Joe 的设计是：
-- nvm 安装到 `~/.nvm`
-- 但**不加载** nvm shell 函数（避免拖慢 shell 启动）
-- 直接使用 `~/.nvm/current/bin` 中的 node
+优化后的 zsh 配置通过 `~/.nvm/current/bin` 直接提供 Node，首次运行 `nvm` 时才加载 shell 集成。如果已有 nvm 但命令不可用，先应用配置并重新打开 zsh：
 
-**如果需要 nvm 命令**：
 ```bash
-# 临时加载
-source ~/.nvm/nvm.sh
-
-# 或永久加载（不推荐，会拖慢启动）
-echo 'export NVM_DIR="$HOME/.nvm"' >> ~/.zshrc
-echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"' >> ~/.zshrc
+./install.sh shell --configure-only
+exec zsh
+nvm --version
 ```
+
+**切换 Node 版本**：
+
+```bash
+# 使用已设置的默认版本，并让后续终端使用相同版本
+NVM_SYMLINK_CURRENT=true nvm use default
+export PATH="${NVM_DIR:-$HOME/.nvm}/current/bin:$PATH"
+node --version
+```
+
+`current` 是指向所选 Node 安装目录的符号链接。尚未安装 nvm/Node 时运行 `./install.sh tools install node`；已有自定义 `NVM_DIR` 时，固定路径对应 `$NVM_DIR/current/bin`。
 
 ---
 

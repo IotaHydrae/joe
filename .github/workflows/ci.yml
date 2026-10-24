@@ -59,6 +59,13 @@ jobs:
           print("python OK")
           PY
 
+      - name: 安装 zsh 测试运行时
+        run: |
+          if ! command -v zsh >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y zsh
+          fi
+
       - name: CLI 测试套件 (含 TUI pty 回归)
         run: bash tests/test_new_cli.sh
 

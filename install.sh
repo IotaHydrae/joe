@@ -30,6 +30,7 @@ usage() {
       --no-p10k          跳过 powerlevel10k
       --no-fastfetch     跳过 fastfetch
       --no-default-plugins  不启用默认 OMZ 插件
+      --configure-only  仅优化 zsh 配置 (保留个人设置, 不安装软件)
       --clean-backups    清理旧备份 (保留最近 5 个)
 
   fonts              字体安装 (Fixedsys Excelsior / JetBrains Mono)
@@ -139,7 +140,7 @@ detect_command() {
         bootstrap) COMMAND="quick-start" ;;  # 映射到新命令
 
         # 旧 Shell 参数（向后兼容）: 参数本身就是选项, 不能 shift 掉
-        -n|--dry-run|--no-fonts|--no-config|--no-p10k|--no-fastfetch|--no-default-plugins|--no-ghostty-ime|--clean-backups|-u)
+        -n|--dry-run|--no-fonts|--no-config|--no-p10k|--no-fastfetch|--no-default-plugins|--no-ghostty-ime|--configure-only|--clean-backups|-u)
             COMMAND="shell"
             COMMAND_ARGS=("$@")
             return 0
@@ -229,7 +230,7 @@ route_command() {
 
         shell)
             # Shell 环境安装
-            local script="$SCRIPTS_DIR/install_shell.sh"
+            local script="${SHELL_SCRIPT:-$SCRIPTS_DIR/install_shell.sh}"
             [ -f "$script" ] || die "脚本不存在: $script"
             exec bash "$script" "${COMMAND_ARGS[@]}"
             ;;

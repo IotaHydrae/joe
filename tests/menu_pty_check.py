@@ -44,7 +44,7 @@ LIST_OUTPUT = """可用 MCP 服务器:
 """
 INSTALL_MARKERS = (
     "[INFO]", "[PROGRESS]", "Installing", "正在安装", "将安装以下组件",
-    "TOOLS_INSTALL|", "MCP_INSTALL|", "FONTS_INSTALL|",
+    "TOOLS_INSTALL|", "MCP_INSTALL|", "FONTS_INSTALL|", "SHELL_INSTALL|",
 )
 
 
@@ -171,6 +171,13 @@ def main():
                 'printf "FONTS_INSTALL|%s\\n" "$*"\n'
                 'printf "FONTS|%s\\n" "$*" >> "$CALL_LOG"\n'
             )
+        shell_stub = os.path.join(tmpdir, "shell.sh")
+        with open(shell_stub, "w", encoding="utf-8") as handle:
+            handle.write(
+                '#!/usr/bin/env bash\n'
+                'printf "SHELL_INSTALL|%s\\n" "$*"\n'
+                'printf "SHELL|%s\\n" "$*" >> "$CALL_LOG"\n'
+            )
         npx_stub = os.path.join(fakebin, "npx")
         with open(npx_stub, "w", encoding="utf-8") as handle:
             handle.write("#!/usr/bin/env bash\nexit 0\n")
@@ -183,6 +190,7 @@ def main():
             os.environ, TERM="xterm-256color", LC_ALL="C.UTF-8", HOME=home,
             PATH=fakebin, NVM_DIR=os.path.join(home, ".nvm"),
             DEVTOOLS_SCRIPT=devtools_stub, MCP_SCRIPT=mcp_stub, FONTS_SCRIPT=fonts_stub,
+            SHELL_SCRIPT=shell_stub,
             MCP_NPX_BIN="npx", CALL_LOG=call_log, MCP_EXIT="0", LIST_FAIL="0",
         )
 
@@ -216,6 +224,8 @@ def main():
         os.rmdir(os.path.join(home, ".pyenv"))
 
         with MenuSession(env) as session:
+            out = session.choose("1", MAIN_PROMPT)
+            require("SHELL_INSTALL|\r\n" in out, "菜单 1 没有派发统一 Shell 安装路径")
             session.choose("3", TOOLS_PROMPT)
             out = session.choose("2", TOOLS_PROMPT)
             require("TOOLS_INSTALL|--python" in out, "开发工具单项安装派发错误")
@@ -247,6 +257,7 @@ def main():
         with open(call_log, encoding="utf-8") as handle:
             calls = handle.read().splitlines()
         require(calls == [
+            "SHELL|",
             "TOOLS|--python", "TOOLS|--node --claude", "TOOLS|" + expected,
             "MCP|memory", "MCP|" + " ".join(MCP_IDS),
             "FONTS|jetbrains-mono", "FONTS|fsex302 jetbrains-mono",

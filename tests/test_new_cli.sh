@@ -910,6 +910,19 @@ test_fonts_installation() {
     fi
 }
 
+test_zsh_configuration() {
+    test_info "测试离线 zsh 配置优化"
+    local out rc=0
+    out=$(timeout 45 bash tests/zsh_config_check.sh 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        test_pass "zsh 配置迁移、按需初始化、幂等和 dry-run"
+    elif [[ $rc -eq 2 ]]; then
+        test_info "未安装 zsh, 跳过交互配置回归"
+    else
+        test_fail "zsh 配置回归失败 (rc=$rc): $out"
+    fi
+}
+
 # =============================================================================
 # 运行所有测试
 # =============================================================================
@@ -944,6 +957,7 @@ test_update_only
 test_daily_app_packages
 test_predictable_temp_paths
 test_fonts_installation
+test_zsh_configuration
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"

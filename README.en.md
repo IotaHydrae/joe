@@ -28,10 +28,16 @@ cd joe
 - **Common plugins**: auto-completion, syntax highlighting, fzf fuzzy search, etc.
 - **Auto-backup**: backs up original config before changes, keeps last 5
 
+Main menu item 1 and the `shell` command apply the same optimized zsh configuration. Fresh setups enable six OMZ plugins: `git sudo extract z history dirhistory`. The theme uses installed powerlevel10k or robbyrussell. Autosuggestions run asynchronously, syntax highlighting loads last, and fzf loads its existing completion and key-binding scripts directly. Node/Python use static PATH entries; version-manager integration loads when `nvm` / `pyenv` is first invoked. OMZ automatic update checks are disabled; use `./install.sh shell --update` to update explicitly.
+
+Existing aliases, custom PATH entries, proxy settings, and plugin choices are preserved. Personal settings live in the user block of `.zshrc` or in `~/.zshrc.local`. Use `--configure-only` to apply the configuration offline. Changed files are backed up as `.zshrc.bak.<timestamp>`, keeping the latest five; identical contents are left untouched.
+
 ```bash
-./install.sh shell              # Full installation
-./install.sh shell --dry-run    # Preview operations
-./install.sh shell --no-fonts   # Skip fonts
+./install.sh shell                              # Full installation with optimized config
+./install.sh shell --dry-run                    # Preview operations
+./install.sh shell --configure-only             # Update zsh config offline only
+./install.sh shell --configure-only --dry-run   # Preview config migration
+./install.sh shell --no-fonts                   # Skip fonts
 ```
 
 ### Font Installation (Fonts)
@@ -196,10 +202,12 @@ bash scripts/fix_ghostty_term.sh  # Fixes the TERM=dumb problem
 ### Shell Options
 ```bash
 --dry-run              # Simulate run without actual changes
+--configure-only       # Update zsh config offline only; no packages, downloads, default-shell changes, or fonts/.config copies
 --no-fonts             # Skip font installation
 --no-config            # Skip .config copy
 --no-p10k              # Skip powerlevel10k
 --no-fastfetch         # Skip fastfetch
+--no-default-plugins   # Fresh config enables only git; preserve existing plugin choices
 --clean-backups        # Clean old backups (keep last 5)
 -u, --update           # Update installed components
 ```
@@ -312,7 +320,7 @@ joe/
 ├── install.sh              # Main entry, command router and menu
 ├── scripts/
 │   ├── commands/           # tools/mcp/skills/fonts action adapters
-│   ├── lib/                # Distro / GitHub / Node / dependencies and font catalog
+│   ├── lib/                # Distro / Node / zsh migration / dependencies and font catalog
 │   ├── ui/                 # TUI components
 │   ├── install_shell.sh    # Shell environment installation
 │   ├── install_fonts.sh    # User font installation
@@ -323,7 +331,7 @@ joe/
 │   ├── update-all.sh       # Update tools
 │   └── sync-configs.sh     # Config sync
 ├── skills/                 # Agent skill templates
-├── templates/              # Project rule file templates
+├── templates/              # Project rules and zsh configuration templates
 ├── .config/                # Config files (Ghostty, etc.)
 └── fonts/                  # FSEX302 and JetBrains Mono fonts and license
 ```

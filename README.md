@@ -36,10 +36,16 @@ cd joe
 - **Ghostty 配置**：包含 `term = xterm-256color` 修复常见问题
 - **自动备份**：修改前备份原配置，保留最近 5 个
 
+主菜单第 1 项和 `shell` 命令使用同一套优化后的 zsh 配置：新配置只启用 `git sudo extract z history dirhistory` 六个 OMZ 插件；主题使用已安装的 powerlevel10k 或 robbyrussell。自动建议异步运行，语法高亮最后加载，fzf 直接加载已有的补全与快捷键脚本。Node/Python 通过固定 PATH 可用，首次调用 `nvm` / `pyenv` 时再初始化版本管理器。OMZ 自动更新检查关闭，可用 `./install.sh shell --update` 显式更新。
+
+已有的别名、自定义 PATH、代理设置和插件选择会保留；个人配置集中在 `.zshrc` 的用户区块，也可放入 `~/.zshrc.local`。`--configure-only` 可离线应用配置，修改前备份为 `.zshrc.bak.<timestamp>`，保留最近 5 份；内容相同时不改写文件。
+
 ```bash
-./install.sh shell              # 完整安装
-./install.sh shell --dry-run    # 预览操作
-./install.sh shell --no-fonts   # 跳过字体
+./install.sh shell                              # 完整安装并应用优化配置
+./install.sh shell --dry-run                    # 预览操作
+./install.sh shell --configure-only             # 仅离线更新 zsh 配置
+./install.sh shell --configure-only --dry-run   # 预览配置迁移
+./install.sh shell --no-fonts                   # 跳过字体
 ```
 
 ### 字体安装（Fonts）
@@ -198,10 +204,12 @@ bash scripts/fix_ghostty_term.sh  # 修复 TERM=dumb 问题
 ### Shell 选项
 ```bash
 --dry-run              # 模拟运行，不实际修改
+--configure-only       # 仅离线更新 zsh 配置，不安装软件、下载、切换默认 shell 或复制字体/.config
 --no-fonts             # 跳过字体安装
 --no-config            # 跳过 .config 复制
 --no-p10k              # 跳过 powerlevel10k
 --no-fastfetch         # 跳过 fastfetch
+--no-default-plugins   # 新配置仅启用 git；保留已有插件选择
 --clean-backups        # 清理旧备份（保留最近 5 个）
 -u, --update           # 更新已安装组件
 ```
@@ -314,7 +322,7 @@ joe/
 ├── install.sh              # 主入口，命令路由与菜单
 ├── scripts/
 │   ├── commands/           # tools/mcp/skills/fonts 动作转换层
-│   ├── lib/                # 发行版 / GitHub / Node / 依赖与字体清单
+│   ├── lib/                # 发行版 / Node / zsh 迁移 / 依赖与字体清单
 │   ├── ui/                 # TUI 组件
 │   ├── install_shell.sh    # Shell 环境安装
 │   ├── install_fonts.sh    # 用户字体安装
@@ -325,7 +333,7 @@ joe/
 │   ├── update-all.sh       # 更新工具
 │   └── sync-configs.sh     # 配置同步
 ├── skills/                 # 代理技能模板
-├── templates/              # 项目规则文件模板
+├── templates/              # 项目规则与 zsh 配置模板
 ├── .config/                # 配置文件（Ghostty 等）
 └── fonts/                  # FSEX302 与 JetBrains Mono 字体及许可证
 ```
