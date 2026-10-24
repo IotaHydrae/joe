@@ -274,10 +274,10 @@ test_tools_list_clean_home() {
     rows=$(grep -cE '^  [a-z]+ ' <<<"$out")
     rm -rf "$tmp_home"
 
-    if [[ $rows -eq 15 ]]; then
-        test_pass "全新环境列出 15 个组件"
+    if [[ $rows -eq 13 ]]; then
+        test_pass "全新环境列出 13 个组件"
     else
-        test_fail "tools list 组件行数=$rows (期望 15)"
+        test_fail "tools list 组件行数=$rows (期望 13)"
     fi
 }
 
@@ -483,9 +483,24 @@ test_component_id_lists_agree() {
         diff <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$tui_ids") || true
     fi
 
+    local daily_ids
+    daily_ids=$(timeout 10 bash -c '
+        set -euo pipefail
+        source scripts/lib/deps.sh
+        printf "%s\n" "${DAILY_IDS[@]}" | sort -u
+    ') || daily_ids=""
+    local overlap
+    overlap=$(comm -12 <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$daily_ids"))
+    if [[ -z $overlap ]]; then
+        test_pass "日常软件清单与开发工具清单无交集"
+    else
+        test_fail "日常软件与开发工具有重叠: $overlap"
+    fi
+
     # 新增组件也必须有自己的模块, 否则派发时会 die
-    local id missing_module=""
-    for id in $deps_ids; do
+    local id missing_module="" all_components
+    all_components=$(printf '%s\n%s\n' "$deps_ids" "$daily_ids" | sort -u)
+    for id in $all_components; do
         if [ ! -f "scripts/components/$id.sh" ] \
             || ! grep -q "^component_${id}_install()" "scripts/components/$id.sh"; then
             missing_module+=" $id"
@@ -497,15 +512,15 @@ test_component_id_lists_agree() {
         test_fail "缺少组件模块或接口:$missing_module"
     fi
 
-    # 派发顺序表 (也是依赖顺序) 必须与组件清单一致
+    # 派发顺序表包含开发工具与日常软件的所有组件
     local order_ids
     order_ids=$(sed -n 's/^COMPONENT_ORDER=(\(.*\))$/\1/p' scripts/install_devtools.sh |
         tr ' ' '\n' | sort -u)
-    if diff <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$order_ids") >/dev/null; then
-        test_pass "COMPONENT_ORDER 与组件清单一致"
+    if diff <(printf '%s\n' "$all_components") <(printf '%s\n' "$order_ids") >/dev/null; then
+        test_pass "COMPONENT_ORDER 覆盖全部开发工具与日常软件"
     else
-        test_fail "COMPONENT_ORDER 与组件清单不一致"
-        diff <(printf '%s\n' "$deps_ids") <(printf '%s\n' "$order_ids") || true
+        test_fail "COMPONENT_ORDER 与预期组件不一致"
+        diff <(printf '%s\n' "$all_components") <(printf '%s\n' "$order_ids") || true
     fi
 
     # 模块之间不应互相调用 (会重新引入隐式依赖)
@@ -594,10 +609,10 @@ test_tools_list_version_failure() {
     rows=$(grep -cE '^  [a-z]+ ' <<<"$out")
     rm -rf "$tmp_home"
 
-    if [[ $rows -eq 15 ]]; then
+    if [[ $rows -eq 13 ]]; then
         test_pass "版本命令失败不影响 tools list 完整输出"
     else
-        test_fail "tools list 被版本探测截断 (行数=$rows, 期望 15)"
+        test_fail "tools list 被版本探测截断 (行数=$rows, 期望 13)"
     fi
 }
 
@@ -658,7 +673,7 @@ test_devtools_dispatch() {
         test_fail "无法复制仓库到沙箱"
         return
     fi
-    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch; do
+    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch wechat qq; do
         printf '#!/usr/bin/env bash\ncomponent_%s_install() { echo "RUN:%s"; }\n' "$id" "$id" \
             > "$box/scripts/components/$id.sh"
     done
@@ -682,10 +697,23 @@ test_devtools_dispatch() {
     out=$(cd "$box" && timeout 90 bash scripts/install_devtools.sh --all 2>&1) || true
     local count
     count=$(grep -cE '^RUN:' <<<"$out" || true)
-    if [[ $count -eq 15 ]]; then
-        test_pass "--all 派发全部 15 个模块"
+    if [[ $count -eq 13 ]]; then
+        test_pass "--all 派发全部 13 个开发工具模块"
     else
         test_fail "--all 派发数不符: $count"
+    fi
+    if grep -qE '^RUN:(brave|chatgpt|wechat|qq)$' <<<"$out"; then
+        test_fail "--all 包含了日常软件"
+    else
+        test_pass "--all 未包含日常软件"
+    fi
+
+    out=$(cd "$box" && timeout 60 bash scripts/install_devtools.sh --wechat --qq 2>&1) || true
+    runs=$(grep -E '^RUN:' <<<"$out" | tr '\n' ' ' || true)
+    if [[ $runs == "RUN:wechat RUN:qq " ]]; then
+        test_pass "--wechat --qq 按组件顺序派发"
+    else
+        test_fail "--wechat --qq 派发不符: $runs"
     fi
 
     # 模块缺失必须显式失败, 不能静默跳过
@@ -750,6 +778,95 @@ test_update_only() {
     fi
 }
 
+test_daily_app_packages() {
+    test_info "测试微信/QQ 安装包地址与校验"
+
+    local hdr pkg big help out rc
+    make_tmp; hdr=$TMP_PATH
+    make_tmp; pkg=$TMP_PATH
+    make_tmp; big=$TMP_PATH
+
+    if (
+        # shellcheck disable=SC1091
+        . scripts/components/wechat.sh
+        # shellcheck disable=SC1091
+        . scripts/components/qq.sh
+
+        url=$(wechat_package_url x86_64 apt)
+        [ "$url" = "https://dldir1v6.qq.com/weixin/Universal/Linux/WeChatLinux_x86_64.deb" ]
+        url=$(wechat_package_url aarch64 zypper)
+        [ "$url" = "https://dldir1v6.qq.com/weixin/Universal/Linux/WeChatLinux_arm64.rpm" ]
+        if wechat_package_url i686 apt >/dev/null; then
+            exit 1
+        fi
+        if wechat_package_url x86_64 pacman >/dev/null; then
+            exit 1
+        fi
+
+        config='var params= {"x64DownloadUrl":{"deb":"https://qqdl.gtimg.cn/qqfile/test/amd64.deb","rpm":"https://qqdl.gtimg.cn/qqfile/test/x86_64.rpm"},"armDownloadUrl":{"deb":"https://qqdl.gtimg.cn/qqfile/test/arm64.deb","rpm":"https://qqdl.gtimg.cn/qqfile/test/aarch64.rpm","appimage":"https://evil.example/nope.AppImage"}};'
+        [ "$(qq_pick_url "$config" x64DownloadUrl deb)" = "https://qqdl.gtimg.cn/qqfile/test/amd64.deb" ]
+        [ "$(qq_pick_url "$config" armDownloadUrl rpm)" = "https://qqdl.gtimg.cn/qqfile/test/aarch64.rpm" ]
+        [ "$(qq_arch_key aarch64)" = "armDownloadUrl" ]
+        [ "$(qq_pkg_kind dnf)" = "rpm" ]
+        if qq_pick_url "$config" x64DownloadUrl appimage >/dev/null; then
+            exit 1
+        fi
+        if qq_arch_key i686 >/dev/null; then
+            exit 1
+        fi
+        bad='{"x64DownloadUrl":{"deb":"https://evil.example/a.deb","rpm":"https://qqdl.gtimg.cn/qqfile/test/x86_64.rpm"}}'
+        if qq_pick_url "$bad" x64DownloadUrl deb >/dev/null; then
+            exit 1
+        fi
+
+        printf 'HTTP/1.1 302\r\nX-COS-META-MD5: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n\r\nHTTP/1.1 200\r\nContent-Length: 1048576\r\nX-COS-META-MD5: 3293E535C3BBCDE61D82A8F5B16963F8\r\n' > "$hdr"
+        [ "$(read_pkg_md5 "$hdr")" = "3293e535c3bbcde61d82a8f5b16963f8" ]
+        printf 'Content-MD5: abcdefghijklmnop\n' > "$hdr"
+        if read_pkg_md5 "$hdr" >/dev/null; then
+            exit 1
+        fi
+
+        dd if=/dev/zero of="$big" bs=1048576 count=1 status=none
+        printf '!<arch>\n' | dd of="$big" conv=notrunc status=none
+        printf 'Content-Length: 1\r\nContent-Length: 1048576\r\n' > "$hdr"
+        pkg_payload_ok "$big" deb "$hdr"
+        printf 'Content-Length: 8\n' > "$hdr"
+        if pkg_payload_ok "$big" deb "$hdr"; then
+            exit 1
+        fi
+        printf '\355\253\356\333' | dd of="$big" conv=notrunc status=none
+        pkg_magic_ok "$big" rpm
+        printf '!<arch>\n' > "$pkg"
+        printf 'Content-Length: 8\n' > "$hdr"
+        if pkg_payload_ok "$pkg" deb "$hdr"; then
+            exit 1
+        fi
+        printf 'not a package' > "$pkg"
+        if pkg_magic_ok "$pkg" deb; then
+            exit 1
+        fi
+    ); then
+        test_pass "微信/QQ 地址、主机限制和安装包校验符合预期"
+    else
+        test_fail "微信/QQ 地址或安装包校验不符"
+    fi
+
+    help=$(timeout 15 bash install.sh devtools --help 2>&1) || true
+    if [[ $help == *"--wechat"* && $help == *"--qq"* && $help == *"依赖"* && $help == *"说明"* ]]; then
+        test_pass "devtools --help 包含微信/QQ 且保留依赖与说明"
+    else
+        test_fail "devtools --help 未包含微信/QQ 或截断了说明"
+    fi
+
+    rc=0
+    out=$(timeout 20 bash scripts/update-all.sh --only wechat </dev/null 2>&1) || rc=$?
+    if [[ $rc -eq 2 && $out == *"没有自更新机制"* && $out == *"tools install wechat"* ]]; then
+        test_pass "微信没有自更新机制时给出重装指引"
+    else
+        test_fail "微信更新提示不符 (rc=$rc): $out"
+    fi
+}
+
 test_predictable_temp_paths() {
     test_info "测试下载临时路径"
 
@@ -802,6 +919,7 @@ test_repair_forwards_args
 test_ghostty_backup_convention
 test_devtools_dispatch
 test_update_only
+test_daily_app_packages
 test_predictable_temp_paths
 
 printf "\n"

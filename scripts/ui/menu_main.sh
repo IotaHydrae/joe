@@ -27,6 +27,46 @@ run_action() {
     fi
 }
 
+apps_menu() {
+    local choice i comp name status all_idx
+    local total=${#DAILY_IDS[@]}
+    all_idx=$((total + 1))
+    while true; do
+        printf '\n── 日常软件安装 ──\n'
+        for ((i=0; i<total; i++)); do
+            comp="${DAILY_IDS[i]}"
+            name="${COMPONENT_NAMES[$comp]:-$comp}"
+            if is_installed "$comp"; then
+                status=" (已安装)"
+            else
+                status=""
+            fi
+            printf '  %d) 安装 %s%s\n' "$((i+1))" "$name" "$status"
+        done
+        printf '  %d) 全部安装\n' "$all_idx"
+        printf '  b) 返回主菜单\n'
+        printf '选择操作 [1-%d/b]: ' "$all_idx"
+        IFS= read -r choice || return 0
+        case "$choice" in
+            b|B|q|Q) return 0 ;;
+            '') continue ;;
+            *)
+                if [[ "$choice" =~ ^[0-9]+$ ]]; then
+                    if [ "$choice" -ge 1 ] && [ "$choice" -le "$total" ]; then
+                        run_action tools install "${DAILY_IDS[$((choice-1))]}"
+                    elif [ "$choice" -eq "$all_idx" ]; then
+                        run_action tools install "${DAILY_IDS[@]}"
+                    else
+                        printf '请输入有效编号或 b。\n'
+                    fi
+                else
+                    printf '请输入有效编号或 b。\n'
+                fi
+                ;;
+        esac
+    done
+}
+
 config_menu() {
     local choice
     while true; do
@@ -55,32 +95,34 @@ main_menu() {
         printf '        Joe 开发环境配置\n'
         printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
         printf '  1) 终端美化      zsh + Oh My Zsh\n'
-        printf '  2) 开发工具      Node/Python/AI CLI/编辑器  (已装 %s)\n' "$(count_installed_tools)"
-        printf '  3) MCP 服务器    代码智能/文件系统/浏览器\n'
-        printf '  4) 代理技能      技能组与分类选择\n'
+        printf '  2) 日常软件      浏览器 / ChatGPT / 微信 / QQ\n'
+        printf '  3) 开发工具      Node/Python/AI CLI/编辑器\n'
+        printf '  4) MCP 服务器    代码智能/文件系统/浏览器\n'
+        printf '  5) 代理技能      技能组与分类选择\n'
         printf '\n'
-        printf '  5) 安装状态      工具 / MCP / 技能汇总\n'
-        printf '  6) 环境体检      doctor 逐项诊断\n'
-        printf '  7) 配置管理      备份/恢复/同步\n'
-        printf '  8) 统一更新      各工具官方自更新\n'
+        printf '  6) 安装状态      工具 / MCP / 技能汇总\n'
+        printf '  7) 环境体检      doctor 逐项诊断\n'
+        printf '  8) 配置管理      备份/恢复/同步\n'
+        printf '  9) 统一更新      各工具官方自更新\n'
         printf '\n'
-        printf '  9) 新手引导      quick-start 推荐配置\n'
+        printf '  10) 新手引导     quick-start 推荐配置\n'
         printf '\n'
         printf '  q) 退出\n\n'
         printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-        printf '选择 [1-9/q]: '
+        printf '选择 [1-10/q]: '
 
         IFS= read -r choice || return 0
         case "$choice" in
             1) run_action shell ;;
-            2) run_action tools ;;
-            3) run_action mcp ;;
-            4) run_action skills ;;
-            5) run_action status ;;
-            6) run_action doctor ;;
-            7) config_menu ;;
-            8) run_action update ;;
-            9) run_action quick-start ;;
+            2) apps_menu ;;
+            3) run_action tools ;;
+            4) run_action mcp ;;
+            5) run_action skills ;;
+            6) run_action status ;;
+            7) run_action doctor ;;
+            8) config_menu ;;
+            9) run_action update ;;
+            10) run_action quick-start ;;
             q|Q) return 0 ;;
             '') continue ;;
             *) printf '请输入有效编号或 q。\n' ;;

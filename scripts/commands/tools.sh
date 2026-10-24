@@ -46,7 +46,8 @@ usage() {
 
 可用组件:
     node, python, claude, codex, gemini, opencode, copilot, grok,
-    zed, vscode, ghostty, brave, mimo, chatgpt, ccswitch
+    zed, vscode, ghostty, mimo, ccswitch
+    (日常软件: brave, chatgpt, wechat, qq)
 
 示例:
     tools                          # 进入 TUI

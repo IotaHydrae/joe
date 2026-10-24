@@ -27,23 +27,26 @@ declare -A COMPONENT_DEPS=(
     [ghostty]=""
     [brave]=""
     [chatgpt]=""
+    [wechat]=""
+    [qq]=""
 )
 
-# 组件分组定义
+# 日常软件列表 (主菜单日常软件项管理, 不作为开发工具列出)
+DAILY_IDS=(brave chatgpt wechat qq)
+
+# 组件分组定义 (仅包含开发工具)
 declare -A COMPONENT_GROUPS=(
     [runtime]="node python"
     [ai-cli]="claude codex gemini opencode copilot grok mimo"
     [editor]="zed vscode"
     [terminal]="ghostty"
-    [browser]="brave"
-    [desktop]="chatgpt"
     [utility]="ccswitch"
 )
 
 # 快捷组定义
 declare -A SHORTCUT_GROUPS=(
     [ai]="claude codex"
-    [all]="node python claude codex gemini opencode copilot grok zed vscode ghostty brave mimo chatgpt ccswitch"
+    [all]="node python claude codex gemini opencode copilot grok zed vscode ghostty mimo ccswitch"
 )
 
 # 组件显示名称
@@ -63,17 +66,17 @@ declare -A COMPONENT_NAMES=(
     [mimo]="MiMo Code"
     [chatgpt]="ChatGPT Desktop"
     [ccswitch]="CC Switch"
+    [wechat]="微信"
+    [qq]="QQ"
 )
 
 # 列表与 TUI 共用的分组顺序和标题
-COMPONENT_GROUP_ORDER=(runtime ai-cli editor terminal browser desktop utility)
+COMPONENT_GROUP_ORDER=(runtime ai-cli editor terminal utility)
 declare -A COMPONENT_GROUP_NAMES=(
     [runtime]="环境管理"
     [ai-cli]="AI 编程助手"
     [editor]="编辑器"
     [terminal]="终端"
-    [browser]="浏览器"
-    [desktop]="桌面应用"
     [utility]="实用工具"
 )
 
@@ -226,6 +229,12 @@ is_installed() {
             ;;
         ccswitch)
             command -v cc-switch >/dev/null 2>&1
+            ;;
+        wechat)
+            command -v wechat >/dev/null 2>&1 || command -v wechat-universal >/dev/null 2>&1
+            ;;
+        qq)
+            command -v qq >/dev/null 2>&1 || command -v linuxqq >/dev/null 2>&1
             ;;
         *)
             return 1

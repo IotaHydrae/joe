@@ -298,6 +298,17 @@ if find_bin ghostty >/dev/null 2>&1; then
 fi
 chk_cmd_optional chatgpt "未安装（可选，./install.sh devtools --chatgpt）"
 chk_cmd_present_optional cc-switch "未安装（可选，./install.sh devtools --ccswitch）"   # GUI 应用, --version 会启动界面
+# 微信/QQ 的 --version 会拉起界面。官方包命令是 wechat/qq, AUR 封装是另一套命令名。
+if find_bin wechat >/dev/null 2>&1 || find_bin wechat-universal >/dev/null 2>&1; then
+    record ok "微信" "$(find_bin wechat 2>/dev/null || find_bin wechat-universal)"
+else
+    record skip "微信" "未安装（可选，./install.sh tools install wechat）"
+fi
+if find_bin qq >/dev/null 2>&1 || find_bin linuxqq >/dev/null 2>&1; then
+    record ok "QQ" "$(find_bin qq 2>/dev/null || find_bin linuxqq)"
+else
+    record skip "QQ" "未安装（可选，./install.sh tools install qq）"
+fi
 
 # ---------------------------------------------------------------------------
 # 6. MCP 服务器

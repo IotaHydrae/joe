@@ -3,7 +3,7 @@
 
 用法: python3 tests/menu_pty_check.py
 失败时退出码非 0; 无 pty 支持时退出码 2 (调用方按跳过处理)。
-测试只走空输入、非法编号和 q, 不会触发任何安装动作。
+测试进入日常软件子菜单后返回, 再走空输入、非法编号和 q, 不会触发任何安装动作。
 """
 
 import fcntl
@@ -57,6 +57,10 @@ def main():
             chunks.extend(data)
 
     drain(1.5)
+    os.write(fd, b"2\r")         # 日常软件子菜单 (主菜单第 2 项)
+    drain(0.8)
+    os.write(fd, b"b\r")         # 返回, 不安装
+    drain(0.8)
     os.write(fd, b"\r")          # 空输入: 只重绘, 不安装
     drain(0.8)
     os.write(fd, b"zz\r")        # 非法编号
@@ -83,10 +87,12 @@ def main():
 
     if "Joe 开发环境配置" not in out:
         fail("菜单未渲染")
-    if not re.search(r"已装 \d+/\d+", out):
-        fail("菜单缺少工具装机数")
-    if out.count("选择 [1-9/q]") < 3:
-        fail("空输入或非法编号后菜单没有重绘 (只出现 %d 次)" % out.count("选择 [1-9/q]"))
+    if "开发工具" not in out:
+        fail("菜单缺少开发工具条目")
+    if "日常软件安装" not in out or ("安装微信" not in out and "安装 微信" not in out):
+        fail("未进入日常软件子菜单")
+    if out.count("选择 [1-10/q]") < 4:
+        fail("空输入或非法编号后菜单没有重绘 (只出现 %d 次)" % out.count("选择 [1-10/q]"))
     if "请输入有效编号" not in out:
         fail("非法编号未给出提示")
     leaked = [m for m in INSTALL_MARKERS if m in out]
