@@ -40,7 +40,7 @@ fi
 
 # ---- 默认组件 (devtools); 调用方可预先覆盖 ----
 if [ -z "${TUI_IDS+x}" ]; then
-    TUI_IDS=(node python claude codex gemini opencode copilot grok zed ghostty vscode mimo ccswitch)
+    TUI_IDS=(node python claude codex gemini opencode copilot grok zed ghostty vscode mimo godot ccswitch)
 fi
 if [ -z "${TUI_TITLE+x}" ]; then
     TUI_TITLE="joe devtools 组件安装选择"
@@ -86,6 +86,7 @@ if ! declare -F tui_component_installed >/dev/null 2>&1; then
             mimo)     _tui_has_bin mimo ;;
             chatgpt)  command -v chatgpt >/dev/null 2>&1 ;;
             ccswitch) command -v cc-switch >/dev/null 2>&1 ;;
+            godot)    command -v godot >/dev/null 2>&1 || [ -x "$HOME/.local/bin/godot" ] ;;
             wechat)   command -v wechat >/dev/null 2>&1 || command -v wechat-universal >/dev/null 2>&1 ;;
             qq)       command -v qq >/dev/null 2>&1 || command -v linuxqq >/dev/null 2>&1 ;;
             rime)     command -v fcitx5 >/dev/null 2>&1 && [ -f "$HOME/.local/share/fcitx5/rime/default.yaml" ] ;;
@@ -113,6 +114,7 @@ if ! declare -F tui_component_name >/dev/null 2>&1; then
             mimo)     echo "MiMo Code (小米 AI 助手)" ;;
             chatgpt)  echo "ChatGPT / Codex 桌面版" ;;
             ccswitch) echo "CC Switch (AI CLI 配置切换器)" ;;
+            godot)    echo "Godot 游戏引擎" ;;
             wechat)   echo "微信 Linux 原生版" ;;
             qq)       echo "Linux QQ" ;;
             rime)     echo "Rime 雾凇拼音输入法" ;;

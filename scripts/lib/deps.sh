@@ -25,6 +25,7 @@ declare -A COMPONENT_DEPS=(
     [zed]=""
     [vscode]=""
     [ghostty]=""
+    [godot]=""
     [brave]=""
     [chatgpt]=""
     [wechat]=""
@@ -41,13 +42,14 @@ declare -A COMPONENT_GROUPS=(
     [ai-cli]="claude codex gemini opencode copilot grok mimo"
     [editor]="zed vscode"
     [terminal]="ghostty"
+    [gamedev]="godot"
     [utility]="ccswitch"
 )
 
 # 快捷组定义
 declare -A SHORTCUT_GROUPS=(
     [ai]="claude codex"
-    [all]="node python claude codex gemini opencode copilot grok zed vscode ghostty mimo ccswitch"
+    [all]="node python claude codex gemini opencode copilot grok zed vscode ghostty mimo godot ccswitch"
 )
 
 # 组件显示名称
@@ -63,6 +65,7 @@ declare -A COMPONENT_NAMES=(
     [zed]="Zed Editor"
     [vscode]="VS Code"
     [ghostty]="Ghostty Terminal"
+    [godot]="Godot Engine"
     [brave]="Brave Browser"
     [mimo]="MiMo Code"
     [chatgpt]="ChatGPT Desktop"
@@ -73,12 +76,13 @@ declare -A COMPONENT_NAMES=(
 )
 
 # 列表与 TUI 共用的分组顺序和标题
-COMPONENT_GROUP_ORDER=(runtime ai-cli editor terminal utility)
+COMPONENT_GROUP_ORDER=(runtime ai-cli editor terminal gamedev utility)
 declare -A COMPONENT_GROUP_NAMES=(
     [runtime]="环境管理"
     [ai-cli]="AI 编程助手"
     [editor]="编辑器"
     [terminal]="终端"
+    [gamedev]="游戏开发"
     [utility]="实用工具"
 )
 
@@ -232,6 +236,9 @@ is_installed() {
         ccswitch)
             command -v cc-switch >/dev/null 2>&1
             ;;
+        godot)
+            command -v godot >/dev/null 2>&1 || [ -x "$HOME/.local/bin/godot" ]
+            ;;
         wechat)
             command -v wechat >/dev/null 2>&1 || command -v wechat-universal >/dev/null 2>&1
             ;;
@@ -274,6 +281,9 @@ get_version() {
             ;;
         vscode)
             code --version 2>/dev/null | head -1 || true
+            ;;
+        godot)
+            godot --version 2>/dev/null | head -1 || "$HOME/.local/bin/godot" --version 2>/dev/null | head -1 || true
             ;;
         rime)
             if command -v fcitx5 >/dev/null 2>&1; then

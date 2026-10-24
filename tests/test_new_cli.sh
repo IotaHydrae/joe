@@ -274,10 +274,10 @@ test_tools_list_clean_home() {
     rows=$(grep -cE '^  [a-z]+ ' <<<"$out")
     rm -rf "$tmp_home"
 
-    if [[ $rows -eq 13 ]]; then
-        test_pass "全新环境列出 13 个组件"
+    if [[ $rows -eq 14 ]]; then
+        test_pass "全新环境列出 14 个组件"
     else
-        test_fail "tools list 组件行数=$rows (期望 13)"
+        test_fail "tools list 组件行数=$rows (期望 14)"
     fi
 }
 
@@ -609,10 +609,10 @@ test_tools_list_version_failure() {
     rows=$(grep -cE '^  [a-z]+ ' <<<"$out")
     rm -rf "$tmp_home"
 
-    if [[ $rows -eq 13 ]]; then
+    if [[ $rows -eq 14 ]]; then
         test_pass "版本命令失败不影响 tools list 完整输出"
     else
-        test_fail "tools list 被版本探测截断 (行数=$rows, 期望 13)"
+        test_fail "tools list 被版本探测截断 (行数=$rows, 期望 14)"
     fi
 }
 
@@ -673,7 +673,7 @@ test_devtools_dispatch() {
         test_fail "无法复制仓库到沙箱"
         return
     fi
-    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch wechat qq rime; do
+    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot wechat qq rime; do
         printf '#!/usr/bin/env bash\ncomponent_%s_install() { echo "RUN:%s"; }\n' "$id" "$id" \
             > "$box/scripts/components/$id.sh"
     done
@@ -697,8 +697,8 @@ test_devtools_dispatch() {
     out=$(cd "$box" && timeout 90 bash scripts/install_devtools.sh --all 2>&1) || true
     local count
     count=$(grep -cE '^RUN:' <<<"$out" || true)
-    if [[ $count -eq 13 ]]; then
-        test_pass "--all 派发全部 13 个开发工具模块"
+    if [[ $count -eq 14 ]]; then
+        test_pass "--all 派发全部 14 个开发工具模块"
     else
         test_fail "--all 派发数不符: $count"
     fi

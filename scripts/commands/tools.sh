@@ -46,7 +46,7 @@ usage() {
 
 可用组件:
     node, python, claude, codex, gemini, opencode, copilot, grok,
-    zed, vscode, ghostty, mimo, ccswitch
+    zed, vscode, ghostty, mimo, godot, ccswitch
     (日常软件: brave, chatgpt, wechat, qq, rime)
 
 示例:

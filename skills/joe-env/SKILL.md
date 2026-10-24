@@ -39,6 +39,7 @@ TUI 按键：`↑/↓` 移动，`PgUp/PgDn` 翻页，`Home/End` 到首尾，`空
 - **AI CLI**: `claude`、`codex`（`--ai` 只装这两个）、`gemini`、`opencode`、`copilot`、`grok`（官方路径 `~/.grok/bin`）、`mimo`（官方路径 `~/.mimocode/bin`）
 - **编辑器**: Zed（`~/.local/bin/zed`）、VS Code（`/usr/bin/code`）
 - **终端**: Ghostty（`Ctrl+Alt+T` 打开）
+- **游戏开发**: Godot 游戏引擎
 - **桌面与工具**: CC Switch
 - **日常软件**: Brave 浏览器、ChatGPT 桌面版、微信、QQ、Rime 雾凇拼音输入法（主菜单第 2 项，或 `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime`；不包含在 `--all` 中）
 

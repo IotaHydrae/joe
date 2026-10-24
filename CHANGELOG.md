@@ -28,6 +28,7 @@
 - MCP 安装器与 `mcp` 动作统一委托新 TUI；缺 npx 时安装前给出先装 Node 的命令
 - 共用 `node_has_bin()` 探测 npx（PATH → nvm current → nvm 版本目录），避免两处各写一份
 - 新增 `tests/mcp_tui_pty_check.py`，套件扩充到 53 项
+- 开发工具新增 Godot 游戏引擎组件：设立「游戏开发」分组，支持跨发行版自动安装（dnf/pacman/zypper/apt 及官方 Release 单文件回退）
 - 日常软件：主菜单第 2 项「日常软件」统一管理非开发工具（Brave 浏览器、ChatGPT Desktop、微信、Linux QQ、Rime 雾凇拼音输入法）；`--all` 和 `quick-start --yes` 不再包含日常软件；集成 Fcitx 5 + Rime + 雾凇拼音与左 Alt+Shift 快捷键配置；微信安装包必须核对 CDN 的 MD5
 - 组件安装逻辑模块化：15 个实现移入 `scripts/components/<id>.sh`，统一接口 `component_<id>_install`
 - 安装器改用 `COMPONENT_ORDER` + `WANT` 关联数组派发，删掉了 15 个布尔标志与 TUI 里重复的 15 分支映射（1131 → 427 行）

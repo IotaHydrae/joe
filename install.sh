@@ -61,7 +61,7 @@ usage() {
       [--json]           JSON 格式输出
 
   status             显示所有组件安装状态
-      [--short]          单行输出 (tools 13/13 | mcp 0/7 | skills 150/150)
+      [--short]          单行输出 (tools 14/14 | mcp 0/7 | skills 150/150)
 
   update             更新工具链、AI CLI 与 joe 仓库
 
