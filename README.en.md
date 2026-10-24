@@ -42,7 +42,8 @@ Cross-distro development tools installation (supports apt/pacman/dnf/zypper):
 - **AI CLI**: Claude Code, Codex (`--ai` installs only these two), Gemini CLI, OpenCode, GitHub Copilot CLI, Grok Build
 - **Editors**: Zed, VS Code
 - **Terminal**: Ghostty
-- **Others**: MiMo Code, ChatGPT, CC Switch
+- **Others**: MiMo Code, CC Switch
+- **Daily apps**: Brave Browser, ChatGPT Desktop, official Linux WeChat and QQ, Rime input method (rime-ice). Main menu item 2, or `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime`. Not included in `devtools --all`, `tools install --all`, or `quick-start --yes`
 
 ```bash
 # ===== New syntax (recommended) =====
@@ -203,6 +204,9 @@ bash scripts/fix_ghostty_term.sh  # Fixes the TERM=dumb problem
 --mimo                 # Install MiMo Code only
 --chatgpt              # Install ChatGPT Desktop only
 --ccswitch             # Install CC Switch only
+--wechat               # Install official Linux WeChat only
+--qq                   # Install official Linux QQ only
+--rime                 # Install Rime (rime-ice) input method only
 ```
 
 ### MCP Options

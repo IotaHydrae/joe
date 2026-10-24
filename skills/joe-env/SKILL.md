@@ -39,7 +39,8 @@ TUI 按键：`↑/↓` 移动，`PgUp/PgDn` 翻页，`Home/End` 到首尾，`空
 - **AI CLI**: `claude`、`codex`（`--ai` 只装这两个）、`gemini`、`opencode`、`copilot`、`grok`（官方路径 `~/.grok/bin`）、`mimo`（官方路径 `~/.mimocode/bin`）
 - **编辑器**: Zed（`~/.local/bin/zed`）、VS Code（`/usr/bin/code`）
 - **终端**: Ghostty（`Ctrl+Alt+T` 打开）
-- **桌面**: ChatGPT 桌面版、CC Switch
+- **桌面与工具**: CC Switch
+- **日常软件**: Brave 浏览器、ChatGPT 桌面版、微信、QQ、Rime 雾凇拼音输入法（主菜单第 2 项，或 `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime`；不包含在 `--all` 中）
 
 > 优先使用**官方安装路径**（官方维护、可自助升级，如 `uv self update`、`mimo upgrade`）。
 > 包管理器探测与包名映射已支持 apt / dnf / pacman / zypper。

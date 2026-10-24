@@ -22,6 +22,6 @@
 ./install.sh shell --dry-run
 ```
 
-开发工具、MCP 和 skills 默认不勾选任何项；非交互安装须明确安装项或 `--all`。`quick-start --yes` 是显式选择所有组件。
+开发工具、MCP 和 skills 默认不勾选任何项；非交互安装须明确安装项或 `--all`。日常软件（Brave 浏览器、ChatGPT Desktop、微信、QQ、Rime 输入法）不包含在 `--all` 或 `quick-start --yes` 中，可在主菜单第 2 项「日常软件」选择安装，或通过 `./install.sh tools install <id>` / `./install.sh devtools --<id>` 单独安装。
 
 `skills` / `skills --tui` 先显示「原有/本地技能」和「low-level-dev-skills」；后者进入 25 个分类的子菜单，再进入该分类的勾选列表。编号进入，`b`/`q` 返回上一级，安装后可继续选其他分类。`skills --category <name> --tui` 直接打开指定分类的勾选列表。
