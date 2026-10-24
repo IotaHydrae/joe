@@ -42,6 +42,20 @@ cd joe
 ./install.sh shell --no-fonts   # 跳过字体
 ```
 
+### 字体安装（Fonts）
+
+主菜单第 6 项「字体安装」或 `./install.sh fonts` 打开编号子菜单：选择 Fixedsys Excelsior（FSEX302）或 JetBrains Mono，查看已安装状态，也可全部安装，`b` 返回主菜单。安装完成后留在当前子菜单。
+
+字体从仓库安装到 `~/.local/share/fonts`，可离线使用，无需 sudo。JetBrains Mono 2.304 包含常规、粗体、斜体和粗斜体，附带 [SIL OFL 许可证](fonts/jetbrains-mono/OFL.txt)。`shell` 默认安装 Fixedsys Excelsior；JetBrains Mono 可从字体菜单单独安装。
+
+```bash
+./install.sh fonts list                           # 查看字体及安装状态
+./install.sh fonts install fsex302                # 安装 Fixedsys Excelsior
+./install.sh fonts install jetbrains-mono         # 安装 JetBrains Mono
+./install.sh fonts install --all                  # 安装全部字体
+./install.sh fonts install --dry-run --all        # 预览安装
+```
+
 ### 2. 开发工具（Devtools）
 跨发行版安装开发工具（支持 apt/pacman/dnf/zypper）：
 
@@ -137,6 +151,7 @@ cd joe
 
 ```bash
 ./install.sh                   # 主菜单
+./install.sh fonts list        # 列出字体及状态
 ./install.sh tools list        # 列出工具
 ./install.sh mcp list          # 列出 MCP 服务
 ./install.sh status            # 一屏汇总 工具/MCP/技能 安装数
@@ -190,6 +205,17 @@ bash scripts/fix_ghostty_term.sh  # 修复 TERM=dumb 问题
 --clean-backups        # 清理旧备份（保留最近 5 个）
 -u, --update           # 更新已安装组件
 ```
+
+### Fonts 选项
+
+| 参数 | 用途 |
+|---|---|
+| `list` / `status` | 列出字体及安装状态，只读 |
+| `install fsex302` | 安装 Fixedsys Excelsior（FSEX302） |
+| `install jetbrains-mono` | 安装 JetBrains Mono；支持同时指定多个字体 id |
+| `install --all` | 显式安装全部字体 |
+| `install --dry-run <id...>` / `install --dry-run --all` | 预览安装，不修改文件或字体缓存 |
+| `--help` | 查看字体命令帮助 |
 
 ### Devtools 选项
 ```bash
@@ -287,10 +313,11 @@ cp ~/.joe/templates/CLAUDE.md /your/project/
 joe/
 ├── install.sh              # 主入口，命令路由与菜单
 ├── scripts/
-│   ├── commands/           # tools/mcp/skills 动作转换层
-│   ├── lib/                # 发行版 / GitHub / Node / 依赖解析库
+│   ├── commands/           # tools/mcp/skills/fonts 动作转换层
+│   ├── lib/                # 发行版 / GitHub / Node / 依赖与字体清单
 │   ├── ui/                 # TUI 组件
 │   ├── install_shell.sh    # Shell 环境安装
+│   ├── install_fonts.sh    # 用户字体安装
 │   ├── install_devtools.sh # 开发工具安装
 │   ├── install_mcp_servers.sh  # MCP 安装
 │   ├── install_skills.sh   # 技能安装
@@ -300,7 +327,7 @@ joe/
 ├── skills/                 # 代理技能模板
 ├── templates/              # 项目规则文件模板
 ├── .config/                # 配置文件（Ghostty 等）
-└── fonts/                  # 字体文件
+└── fonts/                  # FSEX302 与 JetBrains Mono 字体及许可证
 ```
 
 ## 高级用法

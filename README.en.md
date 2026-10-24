@@ -34,6 +34,20 @@ cd joe
 ./install.sh shell --no-fonts   # Skip fonts
 ```
 
+### Font Installation (Fonts)
+
+Main menu item 6 (fonts), or `./install.sh fonts`, opens a numbered submenu with Fixedsys Excelsior (FSEX302) and JetBrains Mono, installed status, individual or all-font installation, and `b` to return to the main menu. After installation, the current submenu stays open.
+
+Fonts are installed from the repository into `~/.local/share/fonts`, work offline, and require no sudo. JetBrains Mono 2.304 includes regular, bold, italic, and bold italic styles with its [SIL OFL license](fonts/jetbrains-mono/OFL.txt). The `shell` command installs Fixedsys Excelsior by default; JetBrains Mono is available separately from the fonts menu.
+
+```bash
+./install.sh fonts list                           # List fonts and installed status
+./install.sh fonts install fsex302                # Install Fixedsys Excelsior
+./install.sh fonts install jetbrains-mono         # Install JetBrains Mono
+./install.sh fonts install --all                  # Install all fonts
+./install.sh fonts install --dry-run --all        # Preview installation
+```
+
 ### 2. Development Tools (Devtools)
 Cross-distro development tools installation (supports apt/pacman/dnf/zypper):
 
@@ -136,6 +150,7 @@ The only real copy lives in `~/.agents/skills`. Claude Code, Codex, Gemini, Open
 
 ```bash
 ./install.sh                   # Main menu
+./install.sh fonts list        # List fonts and status
 ./install.sh tools list        # List tools and status
 ./install.sh mcp list          # List MCP servers
 ./install.sh status            # One-screen summary of tools / MCP / skills
@@ -188,6 +203,17 @@ bash scripts/fix_ghostty_term.sh  # Fixes the TERM=dumb problem
 --clean-backups        # Clean old backups (keep last 5)
 -u, --update           # Update installed components
 ```
+
+### Fonts Options
+
+| Option | Purpose |
+|---|---|
+| `list` / `status` | List fonts and installed status without making changes |
+| `install fsex302` | Install Fixedsys Excelsior (FSEX302) |
+| `install jetbrains-mono` | Install JetBrains Mono; multiple font ids can be supplied together |
+| `install --all` | Explicitly install all fonts |
+| `install --dry-run <id...>` / `install --dry-run --all` | Preview installation without changing files or the font cache |
+| `--help` | Show font command help |
 
 ### Devtools Options
 ```bash
@@ -285,10 +311,11 @@ See [`skills/code-exploration/SKILL.md`](skills/code-exploration/SKILL.md) for d
 joe/
 ├── install.sh              # Main entry, command router and menu
 ├── scripts/
-│   ├── commands/           # tools/mcp/skills action adapters
-│   ├── lib/                # Distro / GitHub / Node / dependency libraries
+│   ├── commands/           # tools/mcp/skills/fonts action adapters
+│   ├── lib/                # Distro / GitHub / Node / dependencies and font catalog
 │   ├── ui/                 # TUI components
 │   ├── install_shell.sh    # Shell environment installation
+│   ├── install_fonts.sh    # User font installation
 │   ├── install_devtools.sh # Development tools installation
 │   ├── install_mcp_servers.sh  # MCP installation
 │   ├── install_skills.sh   # Skills installation
@@ -298,7 +325,7 @@ joe/
 ├── skills/                 # Agent skill templates
 ├── templates/              # Project rule file templates
 ├── .config/                # Config files (Ghostty, etc.)
-└── fonts/                  # Font files
+└── fonts/                  # FSEX302 and JetBrains Mono fonts and license
 ```
 
 ## Advanced Usage

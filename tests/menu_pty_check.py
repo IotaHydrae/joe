@@ -19,10 +19,11 @@ import termios
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MAIN_PROMPT = "选择 [1-10/q]: "
+MAIN_PROMPT = "选择 [1-11/q]: "
 TOOLS_PROMPT = "选择操作 [1-15/b]: "
 APPS_PROMPT = "选择操作 [1-6/b]: "
 MCP_PROMPT = "选择操作 [1-9/b]: "
+FONTS_PROMPT = "选择操作 [1-3/b]: "
 TOOL_IDS = (
     "node", "python", "claude", "codex", "gemini", "opencode", "copilot",
     "grok", "mimo", "zed", "vscode", "ghostty", "godot", "ccswitch",
@@ -43,23 +44,24 @@ LIST_OUTPUT = """可用 MCP 服务器:
 """
 INSTALL_MARKERS = (
     "[INFO]", "[PROGRESS]", "Installing", "正在安装", "将安装以下组件",
-    "TOOLS_INSTALL|", "MCP_INSTALL|",
+    "TOOLS_INSTALL|", "MCP_INSTALL|", "FONTS_INSTALL|",
 )
 
 
 class MenuSession:
-    def __init__(self, env):
+    def __init__(self, env, command=(), initial_prompt=MAIN_PROMPT):
         self.pid, self.fd = pty.fork()
         if self.pid == 0:
             os.chdir(ROOT)
-            os.execvpe("bash", ["bash", "install.sh"], env)
+            os.execvpe("bash", ["bash", "install.sh", *command], env)
         self.output = bytearray()
         self.status = None
+        self.initial_prompt = initial_prompt
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 100, 0, 0))
 
     def __enter__(self):
         try:
-            self.wait_for(MAIN_PROMPT)
+            self.wait_for(self.initial_prompt)
         except Exception:
             self.__exit__(None, None, None)
             raise
@@ -162,6 +164,13 @@ def main():
                 'printf "MCP|%s\\n" "$*" >> "$CALL_LOG"\n'
                 'exit "${MCP_EXIT:-0}"\n'
             )
+        fonts_stub = os.path.join(tmpdir, "fonts.sh")
+        with open(fonts_stub, "w", encoding="utf-8") as handle:
+            handle.write(
+                '#!/usr/bin/env bash\n'
+                'printf "FONTS_INSTALL|%s\\n" "$*"\n'
+                'printf "FONTS|%s\\n" "$*" >> "$CALL_LOG"\n'
+            )
         npx_stub = os.path.join(fakebin, "npx")
         with open(npx_stub, "w", encoding="utf-8") as handle:
             handle.write("#!/usr/bin/env bash\nexit 0\n")
@@ -173,7 +182,7 @@ def main():
         env = dict(
             os.environ, TERM="xterm-256color", LC_ALL="C.UTF-8", HOME=home,
             PATH=fakebin, NVM_DIR=os.path.join(home, ".nvm"),
-            DEVTOOLS_SCRIPT=devtools_stub, MCP_SCRIPT=mcp_stub,
+            DEVTOOLS_SCRIPT=devtools_stub, MCP_SCRIPT=mcp_stub, FONTS_SCRIPT=fonts_stub,
             MCP_NPX_BIN="npx", CALL_LOG=call_log, MCP_EXIT="0", LIST_FAIL="0",
         )
 
@@ -183,12 +192,15 @@ def main():
                 ("2", "日常软件安装", APPS_PROMPT),
                 ("3", "开发工具安装", TOOLS_PROMPT),
                 ("4", "MCP 服务器安装", MCP_PROMPT),
+                ("6", "字体安装", FONTS_PROMPT),
             ):
                 out = session.choose(entry, prompt)
                 require(title in out, "未进入 " + title)
                 require("全部安装" in out and "b) 返回主菜单" in out, title + "操作不完整")
                 if entry == "3":
                     require("pyenv + Python (已安装)" in out, "开发工具未显示已安装状态")
+                if entry == "6":
+                    require("Fixedsys Excelsior" in out and "JetBrains Mono" in out, "字体菜单缺少字体")
                 session.choose("", prompt)
                 for invalid in ("0", "999", "zz"):
                     out = session.choose(invalid, prompt)
@@ -224,13 +236,28 @@ def main():
             out = session.choose("9", MCP_PROMPT)
             require("MCP_INSTALL|" + " ".join(MCP_IDS) + "\r\n" in out, "MCP 全部安装派发错误")
             session.choose("b", MAIN_PROMPT)
+            session.choose("6", FONTS_PROMPT)
+            out = session.choose("2", FONTS_PROMPT)
+            require("FONTS_INSTALL|jetbrains-mono\r\n" in out, "JetBrains Mono 单项安装派发错误")
+            require("字体安装" in out, "字体安装后未留在当前子菜单")
+            out = session.choose("3", FONTS_PROMPT)
+            require("FONTS_INSTALL|fsex302 jetbrains-mono\r\n" in out, "字体全部安装派发错误")
+            session.choose("b", MAIN_PROMPT)
             session.finish()
         with open(call_log, encoding="utf-8") as handle:
             calls = handle.read().splitlines()
         require(calls == [
             "TOOLS|--python", "TOOLS|--node --claude", "TOOLS|" + expected,
             "MCP|memory", "MCP|" + " ".join(MCP_IDS),
+            "FONTS|jetbrains-mono", "FONTS|fsex302 jetbrains-mono",
         ], "子菜单派发了额外安装操作: %r" % calls)
+
+        previous_calls = os.path.getsize(call_log)
+        with MenuSession(env, ("fonts",), FONTS_PROMPT) as session:
+            require("JetBrains Mono" in session.text, "fonts 命令没有打开字体菜单")
+            session.choose("b", MAIN_PROMPT)
+            session.finish()
+        require(os.path.getsize(call_log) == previous_calls, "直接浏览字体菜单触发安装")
 
         with MenuSession(dict(env, MCP_EXIT="7")) as session:
             session.choose("4", MCP_PROMPT)

@@ -32,6 +32,11 @@ usage() {
       --no-default-plugins  不启用默认 OMZ 插件
       --clean-backups    清理旧备份 (保留最近 5 个)
 
+  fonts              字体安装 (Fixedsys Excelsior / JetBrains Mono)
+      <无参数>           进入字体编号菜单
+      list, status       列出字体及安装状态
+      install <字体...>  单独安装字体 (--all / --dry-run)
+
   tools              开发工具管理
       <无参数>           进入 TUI 选择界面
       list               列出所有工具及安装状态
@@ -81,6 +86,8 @@ usage() {
 
   ./install.sh                          # 主菜单
   ./install.sh shell                    # 安装 shell 环境
+  ./install.sh fonts                    # 字体安装菜单
+  ./install.sh fonts install jetbrains-mono  # 单独安装 JetBrains Mono
   ./install.sh tools                    # 进入工具选择 TUI
   ./install.sh tools list               # 列出所有工具
   ./install.sh tools install node       # 安装 Node.js
@@ -119,7 +126,7 @@ detect_command() {
         -h|--help) usage; exit 0 ;;
         --version) printf "joe v%s\n" "$VERSION"; exit 0 ;;
         '') COMMAND="menu" ;;
-        shell|tools|mcp|skills|config|doctor|status|update) COMMAND="$1" ;;
+        shell|fonts|tools|mcp|skills|config|doctor|status|update) COMMAND="$1" ;;
 
         # 快捷命令
         quick-start|install-all) COMMAND="$1" ;;
@@ -235,6 +242,10 @@ route_command() {
                 # 回退到旧脚本
                 exec bash "$SCRIPTS_DIR/install_devtools.sh" "${COMMAND_ARGS[@]}"
             fi
+            ;;
+
+        fonts)
+            exec bash "$COMMANDS_DIR/fonts.sh" "${COMMAND_ARGS[@]}"
             ;;
 
         mcp)

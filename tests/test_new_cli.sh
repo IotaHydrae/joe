@@ -60,7 +60,7 @@ assert_forward() {
     local label="$1" expected="$2"
     shift 2
     local out="" got
-    out=$(MCP_SCRIPT="$FWD_STUB" SKILLS_SCRIPT="$FWD_STUB" timeout 10 bash install.sh "$@" 2>&1) || true
+    out=$(MCP_SCRIPT="$FWD_STUB" SKILLS_SCRIPT="$FWD_STUB" FONTS_SCRIPT="$FWD_STUB" timeout 10 bash install.sh "$@" 2>&1) || true
     # 精确比对最后一行: 前缀匹配会放过多余或错位的参数
     got=$(tail -n1 <<<"$out" | tr -d '\r')
     if [[ $got == "FWD|$expected" ]]; then
@@ -307,7 +307,7 @@ test_tui_pty() {
 }
 
 test_command_adapters() {
-    test_info "测试 mcp/skills 语法转换层"
+    test_info "测试 mcp/skills/fonts 语法转换层"
 
     make_tmp; FWD_STUB=$TMP_PATH
     cat > "$FWD_STUB" <<'STUB'
@@ -324,6 +324,10 @@ STUB
     assert_forward "skills categories" "--categories" skills categories
     assert_forward "skills install <id>" "gdb" skills install gdb
     assert_forward "skills install --category" "--category kernel-dev --all" skills install --category kernel-dev --all
+    assert_forward "fonts list" "--list" fonts list
+    assert_forward "fonts status" "--list" fonts status
+    assert_forward "fonts install <id>" "jetbrains-mono" fonts install jetbrains-mono
+    assert_forward "fonts install --all/--dry-run" "--dry-run --all" fonts install --dry-run --all
 
     # 旧语法必须逐字透传 (转换层只认动作词)
     # 交互选择走 MCP TUI; 非交互终端下应拒绝而不是转发给安装器
@@ -729,7 +733,7 @@ test_devtools_dispatch() {
 test_update_only() {
     test_info "测试 update-all --only"
 
-    local out rc
+    local out rc stub_bin
 
     rc=0
     out=$(timeout 20 bash scripts/update-all.sh --only bogus </dev/null 2>&1) || rc=$?
@@ -763,7 +767,14 @@ test_update_only() {
         test_fail "--only node 筛选不符: $out"
     fi
 
-    out=$(timeout 30 bash scripts/update-all.sh --only node,claude --dry-run 2>&1) || true
+    # 只测试筛选与渲染, 不依赖宿主机是否安装了 Claude Code。
+    make_tmp -d; stub_bin=$TMP_PATH
+    cat > "$stub_bin/claude" <<'STUB'
+#!/usr/bin/env bash
+exit 0
+STUB
+    chmod +x "$stub_bin/claude"
+    out=$(PATH="$stub_bin:$PATH" timeout 30 bash scripts/update-all.sh --only node,claude --dry-run 2>&1) || true
     if [[ $out == *"nvm"* && $out == *"claude (Claude Code)"* ]]; then
         test_pass "--only node,claude 列出两项"
     else
@@ -888,6 +899,17 @@ test_predictable_temp_paths() {
     fi
 }
 
+test_fonts_installation() {
+    test_info "测试独立字体安装"
+    local out rc=0
+    out=$(timeout 30 bash tests/fonts_check.sh 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        test_pass "字体离线安装、备份、幂等和 dry-run"
+    else
+        test_fail "字体安装回归失败 (rc=$rc): $out"
+    fi
+}
+
 # =============================================================================
 # 运行所有测试
 # =============================================================================
@@ -921,6 +943,7 @@ test_devtools_dispatch
 test_update_only
 test_daily_app_packages
 test_predictable_temp_paths
+test_fonts_installation
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"

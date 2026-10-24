@@ -14,6 +14,8 @@ SCRIPTS_DIR="$ROOT_DIR/scripts"
 # shellcheck disable=SC1091
 . "$SCRIPTS_DIR/lib/deps.sh"
 # shellcheck disable=SC1091
+. "$SCRIPTS_DIR/lib/fonts.sh"
+# shellcheck disable=SC1091
 . "$SCRIPTS_DIR/lib/mcp.sh"
 # shellcheck disable=SC1091
 . "$SCRIPTS_DIR/lib/node.sh"
@@ -58,6 +60,11 @@ install_menu() {
                 if is_code_intel "$comp"; then
                     status+=" [三选一]"
                 fi
+            elif [[ $domain == fonts ]]; then
+                name="${FONT_NAMES[$comp]:-$comp}"
+                if font_is_installed "$comp"; then
+                    status=" (已安装)"
+                fi
             else
                 name="${COMPONENT_NAMES[$comp]:-$comp}"
                 if is_installed "$comp"; then
@@ -98,6 +105,8 @@ install_menu() {
                         fi
                         run_action mcp install "${selected[@]}"
                         refresh=true
+                    elif [[ $domain == fonts ]]; then
+                        run_action fonts install "${selected[@]}"
                     else
                         run_action tools install --with-deps "${selected[@]}"
                     fi
@@ -126,6 +135,10 @@ tools_menu() {
 
 mcp_menu() {
     install_menu "MCP 服务器安装" mcp
+}
+
+fonts_menu() {
+    install_menu "字体安装" fonts "${FONT_IDS[@]}"
 }
 
 config_menu() {
@@ -160,17 +173,18 @@ main_menu() {
         printf '  3) 开发工具      Node/Python/AI CLI/编辑器\n'
         printf '  4) MCP 服务器    代码智能/文件系统/浏览器\n'
         printf '  5) 代理技能      技能组与分类选择\n'
+        printf '  6) 字体安装      Fixedsys Excelsior / JetBrains Mono\n'
         printf '\n'
-        printf '  6) 安装状态      工具 / MCP / 技能汇总\n'
-        printf '  7) 环境体检      doctor 逐项诊断\n'
-        printf '  8) 配置管理      备份/恢复/同步\n'
-        printf '  9) 统一更新      各工具官方自更新\n'
+        printf '  7) 安装状态      工具 / MCP / 技能汇总\n'
+        printf '  8) 环境体检      doctor 逐项诊断\n'
+        printf '  9) 配置管理      备份/恢复/同步\n'
+        printf '  10) 统一更新     各工具官方自更新\n'
         printf '\n'
-        printf '  10) 新手引导     quick-start 推荐配置\n'
+        printf '  11) 新手引导     quick-start 推荐配置\n'
         printf '\n'
         printf '  q) 退出\n\n'
         printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-        printf '选择 [1-10/q]: '
+        printf '选择 [1-11/q]: '
 
         IFS= read -r choice || return 0
         case "$choice" in
@@ -179,11 +193,12 @@ main_menu() {
             3) tools_menu ;;
             4) mcp_menu ;;
             5) run_action skills ;;
-            6) run_action status ;;
-            7) run_action doctor ;;
-            8) config_menu ;;
-            9) run_action update ;;
-            10) run_action quick-start ;;
+            6) fonts_menu ;;
+            7) run_action status ;;
+            8) run_action doctor ;;
+            9) config_menu ;;
+            10) run_action update ;;
+            11) run_action quick-start ;;
             q|Q) return 0 ;;
             '') continue ;;
             *) printf '请输入有效编号或 q。\n' ;;
@@ -191,4 +206,7 @@ main_menu() {
     done
 }
 
+if [[ ${1:-} == fonts ]]; then
+    fonts_menu
+fi
 main_menu
