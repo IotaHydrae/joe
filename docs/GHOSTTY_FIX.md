@@ -1,4 +1,4 @@
-# Ghostty 终端按键问题修复
+# Ghostty 终端与字体问题修复
 
 ## 问题描述
 
@@ -105,6 +105,59 @@ stty -a | grep icanon
 2. **SSH 会话**: 通过 SSH 连接时可能降级为 dumb
 3. **Subshell**: 某些情况下子 shell 继承了错误的 TERM
 4. **GTK 环境**: GTK 应用在某些桌面环境下的兼容性问题
+
+## Fixedsys 字体优先级修复
+
+如果 Ghostty 已设置 `font-family = Fixedsys Excelsior`，但英文和数字仍显示为 Noto，可能是 fontconfig 的中文语言规则调整了字体优先级。这与字体是否安装、终端的 `TERM` 设置是两件事；在普通命令行的非中文环境下检查，也可能无法复现桌面上的结果。
+
+运行已有修复命令即可部署字体规则；`./install.sh tools install ghostty` 也会调用同一修复流程：
+
+```bash
+./install.sh repair-ghostty --user-only
+```
+
+仓库中的 [99-fixedsys-explicit.conf](../.config/fontconfig/conf.d/99-fixedsys-explicit.conf) 会写入 `${XDG_CONFIG_HOME:-$HOME/.config}/fontconfig/conf.d/99-fixedsys-explicit.conf`。规则只匹配明确包含 `Fixedsys Excelsior` 的字体请求，并以强绑定替换其字体列表：
+
+1. `Fixedsys Excelsior`：英文和数字。
+2. `Noto Sans Mono CJK SC`：中文缺字回退。
+3. `Noto Color Emoji`：表情和国旗。
+
+替换后的列表不保留通用 `monospace` 标记，避免系统针对中文等宽字体的规则再次把 Noto 插到 Fixedsys 前面。普通 `monospace`、JetBrains Mono 等其他字体请求不会被这条规则匹配。
+
+修复只在内容变化时写入规则，覆盖前备份为 `.bak.<timestamp>`，保留最近 5 份；有 `fc-cache` 时刷新缓存。它不修改 Ghostty 中选择的字体，也不安装字体包。Fixedsys 和两个 Noto 回退字体都需已安装；缺少字体时，规则本身无法提供相应字形。
+
+### 在中文桌面环境验证
+
+先确认系统提供 `zh_CN.UTF-8`，再使用与桌面相同的环境检查：
+
+```bash
+locale -a
+LC_ALL=zh_CN.UTF-8 fc-match -f '%{family}\n' 'Fixedsys Excelsior'
+LC_ALL=zh_CN.UTF-8 fc-match -f '%{family}\n' 'Fixedsys Excelsior:charset=4e2d'
+LC_ALL=zh_CN.UTF-8 fc-match -f '%{family}\n' 'Fixedsys Excelsior:charset=1f600'
+```
+
+在三个字体都安装的情况下，以上依次应匹配 Fixedsys、Noto Sans Mono CJK SC 和 Noto Color Emoji。还需完全退出并重启 Ghostty，确认实际显示的 `ABC 0123 中文 😀 🇨🇳`；`fc-match` 的结果只能验证 fontconfig 选择，不能代替 Ghostty 自身的加载检查。排查时不要仅使用 `C`、`C.UTF-8` 或与桌面不同的语言环境。
+
+可使用 Ghostty 自身的字体诊断，检查各个码位实际选择的字体：
+
+```bash
+LC_ALL=zh_CN.UTF-8 ghostty +show-face --string='ABC 0123 中文 😀 🇨🇳'
+```
+
+此命令逐码位检查，国旗等组合字符仍需在窗口中确认最终显示。
+
+## Cinnamon 快捷键打开窗口后没有焦点
+
+如果 Ctrl+Alt+T 的自定义命令直接写成 `ghostty`，Cinnamon 会按普通进程启动它，缺少桌面应用启动上下文；这可能导致新窗口打开后未自动激活。只改成 `gtk-launch` 仍可能无法解决。运行修复命令：
+
+```bash
+./install.sh repair-ghostty --user-only
+```
+
+修复会安装独立启动器 `~/.local/bin/joe-ghostty`，在 X11 中记录启动前的窗口，最多等待约 5 秒，只对新增的 Ghostty 窗口发送激活请求。它保留调用目录和命令参数，不会激活旧窗口或其他应用。需要系统已有 `wmctrl`；修复命令不安装软件包。Wayland 或缺少 `wmctrl` 时保留 Ghostty 原生焦点行为。
+
+已有 Cinnamon 自定义快捷键直接执行 `ghostty` 或 `gtk-launch com.mitchellh.ghostty` 时，会备份到用户配置目录 `ghostty/cinnamon-shortcut-<id>.bak.<timestamp>` 后迁移到这个启动器，每条保留最近 5 份。其他自定义快捷键不修改。Cinnamon 的 `focus-new-windows = smart` 是正常默认值，修复不修改全局焦点策略。
 
 ## 推荐配置
 

@@ -33,8 +33,8 @@ ghostty_backup_file() {
     while IFS= read -r old; do
         rm -f -- "$old" || return 1
     done < <(find "$(dirname "$base")" -maxdepth 1 -type f \
-        -name "$(basename "$base").bak.[0-9]*" -printf '%T@ %p\n' \
-        | sort -rn | tail -n +6 | cut -d' ' -f2-)
+        -name "$(basename "$base").bak.[0-9]*" -print \
+        | sort -rV | tail -n +6)
 }
 
 # 只在内容变化时备份并原子替换, 保留配置文件的符号链接。
@@ -43,6 +43,7 @@ ghostty_write_file() (
     if [ -L "$dest" ]; then
         dest="$(readlink -f "$dest")" || return 1
     fi
+    [ ! -d "$dest" ] || return 1
     if [ -f "$dest" ] && cmp -s -- "$source" "$dest" \
        && [ "$(stat -c '%a' "$dest")" = "$mode" ]; then
         return 0
@@ -56,6 +57,23 @@ ghostty_write_file() (
     fi
     mv -f -- "$tmp" "$dest"
 )
+
+# 只修复显式 Fixedsys 请求; 不覆盖用户已有的其他 fontconfig 规则。
+# 不输出日志, 供中文修复命令与英文 Shell 安装器共用。
+ghostty_install_fontconfig() {
+    local source dest
+    source="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../.config/fontconfig/conf.d/99-fixedsys-explicit.conf"
+    dest="${XDG_CONFIG_HOME:-$HOME/.config}/fontconfig/conf.d/99-fixedsys-explicit.conf"
+    [ -s "$source" ] || return 1
+    if [ -f "$dest" ] && cmp -s -- "$source" "$dest" \
+       && [ "$(stat -c '%a' "$dest")" = 644 ]; then
+        return 0
+    fi
+    ghostty_write_file "$source" "$dest" 644 || return 1
+    if command -v fc-cache >/dev/null 2>&1; then
+        fc-cache -f || return 1
+    fi
+}
 
 # 忽略当前用户的 ~/.terminfo 和 TERMINFO 覆盖, 只检查 ncurses 的系统搜索目录。
 ghostty_system_terminfo_available() {
@@ -137,6 +155,45 @@ ghostty_install_terminfo() {
     fi
 }
 
+ghostty_install_launcher() {
+    local bin="$1" work="$2" source
+    source="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/launch_ghostty.sh"
+    [ -s "$source" ] || { warn "缺少 Ghostty 启动器: $source"; return 1; }
+    {
+        printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail'
+        printf 'GHOSTTY_BIN=%q\n' "$bin"
+        cat -- "$source"
+    } > "$work/launcher"
+    ghostty_write_file "$work/launcher" "$HOME/.local/bin/joe-ghostty" 755 || return 1
+    if [[ ${XDG_SESSION_TYPE:-} == x11 ]] && ! command -v wmctrl >/dev/null 2>&1; then
+        warn "X11 新窗口焦点修复需要 wmctrl; 当前保留 Ghostty 原生焦点行为"
+    fi
+}
+
+# 只迁移直接打开 Ghostty 的现有 Cinnamon 自定义快捷键。
+ghostty_configure_shortcuts() {
+    local work="$1" config_home launcher command schema id previous
+    config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    launcher="$HOME/.local/bin/joe-ghostty"
+    command -v gsettings >/dev/null 2>&1 || return 0
+    gsettings list-schemas | grep -qx 'org.cinnamon.desktop.keybindings' || return 0
+    while IFS= read -r id; do
+        [[ $id =~ ^[a-zA-Z0-9_-]+$ && $id != __dummy__ ]] || continue
+        schema="org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/$id/"
+        previous=$(gsettings get "$schema" command) || return 1
+        case "$previous" in
+            "'ghostty'"|"'gtk-launch com.mitchellh.ghostty'"|"'gtk-launch com.mitchellh.ghostty.desktop'") ;;
+            *) continue ;;
+        esac
+        printf '%s\n' "$previous" > "$work/shortcut-$id"
+        mkdir -p -- "$config_home/ghostty" || return 1
+        ghostty_backup_file "$work/shortcut-$id" "$config_home/ghostty/cinnamon-shortcut-$id" || return 1
+        printf -v command '%q' "$launcher"
+        gsettings set "$schema" command "$command" || return 1
+        ok "Ghostty 快捷键已改用可激活新窗口的启动器 ($id)"
+    done < <(gsettings get org.cinnamon.desktop.keybindings custom-list | tr "'" '\n' | awk '/^[a-zA-Z0-9_-]+$/')
+}
+
 ghostty_configure_desktop() {
     local bin="$1" work="$2" config_home data_home launcher desktop source dir escaped
     config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -144,13 +201,7 @@ ghostty_configure_desktop() {
     launcher="$HOME/.local/bin/joe-ghostty"
     desktop="$data_home/applications/com.mitchellh.ghostty.desktop"
 
-    # Nemo 只改变子进程 cwd, 单实例 Ghostty 必须显式收到这个目录。
-    {
-        printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail'
-        printf 'GHOSTTY_BIN=%q\n' "$bin"
-        printf '%s\n' 'exec "$GHOSTTY_BIN" --gtk-single-instance=true --working-directory="$(pwd -P)" "$@"'
-    } > "$work/launcher"
-    ghostty_write_file "$work/launcher" "$launcher" 755 || return 1
+    ghostty_install_launcher "$bin" "$work" || return 1
 
     source="$desktop"
     if [ ! -f "$source" ]; then
@@ -234,6 +285,7 @@ EOF
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "$data_home/applications" || return 1
     fi
+    ghostty_configure_shortcuts "$work" || return 1
     ok "Ghostty 桌面入口已配置, 打开终端时传入调用目录"
 }
 
@@ -245,5 +297,10 @@ repair_ghostty() (
     work="$(mktemp -d "${TMPDIR:-/tmp}/joe-ghostty.XXXXXX")" || return 1
     trap 'rm -rf -- "$work"' EXIT
     ghostty_install_terminfo "$bin" "$work" "$user_only" || return 1
+    ghostty_install_fontconfig || { warn "Fixedsys 字体规则部署失败"; return 1; }
+    if ! command -v fc-cache >/dev/null 2>&1; then
+        warn "未找到 fc-cache; 安装 fontconfig 后运行 fc-cache -f"
+    fi
+    ok "Fixedsys 字体优先级规则已配置 (保留中文与表情回退)"
     ghostty_configure_desktop "$bin" "$work" || return 1
 )

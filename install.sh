@@ -105,7 +105,8 @@ usage() {
   devtools [选项]    = tools [选项]
   mcp [旧参数]       兼容旧格式
   configs <动作>     = config <动作>
-  repair-ghostty     = scripts/repair_ghostty.sh (--user-only 不写系统 terminfo)
+  repair-ghostty     修复 terminfo、桌面入口、新窗口焦点和 Fixedsys 字体优先级
+      --user-only       不写系统 terminfo
   bootstrap          = quick-start
 
 EOF

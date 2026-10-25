@@ -923,6 +923,28 @@ test_zsh_configuration() {
     fi
 }
 
+test_ghostty_fontconfig() {
+    test_info "测试 Ghostty Fixedsys 字体优先级修复"
+    local out rc=0
+    out=$(timeout 30 bash tests/ghostty_fontconfig_check.sh 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        test_pass "Ghostty 字体规则部署、备份、幂等与中文字体优先级"
+    else
+        test_fail "Ghostty 字体规则回归失败 (rc=$rc): $out"
+    fi
+}
+
+test_ghostty_launcher() {
+    test_info "测试 Ghostty 新窗口焦点修复"
+    local out rc=0
+    out=$(timeout 20 bash tests/ghostty_launcher_check.sh 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        test_pass "Ghostty 新窗口焦点、参数与快捷键迁移"
+    else
+        test_fail "Ghostty 启动器回归失败 (rc=$rc): $out"
+    fi
+}
+
 # =============================================================================
 # 运行所有测试
 # =============================================================================
@@ -958,6 +980,8 @@ test_daily_app_packages
 test_predictable_temp_paths
 test_fonts_installation
 test_zsh_configuration
+test_ghostty_fontconfig
+test_ghostty_launcher
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"

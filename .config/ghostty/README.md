@@ -117,6 +117,18 @@ Ghostty 可能从其他位置读取配置：
 
 确保编辑的是正确的文件。
 
+### 问题：设置 Fixedsys 后仍显示 Noto
+
+中文桌面环境下，系统 fontconfig 规则可能把 Noto 排到明确指定的 Fixedsys 前面。运行以下命令，部署用户级 [99-fixedsys-explicit.conf](../fontconfig/conf.d/99-fixedsys-explicit.conf)：
+
+```bash
+./install.sh repair-ghostty --user-only
+```
+
+仅对明确请求 `Fixedsys Excelsior` 的程序，规则将字体列表替换为 `Fixedsys Excelsior` → `Noto Sans Mono CJK SC` → `Noto Color Emoji`，并移除通用 `monospace` 标记；普通等宽字体请求不受影响。三个字体都需已安装，修复命令不安装字体包。
+
+规则写入 `${XDG_CONFIG_HOME:-$HOME/.config}/fontconfig/conf.d/99-fixedsys-explicit.conf`，内容变化时备份并刷新字体缓存。完全重启 Ghostty 后，在与桌面相同的 `zh_CN.UTF-8` 环境下检查英文、中文、表情和国旗；详见 [Fixedsys 字体修复](../../docs/GHOSTTY_FIX.md#fixedsys-字体优先级修复)。
+
 ### 自动修复
 
 ```bash

@@ -170,13 +170,20 @@ cd joe
 
 遇到问题？查看：
 - [故障排除指南](docs/TROUBLESHOOTING.md) - 常见问题和解决方案
-- [Ghostty 终端修复](docs/GHOSTTY_FIX.md) - Ghostty 按键问题修复
+- [Ghostty 终端修复](docs/GHOSTTY_FIX.md) - terminfo、桌面入口和 Fixedsys 字体优先级修复
 - [迁移指南](docs/MIGRATION.md) - 1.x → 2.0 迁移
 
 **快速修复 Ghostty**：
 ```bash
-bash scripts/fix_ghostty_term.sh  # 修复 TERM=dumb 问题
+./install.sh repair-ghostty              # 修复 terminfo、桌面入口和 Fixedsys 字体优先级
+./install.sh repair-ghostty --user-only  # 仅修当前用户，不写系统 terminfo
 ```
+
+修复命令以及 `./install.sh tools install ghostty` 会部署用户级字体规则 `${XDG_CONFIG_HOME:-$HOME/.config}/fontconfig/conf.d/99-fixedsys-explicit.conf`；`shell` 复制配置时也会合并这条规则，保留其他用户字体规则，`--no-config` 可跳过。仅在程序明确请求 `Fixedsys Excelsior` 时，将字体顺序设为 Fixedsys → Noto Sans Mono CJK SC → Noto Color Emoji，并移除这类请求中的通用 `monospace` 标记，避免中文语言规则抢占 Fixedsys；其他字体和普通 `monospace` 请求不受影响。
+
+规则变化时会备份旧文件、保留最近 5 份，并在有 `fc-cache` 时刷新字体缓存；不会安装缺失的回退字体。完成后重启 Ghostty，并在与桌面一致的 `zh_CN.UTF-8` 环境下验证英文、中文和表情，详见[字体修复说明](docs/GHOSTTY_FIX.md#fixedsys-字体优先级修复)。
+
+修复还会更新 `~/.local/bin/joe-ghostty` 启动器：X11 有 `wmctrl` 时只激活本次新增的 Ghostty 窗口，Wayland 使用原生焦点行为。已有 Cinnamon 自定义快捷键若直接执行 `ghostty`，会备份后迁移到这个启动器；其他自定义命令保留，不修改全局焦点策略。
 
 ## 维护命令
 

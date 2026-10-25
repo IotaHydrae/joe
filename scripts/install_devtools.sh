@@ -19,7 +19,7 @@
 #   ./install.sh devtools --copilot  # 只装 GitHub Copilot CLI
 #   ./install.sh devtools --grok     # 只装 Grok Build
 #   ./install.sh devtools --zed      # 只装 Zed 编辑器 + JetBrains Mono
-#   ./install.sh devtools --ghostty  # 安装/修复 Ghostty、terminfo 和桌面终端入口
+#   ./install.sh devtools --ghostty  # 安装/修复 Ghostty、terminfo、桌面入口、焦点和字体优先级
 #   ./install.sh devtools --vscode   # 只装 VS Code 编辑器
 #   ./install.sh devtools --brave    # 只装 Brave 浏览器
 #   ./install.sh devtools --mimo     # 只装 MiMo Code (小米 AI 编程助手)
@@ -44,7 +44,7 @@
 #   - nvm 装到 ~/.nvm; --node 会切换到最新 LTS, 迁移已有全局包
 #   - 日常 shell 只使用 ~/.nvm/current/bin, 不加载 nvm.sh 或 nvm 补全
 #   - pyenv 装到 ~/.pyenv, Python 版本与 pipx 由用户自行安装
-#   - --ghostty 会修复已有安装的用户/系统 terminfo 与桌面入口; 系统条目缺失时需要 sudo
+#   - --ghostty 修复用户/系统 terminfo、桌面入口、焦点与 Fixedsys 字体优先级; 系统条目缺失时需要 sudo
 #   - 单独修复用 ./install.sh repair-ghostty; --user-only 不写系统 terminfo
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)

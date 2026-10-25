@@ -59,11 +59,11 @@ jobs:
           print("python OK")
           PY
 
-      - name: 安装 zsh 测试运行时
+      - name: 安装 zsh 与 fontconfig 测试运行时
         run: |
-          if ! command -v zsh >/dev/null 2>&1; then
+          if ! command -v zsh >/dev/null 2>&1 || ! command -v fc-pattern >/dev/null 2>&1; then
             sudo apt-get update
-            sudo apt-get install -y zsh
+            sudo apt-get install -y zsh fontconfig
           fi
 
       - name: CLI 测试套件 (含 TUI pty 回归)

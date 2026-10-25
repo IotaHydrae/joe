@@ -168,13 +168,20 @@ The only real copy lives in `~/.agents/skills`. Claude Code, Codex, Gemini, Open
 ## Troubleshooting
 
 - [Troubleshooting guide](docs/TROUBLESHOOTING.md) - common problems and fixes
-- [Ghostty terminal fix](docs/GHOSTTY_FIX.md) - broken key handling in Ghostty
+- [Ghostty terminal fix](docs/GHOSTTY_FIX.md) - terminfo, desktop integration, and Fixedsys font priority
 - [Migration guide](docs/MIGRATION.md) - 1.x to 2.0
 
 Quick Ghostty fix:
 ```bash
-bash scripts/fix_ghostty_term.sh  # Fixes the TERM=dumb problem
+./install.sh repair-ghostty              # Repair terminfo, desktop integration, and Fixedsys font priority
+./install.sh repair-ghostty --user-only  # Current user only; do not write system terminfo
 ```
+
+The repair command and `./install.sh tools install ghostty` deploy a user font rule at `${XDG_CONFIG_HOME:-$HOME/.config}/fontconfig/conf.d/99-fixedsys-explicit.conf`. The `shell` configuration step also merges this rule while preserving other user font rules; `--no-config` skips it. Only when an application explicitly requests `Fixedsys Excelsior`, the rule sets the family order to Fixedsys → Noto Sans Mono CJK SC → Noto Color Emoji and removes the generic `monospace` entry from that request. This prevents Chinese language rules from taking priority over Fixedsys; other families and ordinary `monospace` requests are unaffected.
+
+Changed rules are backed up, keeping the latest five backups, and the font cache is refreshed when `fc-cache` is available. Missing fallback fonts are not installed. Restart Ghostty afterward and verify Latin text, Chinese, and emoji under the same `zh_CN.UTF-8` locale as the desktop; see the [font repair guide](docs/GHOSTTY_FIX.md#fixedsys-字体优先级修复).
+
+The repair also updates `~/.local/bin/joe-ghostty`: on X11 with `wmctrl`, it activates only newly created Ghostty windows; Wayland keeps native focus behavior. Existing Cinnamon custom shortcuts that directly execute `ghostty` are backed up and migrated to this launcher. Other custom commands and global focus settings are preserved.
 
 ## Maintenance Commands
 

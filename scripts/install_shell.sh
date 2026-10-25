@@ -41,6 +41,8 @@ BACKUP_RETENTION=5
 
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/scripts/lib/zsh.sh"
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/scripts/lib_ghostty.sh"
 
 # Use sudo for privileged commands unless we are already root
 if [ "$EUID" -eq 0 ]; then
@@ -685,7 +687,15 @@ main() {
         for item in ./.config/*; do
             if [ -e "$item" ]; then
                 item_name=$(basename "$item")
-                copy_with_backup "$item" "$HOME/.config/$item_name"
+                if [ "$item_name" = fontconfig ]; then
+                    log INFO "Configuring explicit Fixedsys font priority..."
+                    run_cmd ghostty_install_fontconfig
+                    if ! command -v fc-cache >/dev/null 2>&1; then
+                        log WARNING "fc-cache not found; run fc-cache -f after installing fontconfig"
+                    fi
+                else
+                    copy_with_backup "$item" "$HOME/.config/$item_name"
+                fi
             fi
         done
     fi
