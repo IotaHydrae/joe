@@ -4,6 +4,9 @@
 # =============================================================================
 # 处理组件之间的依赖关系，自动补全和验证
 
+# shellcheck source=rime.sh
+. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/rime.sh"
+
 # 依赖关系映射 (组件 -> 依赖列表)
 declare -A COMPONENT_DEPS=(
     # AI CLI 都依赖 Node.js
@@ -246,7 +249,7 @@ is_installed() {
             command -v qq >/dev/null 2>&1 || command -v linuxqq >/dev/null 2>&1
             ;;
         rime)
-            command -v fcitx5 >/dev/null 2>&1 && [ -f "$HOME/.local/share/fcitx5/rime/default.yaml" ]
+            rime_installation_ready
             ;;
         *)
             return 1

@@ -60,6 +60,9 @@ usage() {
     tools update claude node       # 只更新指定组件
     tools update --dry-run         # 预览将执行的更新
     tools install node claude      # 安装指定组件 (已装的会跳过)
+    tools install rime             # 安装/修复雾凇, 保留个人词库
+
+Rime 重跑会重新部署词库、选择 Fcitx 5 并修复左 Alt+Shift; 已打开的应用需重开。
 
 EOF
 }
@@ -186,10 +189,10 @@ cmd_install() {
         install_list=("${resolved[@]}")
     fi
 
-    # 过滤已安装的组件
+    # Rime 显式安装也是修复入口, 不能被已安装检测提前跳过。
     local -a to_install=()
     for comp in "${install_list[@]}"; do
-        if is_installed "$comp"; then
+        if [[ $comp != rime ]] && is_installed "$comp"; then
             printf "${COLOR_DIM}跳过已安装: %s${COLOR_RESET}\n" "$comp"
         else
             to_install+=("$comp")

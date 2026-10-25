@@ -28,7 +28,7 @@
 #   ./install.sh devtools --godot    # 只装 Godot 游戏引擎
 #   ./install.sh devtools --wechat   # 只装微信 Linux 原生版
 #   ./install.sh devtools --qq       # 只装 Linux QQ
-#   ./install.sh devtools --rime     # 只装 Rime 雾凇拼音输入法
+#   ./install.sh devtools --rime     # 安装/修复 Rime 雾凇拼音, 保留个人词库
 #   ./install.sh devtools --tui      # 交互式勾选界面 (TUI)
 #   ./install.sh devtools --list     # 列出可安装组件
 #   ./install.sh devtools --check    # 只报告本机适配情况 (发行版/包名解析/安装方式), 不做改动
@@ -46,6 +46,8 @@
 #   - pyenv 装到 ~/.pyenv, Python 版本与 pipx 由用户自行安装
 #   - --ghostty 修复用户/系统 terminfo、桌面入口、焦点与 Fixedsys 字体优先级; 系统条目缺失时需要 sudo
 #   - 单独修复用 ./install.sh repair-ghostty; --user-only 不写系统 terminfo
+#   - --rime 安装 Lua 插件并编译雾凇, 重跑修复 Fcitx 5 登录配置与左 Alt+Shift, 保留个人词库
+#   - Rime 修复会重启当前会话输入法; 已打开的应用需重开以加载 GTK 输入法模块
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
 #   - brave, chatgpt, wechat, qq, rime 为日常软件, 位于主菜单第 2 项, --all 时默认跳过

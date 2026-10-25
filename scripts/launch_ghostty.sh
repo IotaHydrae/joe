@@ -66,5 +66,6 @@ if $focus_window && [[ ${XDG_SESSION_TYPE:-} == x11 \
     fi
 fi
 
-# Nemo 只改变 cwd, 单实例 Ghostty 必须显式收到该目录。
-exec "$GHOSTTY_BIN" --gtk-single-instance=true --working-directory="$(pwd -P)" "$@"
+# 每个新窗口重新加载 GTK 输入法模块, 避免复用安装输入法之前的旧进程。
+# Nemo 只改变 cwd, 仍显式传入工作目录。
+exec "$GHOSTTY_BIN" --gtk-single-instance=false --working-directory="$(pwd -P)" "$@"

@@ -21,6 +21,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=lib_ghostty.sh
 . "$SCRIPT_DIR/lib_ghostty.sh"
+# shellcheck source=lib/rime.sh
+. "$SCRIPT_DIR/lib/rime.sh"
 
 # 多字节文本按"字符"处理
 if [ -z "${LC_ALL:-}" ]; then
@@ -314,10 +316,21 @@ if find_bin qq >/dev/null 2>&1 || find_bin linuxqq >/dev/null 2>&1; then
 else
     record skip "QQ" "未安装（可选，./install.sh tools install qq）"
 fi
-if find_bin fcitx5 >/dev/null 2>&1 && [ -f "$HOME/.local/share/fcitx5/rime/default.yaml" ]; then
-    record ok "Rime 雾凇拼音" "Fcitx 5 + 雾凇词库"
+if rime_installation_ready; then
+    record ok "Rime 雾凇拼音" "Fcitx 5 + 已编译雾凇词库 + Rime 输入法列表"
+elif [ -f "$(rime_data_dir)/default.yaml" ] || [ -f "$(rime_data_dir)/rime_ice.schema.yaml" ]; then
+    record warn "Rime 雾凇拼音" "引擎、编译产物或输入法列表不完整，运行 ./install.sh tools install rime 修复"
 else
     record skip "Rime 雾凇拼音" "未安装（可选，./install.sh tools install rime）"
+fi
+if [ -f "$HOME/.xinputrc" ] && awk '
+    $1 == "run_im" { value=$2; gsub(/["\047]/, "", value); if (value == "fcitx") found=1 }
+    END { exit !found }
+' "$HOME/.xinputrc"; then
+    record warn "输入法登录配置" "仍选择 Fcitx 4，运行 ./install.sh tools install rime 切换到 Fcitx 5"
+fi
+if command -v pgrep >/dev/null 2>&1 && pgrep -u "$(id -u)" -x fcitx >/dev/null 2>&1; then
+    record warn "输入法后台" "当前用户仍有 Fcitx 4 进程；使用 Fcitx 5 雾凇时运行 ./install.sh tools install rime 退出旧后台"
 fi
 
 # ---------------------------------------------------------------------------

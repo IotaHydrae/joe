@@ -183,7 +183,7 @@ cd joe
 
 规则变化时会备份旧文件、保留最近 5 份，并在有 `fc-cache` 时刷新字体缓存；不会安装缺失的回退字体。完成后重启 Ghostty，并在与桌面一致的 `zh_CN.UTF-8` 环境下验证英文、中文和表情，详见[字体修复说明](docs/GHOSTTY_FIX.md#fixedsys-字体优先级修复)。
 
-修复还会更新 `~/.local/bin/joe-ghostty` 启动器：X11 有 `wmctrl` 时只激活本次新增的 Ghostty 窗口，配合 `xprop` 确认焦点并在请求未被接受时短暂重试；Wayland 使用原生焦点行为。已有 Cinnamon 自定义快捷键若直接执行 `ghostty`，会备份后迁移到这个启动器，并刷新 Cinnamon 内存中的快捷键命令，立即生效；其他自定义命令保留，不修改全局焦点策略。
+修复还会更新 `~/.local/bin/joe-ghostty` 启动器：每次创建独立进程，使新窗口加载当前安装的输入法模块；X11 有 `wmctrl` 时只激活本次新增的 Ghostty 窗口，配合 `xprop` 确认焦点并在请求未被接受时短暂重试；Wayland 使用原生焦点行为。已有 Cinnamon 自定义快捷键若直接执行 `ghostty`，会备份后迁移到这个启动器，并刷新 Cinnamon 内存中的快捷键命令，立即生效；其他自定义命令保留，不修改全局焦点策略。
 
 ## 维护命令
 
@@ -255,8 +255,12 @@ cd joe
 --godot                # 只装 Godot 游戏引擎
 --wechat               # 只装微信 Linux 原生版
 --qq                   # 只装 Linux QQ
---rime                 # 只装 Rime 雾凇拼音输入法
+--rime                 # 安装/修复 Rime 雾凇拼音, 保留个人词库
 ```
+
+重复运行 `./install.sh tools install rime`（或主菜单第 2 项选择 Rime）会修复已有安装：补齐 Fcitx 5 的 GTK/Qt 前端和 Rime Lua 插件，重新编译雾凇，合并输入法列表与左 Alt+Shift 快捷键，并通过 `im-config`（可用时）选择 Fcitx 5。保留个人词库、其他输入法和无关环境变量；变更前备份配置，保留最近 5 份。
+
+部署失败会显示错误，已有但不完整的词库目录会保留并提示处理。桌面会话中的旧 Fcitx 4 会优雅退出，Fcitx 5 会重启；脚本不会自动卸载旧软件包。已打开的 Ghostty 等应用需要关闭后重新打开，以加载新装的输入法模块。`doctor` 会检查雾凇编译产物与输入法列表，并提示仍指向 Fcitx 4 的登录配置和残留旧后台。
 
 ### MCP 选项
 ```bash

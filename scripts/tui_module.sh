@@ -27,6 +27,9 @@
 #   q / Esc   退出
 # =============================================================================
 
+# shellcheck source=lib/rime.sh
+. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/lib/rime.sh"
+
 # 多字节文本按"字符"处理 (POSIX locale 下 bash 按字节截断会切坏中文)
 if [ -z "${LC_ALL:-}" ]; then
     for _loc in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
@@ -89,7 +92,7 @@ if ! declare -F tui_component_installed >/dev/null 2>&1; then
             godot)    command -v godot >/dev/null 2>&1 || [ -x "$HOME/.local/bin/godot" ] ;;
             wechat)   command -v wechat >/dev/null 2>&1 || command -v wechat-universal >/dev/null 2>&1 ;;
             qq)       command -v qq >/dev/null 2>&1 || command -v linuxqq >/dev/null 2>&1 ;;
-            rime)     command -v fcitx5 >/dev/null 2>&1 && [ -f "$HOME/.local/share/fcitx5/rime/default.yaml" ] ;;
+            rime)     rime_installation_ready ;;
             *)        return 1 ;;
         esac
     }

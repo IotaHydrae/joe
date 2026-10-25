@@ -62,7 +62,7 @@ for ((attempt = 0; attempt < 30; attempt++)); do
     sleep 0.1
 done
 [[ -f "$FOCUS_BOX/activated" && $(cat "$FOCUS_BOX/activated") == 0x030 ]] || fail "未仅激活新增 Ghostty 窗口"
-printf '%s\n' --gtk-single-instance=true "--working-directory=$FOCUS_HOME" \
+printf '%s\n' --gtk-single-instance=false "--working-directory=$FOCUS_HOME" \
     '--title=a title with spaces' -e printf '%s' "it's fine" > "$FOCUS_BOX/expected-args"
 cmp -s "$FOCUS_BOX/arguments" "$FOCUS_BOX/expected-args" || fail "启动器改变了工作目录或参数边界"
 sleep 0.2

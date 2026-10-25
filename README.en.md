@@ -181,7 +181,7 @@ The repair command and `./install.sh tools install ghostty` deploy a user font r
 
 Changed rules are backed up, keeping the latest five backups, and the font cache is refreshed when `fc-cache` is available. Missing fallback fonts are not installed. Restart Ghostty afterward and verify Latin text, Chinese, and emoji under the same `zh_CN.UTF-8` locale as the desktop; see the [font repair guide](docs/GHOSTTY_FIX.md#fixedsys-字体优先级修复).
 
-The repair also updates `~/.local/bin/joe-ghostty`: on X11 with `wmctrl`, it activates only newly created Ghostty windows, using `xprop` to confirm focus and briefly retry rejected requests; Wayland keeps native focus behavior. Existing Cinnamon custom shortcuts that directly execute `ghostty` are backed up and migrated to this launcher, and Cinnamon's cached shortcut commands are refreshed immediately. Other custom commands and global focus settings are preserved.
+The repair also updates `~/.local/bin/joe-ghostty`: each window starts a separate process so it loads the currently installed input-method module; on X11 with `wmctrl`, it activates only newly created Ghostty windows, using `xprop` to confirm focus and briefly retry rejected requests; Wayland keeps native focus behavior. Existing Cinnamon custom shortcuts that directly execute `ghostty` are backed up and migrated to this launcher, and Cinnamon's cached shortcut commands are refreshed immediately. Other custom commands and global focus settings are preserved.
 
 ## Maintenance Commands
 
@@ -253,8 +253,12 @@ The repair also updates `~/.local/bin/joe-ghostty`: on X11 with `wmctrl`, it act
 --godot                # Install Godot Engine only
 --wechat               # Install official Linux WeChat only
 --qq                   # Install official Linux QQ only
---rime                 # Install Rime (rime-ice) input method only
+--rime                 # Install/repair Rime (rime-ice), preserving personal dictionaries
 ```
+
+Run `./install.sh tools install rime` again (or select Rime in main menu item 2) to repair an existing installation. It installs the Fcitx 5 GTK/Qt frontends and Rime Lua plugin, recompiles rime-ice, merges the input-method list and left Alt+Shift shortcuts, and selects Fcitx 5 through `im-config` when available. Personal dictionaries, other input methods, and unrelated environment variables are preserved. Changed configuration is backed up, keeping the latest five copies.
+
+Deployment failures are reported; incomplete existing dictionary directories are preserved for recovery. In a desktop session, the old Fcitx 4 daemon exits gracefully and Fcitx 5 restarts; old packages are not automatically removed. Close and reopen existing applications such as Ghostty so they can load the newly installed input-method module. `doctor` checks the compiled rime-ice files and input-method list, and warns about login configuration that still selects Fcitx 4 or a remaining old daemon.
 
 ### MCP Options
 ```bash

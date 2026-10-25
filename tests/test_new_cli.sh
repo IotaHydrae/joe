@@ -945,6 +945,17 @@ test_ghostty_launcher() {
     fi
 }
 
+test_rime_installation() {
+    test_info "测试 Rime 安装与配置修复"
+    local out rc=0
+    out=$(timeout 45 bash tests/test_rime.sh 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        test_pass "Rime 离线部署、数据保留、幂等和失败处理"
+    else
+        test_fail "Rime 安装回归失败 (rc=$rc): $out"
+    fi
+}
+
 # =============================================================================
 # 运行所有测试
 # =============================================================================
@@ -982,6 +993,7 @@ test_fonts_installation
 test_zsh_configuration
 test_ghostty_fontconfig
 test_ghostty_launcher
+test_rime_installation
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
