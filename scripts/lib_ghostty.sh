@@ -171,18 +171,35 @@ ghostty_install_launcher() {
 }
 
 # 只迁移直接打开 Ghostty 的现有 Cinnamon 自定义快捷键。
+ghostty_refresh_shortcuts() {
+    local current updated
+    current=$(gsettings get org.cinnamon.desktop.keybindings custom-list) || return 1
+    # 与 Cinnamon 设置面板的 ensureCustomListChanges 一致: 切换被忽略的哨兵,
+    # 触发 changed::custom-list, 重建内存中的快捷键回调, 保留真实条目及顺序。
+    case "$current" in
+        *", '__dummy__'"*) updated="${current/, \'__dummy__\'/}" ;;
+        *"'__dummy__', "*) updated="${current/\'__dummy__\', /}" ;;
+        *"'__dummy__'"*) updated="${current/\'__dummy__\'/}" ;;
+        '[]'|'@as []') updated="['__dummy__']" ;;
+        *) updated="${current%]}, '__dummy__']" ;;
+    esac
+    gsettings set org.cinnamon.desktop.keybindings custom-list "$updated"
+}
+
 ghostty_configure_shortcuts() {
     local work="$1" config_home launcher command schema id previous
+    local refresh=false
     config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
     launcher="$HOME/.local/bin/joe-ghostty"
     command -v gsettings >/dev/null 2>&1 || return 0
-    gsettings list-schemas | grep -qx 'org.cinnamon.desktop.keybindings' || return 0
+    gsettings list-schemas | grep -x 'org.cinnamon.desktop.keybindings' >/dev/null || return 0
     while IFS= read -r id; do
         [[ $id =~ ^[a-zA-Z0-9_-]+$ && $id != __dummy__ ]] || continue
         schema="org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/$id/"
         previous=$(gsettings get "$schema" command) || return 1
         case "$previous" in
             "'ghostty'"|"'gtk-launch com.mitchellh.ghostty'"|"'gtk-launch com.mitchellh.ghostty.desktop'") ;;
+            *joe-ghostty*) refresh=true; continue ;;
             *) continue ;;
         esac
         printf '%s\n' "$previous" > "$work/shortcut-$id"
@@ -190,8 +207,12 @@ ghostty_configure_shortcuts() {
         ghostty_backup_file "$work/shortcut-$id" "$config_home/ghostty/cinnamon-shortcut-$id" || return 1
         printf -v command '%q' "$launcher"
         gsettings set "$schema" command "$command" || return 1
+        refresh=true
         ok "Ghostty 快捷键已改用可激活新窗口的启动器 ($id)"
     done < <(gsettings get org.cinnamon.desktop.keybindings custom-list | tr "'" '\n' | awk '/^[a-zA-Z0-9_-]+$/')
+    if $refresh; then
+        ghostty_refresh_shortcuts || return 1
+    fi
 }
 
 ghostty_configure_desktop() {

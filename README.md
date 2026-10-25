@@ -183,7 +183,7 @@ cd joe
 
 规则变化时会备份旧文件、保留最近 5 份，并在有 `fc-cache` 时刷新字体缓存；不会安装缺失的回退字体。完成后重启 Ghostty，并在与桌面一致的 `zh_CN.UTF-8` 环境下验证英文、中文和表情，详见[字体修复说明](docs/GHOSTTY_FIX.md#fixedsys-字体优先级修复)。
 
-修复还会更新 `~/.local/bin/joe-ghostty` 启动器：X11 有 `wmctrl` 时只激活本次新增的 Ghostty 窗口，Wayland 使用原生焦点行为。已有 Cinnamon 自定义快捷键若直接执行 `ghostty`，会备份后迁移到这个启动器；其他自定义命令保留，不修改全局焦点策略。
+修复还会更新 `~/.local/bin/joe-ghostty` 启动器：X11 有 `wmctrl` 时只激活本次新增的 Ghostty 窗口，配合 `xprop` 确认焦点并在请求未被接受时短暂重试；Wayland 使用原生焦点行为。已有 Cinnamon 自定义快捷键若直接执行 `ghostty`，会备份后迁移到这个启动器，并刷新 Cinnamon 内存中的快捷键命令，立即生效；其他自定义命令保留，不修改全局焦点策略。
 
 ## 维护命令
 

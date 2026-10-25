@@ -155,9 +155,11 @@ LC_ALL=zh_CN.UTF-8 ghostty +show-face --string='ABC 0123 中文 😀 🇨🇳'
 ./install.sh repair-ghostty --user-only
 ```
 
-修复会安装独立启动器 `~/.local/bin/joe-ghostty`，在 X11 中记录启动前的窗口，最多等待约 5 秒，只对新增的 Ghostty 窗口发送激活请求。它保留调用目录和命令参数，不会激活旧窗口或其他应用。需要系统已有 `wmctrl`；修复命令不安装软件包。Wayland 或缺少 `wmctrl` 时保留 Ghostty 原生焦点行为。
+修复会安装独立启动器 `~/.local/bin/joe-ghostty`，在 X11 中记录启动前的窗口，最多等待约 5 秒，只对新增的 Ghostty 窗口发送激活请求。窗口首次出现在列表里时可能尚未完成映射，快捷键也可能仍持有键盘抓取；启动器会短暂等待，再通过 `xprop` 检查实际活动窗口，未成功则有界重试。它保留调用目录和命令参数，不会激活旧窗口或其他应用。需要系统已有 `wmctrl`；缺少 `xprop` 时仅短暂重试三次。修复命令不安装软件包。Wayland 或缺少 `wmctrl` 时保留 Ghostty 原生焦点行为。
 
 已有 Cinnamon 自定义快捷键直接执行 `ghostty` 或 `gtk-launch com.mitchellh.ghostty` 时，会备份到用户配置目录 `ghostty/cinnamon-shortcut-<id>.bak.<timestamp>` 后迁移到这个启动器，每条保留最近 5 份。其他自定义快捷键不修改。Cinnamon 的 `focus-new-windows = smart` 是正常默认值，修复不修改全局焦点策略。
+
+Cinnamon 的快捷键管理器缓存了启动命令，只监听 `custom-list` 变化；单独修改快捷键的 `command` 后，实际按键仍可能运行旧命令。修复会沿用 Cinnamon 设置面板的方法，切换列表中被忽略的 `__dummy__` 标记，触发重载并保留真实快捷键条目及其顺序。已经指向 `joe-ghostty` 的快捷键也会刷新，避免出现“设置正确但没有生效”。
 
 ## 推荐配置
 

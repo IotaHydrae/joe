@@ -181,7 +181,7 @@ The repair command and `./install.sh tools install ghostty` deploy a user font r
 
 Changed rules are backed up, keeping the latest five backups, and the font cache is refreshed when `fc-cache` is available. Missing fallback fonts are not installed. Restart Ghostty afterward and verify Latin text, Chinese, and emoji under the same `zh_CN.UTF-8` locale as the desktop; see the [font repair guide](docs/GHOSTTY_FIX.md#fixedsys-字体优先级修复).
 
-The repair also updates `~/.local/bin/joe-ghostty`: on X11 with `wmctrl`, it activates only newly created Ghostty windows; Wayland keeps native focus behavior. Existing Cinnamon custom shortcuts that directly execute `ghostty` are backed up and migrated to this launcher. Other custom commands and global focus settings are preserved.
+The repair also updates `~/.local/bin/joe-ghostty`: on X11 with `wmctrl`, it activates only newly created Ghostty windows, using `xprop` to confirm focus and briefly retry rejected requests; Wayland keeps native focus behavior. Existing Cinnamon custom shortcuts that directly execute `ghostty` are backed up and migrated to this launcher, and Cinnamon's cached shortcut commands are refreshed immediately. Other custom commands and global focus settings are preserved.
 
 ## Maintenance Commands
 

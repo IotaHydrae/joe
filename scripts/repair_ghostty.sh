@@ -4,7 +4,8 @@
 # 默认补齐系统 terminfo (缺失时通过 sudo 写入), 支持 sudo minicom。
 # --user-only 只修复当前用户, 不使用 sudo, 不保证 sudo 下的终端程序可用。
 # 部署用户 fontconfig 规则, 仅匹配显式 Fixedsys 请求, 保留中文/表情回退并刷新缓存。
-# X11 有 wmctrl 时仅激活新增窗口; 迁移直接执行 ghostty 的 Cinnamon 自定义快捷键并备份。
+# X11 有 wmctrl 时仅激活新增窗口并重试; xprop 可确认焦点是否成功。
+# 迁移直接执行 ghostty 的 Cinnamon 自定义快捷键并备份, 刷新缓存使其立即生效。
 # 不安装软件包, 不改 Ghostty 主题、字体选择或快捷键配置。
 
 set -euo pipefail
