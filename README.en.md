@@ -68,6 +68,10 @@ Main menu item 3 (development tools) uses the same numbered list as item 2 (dail
 - **Others**: MiMo Code, CC Switch
 - **Daily apps**: Brave Browser, ChatGPT Desktop, official Linux WeChat and QQ, Rime input method (rime-ice). Main menu item 2, or `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime`. Not included in `devtools --all`, `tools install --all`, or `quick-start --yes`
 
+Linux QQ reads the package URL from the official configuration and requests a temporary signed download link from the official API before downloading, avoiding HTTP 403 on unsigned links. Installation stops if signing or validation fails.
+
+WeChat and QQ packages support resumable downloads: connection failures are retried automatically, and unfinished downloads are kept for the next run of the same install command (QQ obtains a fresh signature). The cache is stored in `${XDG_CACHE_HOME:-~/.cache}/joe/downloads` and removed after successful installation. Changed files or servers without resume support trigger a fresh download; failed integrity checks prevent installation. Requires `flock` (util-linux).
+
 ```bash
 # ===== New syntax (recommended) =====
 ./install.sh tools                     # TUI interactive selection

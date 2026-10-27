@@ -76,6 +76,10 @@ cd joe
 - **其他**：MiMo Code、CC Switch
 - **日常软件**：Brave 浏览器、ChatGPT Desktop、微信 Linux 原生版、Linux QQ、Rime 雾凇拼音输入法。主菜单第 2 项，或 `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime`。不包含在 `devtools --all`、`tools install --all` 和 `quick-start --yes` 中
 
+Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名接口获取临时链接，避免未签名链接返回 HTTP 403。签名获取或验证失败时会中止安装。
+
+微信和 QQ 的安装包支持断点续传：连接中断时自动重试，仍失败则保留进度，重跑原安装命令即可继续（QQ 会重新获取签名）。缓存位于 `${XDG_CACHE_HOME:-~/.cache}/joe/downloads`，安装成功后删除；远端文件变化或不支持续传时会重新下载，完整性校验失败时拒绝安装。需要系统提供 `flock`（util-linux）。
+
 ```bash
 # ===== 新版命令（推荐）=====
 ./install.sh tools                     # TUI 交互选择

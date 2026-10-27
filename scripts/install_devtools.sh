@@ -51,6 +51,8 @@
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
 #   - brave, chatgpt, wechat, qq, rime 为日常软件, 位于主菜单第 2 项, --all 时默认跳过
+#   - QQ 下载前实时获取官方临时签名; 签名失败时中止安装
+#   - 微信/QQ 支持自动重试与跨运行续传; 缓存位于 ${XDG_CACHE_HOME:-~/.cache}/joe/downloads, 成功安装后清理
 # =============================================================================
 
 set -euo pipefail

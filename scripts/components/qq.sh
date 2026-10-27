@@ -3,7 +3,7 @@
 # 组件模块: qq
 # =============================================================================
 # 由 install_devtools.sh 在选中时 source, 然后调用 component_<id>_install。
-# 下载地址来自官网使用的 linuxConfig.js, 且只接受 qqdl.gtimg.cn。
+# 下载地址来自官网使用的 linuxConfig.js, 经官方接口签名后下载, 只接受 qqdl.gtimg.cn。
 # 官方 deb/rpm 安装后命令是 qq。Arch 的 AUR 包 linuxqq 命令是 linuxqq。
 # 官方配置不发布独立校验文件; 有 MD5 响应头时必须通过, 否则核对包格式与大小。
 # =============================================================================
@@ -12,6 +12,7 @@
 . "$(dirname "${BASH_SOURCE[0]}")/_vendor_pkg.sh"
 
 QQ_CONFIG_URL="https://cdn-go.cn/qq-web/im.qq.com_new/latest/rainbow/linuxConfig.js"
+QQ_SIGN_URL="https://im.qq.com/http2rpc/gotrpc/noauth/trpc.qqntv2.urlsign.UrlSign/GetSign"
 
 # qq_arch_key <uname -m>
 qq_arch_key() {
@@ -53,6 +54,29 @@ qq_pick_url() {
     esac
 }
 
+# qq_get_signed_url <unsigned package URL>
+# QQ CDN 拒绝未签名链接; 签名必须在下载前实时获取, 且只能指向原安装包。
+qq_get_signed_url() {
+    local url="$1" response="" signed_url=""
+    local success_pattern='"retcode"[[:space:]]*:[[:space:]]*0[[:space:]]*[,}]'
+    [[ "$url" =~ ^https://qqdl\.gtimg\.cn/qqfile/[a-zA-Z0-9_./-]+\.(deb|rpm)$ ]] || return 1
+    if ! response=$(curl -fsSL --connect-timeout 15 --retry 2 --retry-delay 2 \
+            -A "Mozilla/5.0" -e "https://im.qq.com/" \
+            -H 'Origin: https://im.qq.com' \
+            -H 'Content-Type: application/json' \
+            -H 'x-oidb: {"uint32_command":"0x9b8e","uint32_service_type":1}' \
+            --data "{\"url\":\"$url\"}" "$QQ_SIGN_URL"); then
+        return 1
+    fi
+    [[ "$response" =~ $success_pattern ]] || return 1
+    signed_url=$(printf '%s\n' "$response" | sed -n 's/.*"url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    signed_url="${signed_url//\\\//\/}"
+    [[ "$signed_url" == "$url"\?* ]] || return 1
+    [[ "$signed_url" =~ [\?\&]sign=[[:xdigit:]]+(\&|$) ]] || return 1
+    [[ "$signed_url" =~ [\?\&]t=[[:digit:]]+(\&|$) ]] || return 1
+    printf '%s\n' "$signed_url"
+}
+
 qq_present() {
     command -v qq >/dev/null 2>&1 || command -v linuxqq >/dev/null 2>&1
 }
@@ -85,6 +109,10 @@ component_qq_install() {
                 die "下载配置里没有可用的 $kind 地址"
             fi
             rm -f -- "$config"
+            info "正在获取 Linux QQ 下载签名..."
+            if ! url=$(qq_get_signed_url "$url"); then
+                die "无法获取 Linux QQ 下载签名, 请稍后重试或查看 https://im.qq.com/linuxqq/index.shtml"
+            fi
             info "正在下载 Linux QQ..."
             install_vendor_package "$url" "$kind" no "https://im.qq.com/linuxqq/index.shtml"
             qq_present || die "QQ 安装失败, 未找到 qq 命令"

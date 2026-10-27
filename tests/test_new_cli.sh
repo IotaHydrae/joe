@@ -878,6 +878,111 @@ test_daily_app_packages() {
     fi
 }
 
+test_qq_download_signing() {
+    test_info "测试 QQ 下载签名与失败处理"
+
+    local box original signed reply label out rc expected
+    make_tmp -d; box=$TMP_PATH
+    mkdir -p "$box/home" "$box/tmp"
+    original="https://qqdl.gtimg.cn/qqfile/test/amd64.deb"
+    signed="$original?sign=abcdef0123456789&t=1793105764"
+    cat > "$box/runner.sh" <<'RUNNER'
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck disable=SC1091
+. "$1/scripts/components/qq.sh"
+PM=apt
+info() { :; }
+ok() { :; }
+die() { printf '%s\n' "$*" >&2; exit 1; }
+uname() { printf 'x86_64\n'; }
+qq_present() { [ -f "$QQ_TEST_BOX/installed" ]; }
+make_tmp() { printf -v "$1" '%s/config.js' "$TMPDIR"; }
+trap 'rm -f -- "$TMPDIR/config.js"' EXIT
+curl() {
+    local url="${!#}" output="" data=""
+    printf 'curl\n' >> "$QQ_TEST_BOX/request.log"
+    printf '%s\n' "$@" >> "$QQ_TEST_BOX/request.log"
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            -o) output="$2"; shift ;;
+            --data|--data-raw) data="$2"; shift ;;
+        esac
+        shift
+    done
+    case "$url" in
+        https://cdn-go.cn/qq-web/im.qq.com_new/latest/rainbow/linuxConfig.js)
+            printf '{"x64DownloadUrl":{"deb":"%s"}}\n' "$QQ_TEST_ORIGINAL" > "$output"
+            ;;
+        https://im.qq.com/http2rpc/gotrpc/noauth/trpc.qqntv2.urlsign.UrlSign/GetSign)
+            [ "$data" = "{\"url\":\"$QQ_TEST_ORIGINAL\"}" ] || return 99
+            [ "${QQ_TEST_CURL_FAIL:-0}" = 0 ] || return 22
+            printf '%s\n' "$QQ_TEST_REPLY"
+            ;;
+        *) return 99 ;;
+    esac
+}
+install_vendor_package() {
+    printf 'package|%s|%s|%s|%s\n' "$@" >> "$QQ_TEST_BOX/package.log"
+    [ "$1" = "$QQ_TEST_SIGNED" ] || return 22
+    touch "$QQ_TEST_BOX/installed"
+}
+component_qq_install
+RUNNER
+
+    for label in success escaped pretty http_error api_error no_url foreign_host wrong_path unsigned no_sign no_time malformed; do
+        expected=1
+        case "$label" in
+            success) expected=0; reply="{\"retcode\":0,\"data\":{\"url\":\"$signed\"}}" ;;
+            escaped) expected=0; reply="{\"retcode\":0,\"data\":{\"url\":\"${signed//\//\\/}\"}}" ;;
+            pretty) expected=0; printf -v reply '{\n  "retcode": 0,\n  "data": {\n    "url": "%s"\n  }\n}\n' "$signed" ;;
+            http_error) reply='' ;;
+            api_error) reply="{\"retcode\":1,\"data\":{\"url\":\"$signed\"}}" ;;
+            no_url) reply='{"retcode":0,"data":{}}' ;;
+            foreign_host) reply='{"retcode":0,"data":{"url":"https://evil.example/a.deb?sign=abc&t=123"}}' ;;
+            wrong_path) reply='{"retcode":0,"data":{"url":"https://qqdl.gtimg.cn/qqfile/other.deb?sign=abc&t=123"}}' ;;
+            unsigned) reply="{\"retcode\":0,\"data\":{\"url\":\"$original\"}}" ;;
+            no_sign) reply="{\"retcode\":0,\"data\":{\"url\":\"$original?t=123\"}}" ;;
+            no_time) reply="{\"retcode\":0,\"data\":{\"url\":\"$original?sign=abc\"}}" ;;
+            malformed) reply='<html>unavailable</html>' ;;
+        esac
+        rm -f -- "$box/installed" "$box/request.log" "$box/package.log"
+        rc=0
+        out=$(HOME="$box/home" TMPDIR="$box/tmp" QQ_TEST_BOX="$box" \
+            QQ_TEST_ORIGINAL="$original" QQ_TEST_SIGNED="$signed" QQ_TEST_REPLY="$reply" \
+            QQ_TEST_CURL_FAIL="$([[ $label == http_error ]] && printf 1 || printf 0)" \
+            timeout 15 bash "$box/runner.sh" "$ROOT_DIR" 2>&1) || rc=$?
+        if [[ $expected -eq 0 ]]; then
+            if [[ $rc -eq 0 ]] &&
+                    grep -Fxq "package|$signed|deb|no|https://im.qq.com/linuxqq/index.shtml" "$box/package.log" &&
+                    grep -Fxq 'Content-Type: application/json' "$box/request.log" &&
+                    grep -Fxq 'x-oidb: {"uint32_command":"0x9b8e","uint32_service_type":1}' "$box/request.log"; then
+                test_pass "QQ 获取签名后下载 ($label)"
+            else
+                test_fail "QQ 签名下载失败 ($label, rc=$rc): $out"
+            fi
+        elif [[ $rc -ne 0 && $out == *"无法获取 Linux QQ 下载签名"* && ! -e "$box/package.log" ]]; then
+            test_pass "QQ 签名异常时拒绝下载 ($label)"
+        else
+            test_fail "QQ 未正确拒绝签名异常 ($label, rc=$rc): $out"
+        fi
+        if [[ -n $(find "$box/tmp" -mindepth 1 -print -quit) ]]; then
+            test_fail "QQ 签名测试遗留临时文件 ($label)"
+        fi
+    done
+}
+
+test_vendor_download_resume() {
+    test_info "测试微信/QQ 安装包断点续传"
+    local out rc=0
+    out=$(timeout 45 bash tests/vendor_download_check.sh 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        test_pass "自动续传、跨运行缓存、版本识别和完整性校验"
+    else
+        test_fail "安装包续传回归失败 (rc=$rc): $out"
+    fi
+}
+
 test_predictable_temp_paths() {
     test_info "测试下载临时路径"
 
@@ -988,6 +1093,8 @@ test_ghostty_backup_convention
 test_devtools_dispatch
 test_update_only
 test_daily_app_packages
+test_qq_download_signing
+test_vendor_download_resume
 test_predictable_temp_paths
 test_fonts_installation
 test_zsh_configuration
