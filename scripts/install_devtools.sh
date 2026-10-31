@@ -25,7 +25,7 @@
 #   ./install.sh devtools --mimo     # 只装 MiMo Code (小米 AI 编程助手)
 #   ./install.sh devtools --chatgpt  # 只装 ChatGPT / Codex 桌面版
 #   ./install.sh devtools --ccswitch # 只装 CC Switch (AI CLI 配置切换器)
-#   ./install.sh devtools --godot    # 只装 Godot 游戏引擎
+#   ./install.sh devtools --godot    # 安装/更新 Godot 官方最新稳定版
 #   ./install.sh devtools --wechat   # 只装微信 Linux 原生版
 #   ./install.sh devtools --qq       # 只装 Linux QQ
 #   ./install.sh devtools --rime     # 安装/修复 Rime 雾凇拼音, 保留个人词库
@@ -51,6 +51,7 @@
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
 #   - brave, chatgpt, wechat, qq, rime 为日常软件, 位于主菜单第 2 项, --all 时默认跳过
+#   - Godot 从官方 latest release 获取稳定版并校验 SHA-512, 重跑 --godot 可升级
 #   - QQ 下载前实时获取官方临时签名; 签名失败时中止安装
 #   - 微信/QQ 支持自动重试与跨运行续传; 缓存位于 ${XDG_CACHE_HOME:-~/.cache}/joe/downloads, 成功安装后清理
 # =============================================================================

@@ -64,7 +64,7 @@ Main menu item 3 (development tools) uses the same numbered list as item 2 (dail
 - **AI CLI**: Claude Code, Codex (`--ai` installs only these two), Gemini CLI, OpenCode, GitHub Copilot CLI, Grok Build
 - **Editors**: Zed, VS Code
 - **Terminal**: Ghostty
-- **Game Engine**: Godot Engine
+- **Game Engine**: Latest official stable Godot release (x86_64 / ARM64), verified with SHA-512. Run `./install.sh tools install godot` to install or upgrade; skips the download when already current
 - **Others**: MiMo Code, CC Switch
 - **Daily apps**: Brave Browser, ChatGPT Desktop, official Linux WeChat and QQ, Rime input method (rime-ice). Main menu item 2, or `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime`. Not included in `devtools --all`, `tools install --all`, or `quick-start --yes`
 
@@ -254,7 +254,7 @@ The repair also updates `~/.local/bin/joe-ghostty`: each window starts a separat
 --mimo                 # Install MiMo Code only
 --chatgpt              # Install ChatGPT Desktop only
 --ccswitch             # Install CC Switch only
---godot                # Install Godot Engine only
+--godot                # Install/update the latest official stable Godot release
 --wechat               # Install official Linux WeChat only
 --qq                   # Install official Linux QQ only
 --rime                 # Install/repair Rime (rime-ice), preserving personal dictionaries

@@ -1050,6 +1050,17 @@ test_ghostty_launcher() {
     fi
 }
 
+test_godot_installation() {
+    test_info "测试 Godot 官方最新稳定版安装与升级"
+    local out rc=0
+    out=$(timeout 45 bash tests/godot_check.sh 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        test_pass "Godot 稳定版解析、跨发行版安装、升级与校验失败处理"
+    else
+        test_fail "Godot 安装回归失败 (rc=$rc): $out"
+    fi
+}
+
 test_rime_installation() {
     test_info "测试 Rime 安装与配置修复"
     local out rc=0
@@ -1101,6 +1112,7 @@ test_zsh_configuration
 test_ghostty_fontconfig
 test_ghostty_launcher
 test_rime_installation
+test_godot_installation
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"

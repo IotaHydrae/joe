@@ -72,7 +72,7 @@ cd joe
 - **AI CLI**：Claude Code、Codex（`--ai` 只装这两个）、Gemini CLI、OpenCode、GitHub Copilot CLI、Grok Build
 - **编辑器**：Zed、VS Code
 - **终端**：Ghostty
-- **游戏开发**：Godot 游戏引擎
+- **游戏开发**：Godot 官方最新稳定版（x86_64 / ARM64），安装前校验 SHA-512；`./install.sh tools install godot` 可安装或升级，已是最新时跳过下载
 - **其他**：MiMo Code、CC Switch
 - **日常软件**：Brave 浏览器、ChatGPT Desktop、微信 Linux 原生版、Linux QQ、Rime 雾凇拼音输入法。主菜单第 2 项，或 `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime`。不包含在 `devtools --all`、`tools install --all` 和 `quick-start --yes` 中
 
@@ -256,7 +256,7 @@ Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名�
 --mimo                 # 只装 MiMo Code
 --chatgpt              # 只装 ChatGPT Desktop
 --ccswitch             # 只装 CC Switch
---godot                # 只装 Godot 游戏引擎
+--godot                # 安装/更新 Godot 官方最新稳定版
 --wechat               # 只装微信 Linux 原生版
 --qq                   # 只装 Linux QQ
 --rime                 # 安装/修复 Rime 雾凇拼音, 保留个人词库
