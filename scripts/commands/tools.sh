@@ -46,7 +46,7 @@ usage() {
 
 可用组件:
     node, python, claude, codex, gemini, opencode, copilot, grok,
-    zed, vscode, ghostty, mimo, godot, ccswitch
+    zed, vscode, ghostty, mimo, godot, blender, ccswitch
     (日常软件: brave, chatgpt, wechat, qq, rime)
 
 示例:
@@ -62,6 +62,7 @@ usage() {
     tools install node claude      # 安装指定组件 (已装的会跳过)
     tools install rime             # 安装/修复雾凇, 保留个人词库
     tools install godot            # 安装/更新 Godot 官方最新稳定版
+    tools install blender          # 安装/更新 Blender 官方最新稳定版
 
 Rime 重跑会重新部署词库、选择 Fcitx 5 并修复左 Alt+Shift; 已打开的应用需重开。
 
@@ -106,7 +107,7 @@ cmd_list() {
 cmd_install() {
     local -a components=()
     local with_deps=false
-    local godot_requested=false
+    local -A explicitly_requested=()
 
     # 解析参数
     while [[ $# -gt 0 ]]; do
@@ -127,7 +128,7 @@ cmd_install() {
                 local comp="${1#--}"
                 if validate_component "$comp"; then
                     components+=("$comp")
-                    [[ $comp != godot ]] || godot_requested=true
+                    explicitly_requested[$comp]=1
                 else
                     printf "未知组件: %s\n" "$comp" >&2
                     return 1
@@ -192,10 +193,10 @@ cmd_install() {
         install_list=("${resolved[@]}")
     fi
 
-    # Rime 可重跑修复; 显式选择 Godot 时检查更新, --all 仍跳过已安装的 Godot。
+    # Rime 可重跑修复; 显式选择 Godot/Blender 时检查更新, --all 仍跳过已安装的。
     local -a to_install=()
     for comp in "${install_list[@]}"; do
-        if [[ $comp == rime || ( $comp == godot && $godot_requested == true ) ]]; then
+        if [[ $comp == rime || ( ( $comp == godot || $comp == blender ) && -n ${explicitly_requested[$comp]:-} ) ]]; then
             to_install+=("$comp")
         elif is_installed "$comp"; then
             printf "${COLOR_DIM}跳过已安装: %s${COLOR_RESET}\n" "$comp"

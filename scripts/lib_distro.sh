@@ -177,6 +177,7 @@ pkg_candidates() {
                 ncurses-tools)       echo "ncurses-bin" ;;
                 fontconfig)          echo "fontconfig" ;;
                 unzip)               echo "unzip" ;;
+                xz)                  echo "xz-utils" ;;
                 *)                   echo "$logical" ;;
             esac ;;
         pacman)
@@ -191,6 +192,7 @@ pkg_candidates() {
                 ncurses-tools)       echo "ncurses" ;;
                 fontconfig)          echo "fontconfig" ;;
                 unzip)               echo "unzip" ;;
+                xz)                  echo "xz" ;;
                 *)                   echo "$logical" ;;
             esac ;;
         dnf)
@@ -205,6 +207,7 @@ pkg_candidates() {
                 ncurses-tools)       echo "ncurses" ;;
                 fontconfig)          echo "fontconfig" ;;
                 unzip)               echo "unzip" ;;
+                xz)                  echo "xz" ;;
                 *)                   echo "$logical" ;;
             esac ;;
         zypper)
@@ -219,6 +222,7 @@ pkg_candidates() {
                 ncurses-tools)       echo "ncurses-utils" ;;
                 fontconfig)          echo "fontconfig" ;;
                 unzip)               echo "unzip" ;;
+                xz)                  echo "xz" ;;
                 *)                   echo "$logical" ;;
             esac ;;
         *) echo "$logical" ;;

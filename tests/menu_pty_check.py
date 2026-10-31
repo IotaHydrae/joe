@@ -20,13 +20,13 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAIN_PROMPT = "选择 [1-11/q]: "
-TOOLS_PROMPT = "选择操作 [1-15/b]: "
+TOOLS_PROMPT = "选择操作 [1-16/b]: "
 APPS_PROMPT = "选择操作 [1-6/b]: "
 MCP_PROMPT = "选择操作 [1-9/b]: "
 FONTS_PROMPT = "选择操作 [1-3/b]: "
 TOOL_IDS = (
     "node", "python", "claude", "codex", "gemini", "opencode", "copilot",
-    "grok", "mimo", "zed", "vscode", "ghostty", "godot", "ccswitch",
+    "grok", "mimo", "zed", "vscode", "ghostty", "godot", "blender", "ccswitch",
 )
 MCP_IDS = (
     "filesystem", "git", "memory", "codebase-memory-mcp", "context7",
@@ -232,7 +232,7 @@ def main():
             require("开发工具安装" in out, "工具安装后未留在当前子菜单")
             out = session.choose("3", TOOLS_PROMPT)
             require("TOOLS_INSTALL|--node --claude\r\n" in out, "开发工具未自动补全依赖")
-            out = session.choose("15", TOOLS_PROMPT)
+            out = session.choose("16", TOOLS_PROMPT)
             expected = " ".join("--" + component for component in TOOL_IDS)
             require("TOOLS_INSTALL|" + expected + "\r\n" in out, "全部工具安装派发错误或混入日常软件")
             session.choose("q", MAIN_PROMPT)

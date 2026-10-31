@@ -26,6 +26,7 @@
 #   ./install.sh devtools --chatgpt  # 只装 ChatGPT / Codex 桌面版
 #   ./install.sh devtools --ccswitch # 只装 CC Switch (AI CLI 配置切换器)
 #   ./install.sh devtools --godot    # 安装/更新 Godot 官方最新稳定版
+#   ./install.sh devtools --blender  # 安装/更新 Blender 官方最新稳定版
 #   ./install.sh devtools --wechat   # 只装微信 Linux 原生版
 #   ./install.sh devtools --qq       # 只装 Linux QQ
 #   ./install.sh devtools --rime     # 安装/修复 Rime 雾凇拼音, 保留个人词库
@@ -52,6 +53,7 @@
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
 #   - brave, chatgpt, wechat, qq, rime 为日常软件, 位于主菜单第 2 项, --all 时默认跳过
 #   - Godot 从官方 latest release 获取稳定版并校验 SHA-512, 重跑 --godot 可升级
+#   - Blender 从官方 release 获取最新稳定版并校验 SHA-256, 重跑 --blender 可升级, 自动写入桌面菜单项
 #   - QQ 下载前实时获取官方临时签名; 签名失败时中止安装
 #   - 微信/QQ 支持自动重试与跨运行续传; 缓存位于 ${XDG_CACHE_HOME:-~/.cache}/joe/downloads, 成功安装后清理
 # =============================================================================
@@ -70,7 +72,7 @@ INSTALL_ALL=false
 TUI_MODE=false
 
 # 安装顺序也是依赖顺序: node 必须先于依赖它的 AI CLI。
-COMPONENT_ORDER=(node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot wechat qq rime)
+COMPONENT_ORDER=(node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot blender wechat qq rime)
 
 # 日常软件 (不属于开发工具, --all 时跳过; 走主菜单第 2 项或显式 --<id> 参数安装)
 DAILY_IDS=(brave chatgpt wechat qq rime)
@@ -304,7 +306,7 @@ HAS_ARGS=false
 [ "$#" -gt 0 ] && HAS_ARGS=true
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --node|--python|--claude|--codex|--gemini|--opencode|--copilot|--grok|--zed|--ghostty|--vscode|--brave|--mimo|--chatgpt|--ccswitch|--godot|--wechat|--qq|--rime)
+        --node|--python|--claude|--codex|--gemini|--opencode|--copilot|--grok|--zed|--ghostty|--vscode|--brave|--mimo|--chatgpt|--ccswitch|--godot|--blender|--wechat|--qq|--rime)
             WANT[${1#--}]=1; shift ;;
         --ai)       WANT[claude]=1; WANT[codex]=1; shift ;;
         --all)      INSTALL_ALL=true; shift ;;

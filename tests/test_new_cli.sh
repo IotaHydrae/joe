@@ -274,10 +274,10 @@ test_tools_list_clean_home() {
     rows=$(grep -cE '^  [a-z]+ ' <<<"$out")
     rm -rf "$tmp_home"
 
-    if [[ $rows -eq 14 ]]; then
-        test_pass "全新环境列出 14 个组件"
+    if [[ $rows -eq 15 ]]; then
+        test_pass "全新环境列出 15 个组件"
     else
-        test_fail "tools list 组件行数=$rows (期望 14)"
+        test_fail "tools list 组件行数=$rows (期望 15)"
     fi
 }
 
@@ -613,10 +613,10 @@ test_tools_list_version_failure() {
     rows=$(grep -cE '^  [a-z]+ ' <<<"$out")
     rm -rf "$tmp_home"
 
-    if [[ $rows -eq 14 ]]; then
+    if [[ $rows -eq 15 ]]; then
         test_pass "版本命令失败不影响 tools list 完整输出"
     else
-        test_fail "tools list 被版本探测截断 (行数=$rows, 期望 14)"
+        test_fail "tools list 被版本探测截断 (行数=$rows, 期望 15)"
     fi
 }
 
@@ -677,7 +677,7 @@ test_devtools_dispatch() {
         test_fail "无法复制仓库到沙箱"
         return
     fi
-    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot wechat qq rime; do
+    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot blender wechat qq rime; do
         printf '#!/usr/bin/env bash\ncomponent_%s_install() { echo "RUN:%s"; }\n' "$id" "$id" \
             > "$box/scripts/components/$id.sh"
     done
@@ -701,8 +701,8 @@ test_devtools_dispatch() {
     out=$(cd "$box" && timeout 90 bash scripts/install_devtools.sh --all 2>&1) || true
     local count
     count=$(grep -cE '^RUN:' <<<"$out" || true)
-    if [[ $count -eq 14 ]]; then
-        test_pass "--all 派发全部 14 个开发工具模块"
+    if [[ $count -eq 15 ]]; then
+        test_pass "--all 派发全部 15 个开发工具模块"
     else
         test_fail "--all 派发数不符: $count"
     fi
@@ -1061,6 +1061,17 @@ test_godot_installation() {
     fi
 }
 
+test_blender_installation() {
+    test_info "测试 Blender 官方最新稳定版安装与升级"
+    local out rc=0
+    out=$(timeout 60 bash tests/blender_check.sh 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        test_pass "Blender 稳定版解析、镜像回退、安装、升级与校验失败处理"
+    else
+        test_fail "Blender 安装回归失败 (rc=$rc): $out"
+    fi
+}
+
 test_rime_installation() {
     test_info "测试 Rime 安装与配置修复"
     local out rc=0
@@ -1113,6 +1124,7 @@ test_ghostty_fontconfig
 test_ghostty_launcher
 test_rime_installation
 test_godot_installation
+test_blender_installation
 
 printf "\n"
 printf "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"

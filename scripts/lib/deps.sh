@@ -29,6 +29,7 @@ declare -A COMPONENT_DEPS=(
     [vscode]=""
     [ghostty]=""
     [godot]=""
+    [blender]=""
     [brave]=""
     [chatgpt]=""
     [wechat]=""
@@ -45,14 +46,14 @@ declare -A COMPONENT_GROUPS=(
     [ai-cli]="claude codex gemini opencode copilot grok mimo"
     [editor]="zed vscode"
     [terminal]="ghostty"
-    [gamedev]="godot"
+    [gamedev]="godot blender"
     [utility]="ccswitch"
 )
 
 # 快捷组定义
 declare -A SHORTCUT_GROUPS=(
     [ai]="claude codex"
-    [all]="node python claude codex gemini opencode copilot grok zed vscode ghostty mimo godot ccswitch"
+    [all]="node python claude codex gemini opencode copilot grok zed vscode ghostty mimo godot blender ccswitch"
 )
 
 # 组件显示名称
@@ -69,6 +70,7 @@ declare -A COMPONENT_NAMES=(
     [vscode]="VS Code"
     [ghostty]="Ghostty Terminal"
     [godot]="Godot Engine"
+    [blender]="Blender"
     [brave]="Brave Browser"
     [mimo]="MiMo Code"
     [chatgpt]="ChatGPT Desktop"
@@ -242,6 +244,9 @@ is_installed() {
         godot)
             command -v godot >/dev/null 2>&1 || [ -x "$HOME/.local/bin/godot" ]
             ;;
+        blender)
+            command -v blender >/dev/null 2>&1 || [ -x "$HOME/.local/bin/blender" ]
+            ;;
         wechat)
             command -v wechat >/dev/null 2>&1 || command -v wechat-universal >/dev/null 2>&1
             ;;
@@ -287,6 +292,9 @@ get_version() {
             ;;
         godot)
             godot --version 2>/dev/null | head -1 || "$HOME/.local/bin/godot" --version 2>/dev/null | head -1 || true
+            ;;
+        blender)
+            blender --version 2>/dev/null | head -1 || "$HOME/.local/bin/blender" --version 2>/dev/null | head -1 || true
             ;;
         rime)
             if command -v fcitx5 >/dev/null 2>&1; then
