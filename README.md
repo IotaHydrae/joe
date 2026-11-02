@@ -50,7 +50,7 @@ cd joe
 
 ### 字体安装（Fonts）
 
-主菜单第 6 项「字体安装」或 `./install.sh fonts` 打开编号子菜单：选择 Fixedsys Excelsior（FSEX302）或 JetBrains Mono，查看已安装状态，也可全部安装，`b` 返回主菜单。安装完成后留在当前子菜单。
+主菜单第 7 项「字体安装」或 `./install.sh fonts` 打开编号子菜单：选择 Fixedsys Excelsior（FSEX302）或 JetBrains Mono，查看已安装状态，也可全部安装，`b` 返回主菜单。安装完成后留在当前子菜单。
 
 字体从仓库安装到 `~/.local/share/fonts`，可离线使用，无需 sudo。JetBrains Mono 2.304 包含常规、粗体、斜体和粗斜体，附带 [SIL OFL 许可证](fonts/jetbrains-mono/OFL.txt)。`shell` 默认安装 Fixedsys Excelsior；JetBrains Mono 可从字体菜单单独安装。
 
@@ -107,9 +107,9 @@ Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名�
 ### 3. MCP 服务器（MCP）
 为 AI 编程助手安装 Model Context Protocol 服务器：
 
-主菜单第 4 项「MCP 服务器」同样使用编号列表，显示已配置状态，支持单项或全部安装，`b` 返回主菜单。代码智能服务会标记「三选一」，安装前会检查 Node/npx。
+主菜单第 5 项「MCP 服务器」同样使用编号列表，显示已配置状态，支持单项或全部安装，`b` 返回主菜单。代码智能服务会标记「三选一」，安装前会检查 Node/npx。
 
-主菜单第 11 项「休闲娱乐」是占位入口，暂无条目（待补充游戏 / mod 工具等），后续往这里加内容。
+主菜单第 4 项「休闲娱乐」是占位入口，暂无条目（待补充游戏 / mod 工具等），后续往这里加内容。
 
 - **filesystem** / **git**：文件和代码管理
 - **memory**：对话记忆

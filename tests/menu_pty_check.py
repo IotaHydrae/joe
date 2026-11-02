@@ -200,8 +200,8 @@ def main():
             for entry, title, prompt in (
                 ("2", "日常软件安装", APPS_PROMPT),
                 ("3", "开发工具安装", TOOLS_PROMPT),
-                ("4", "MCP 服务器安装", MCP_PROMPT),
-                ("6", "字体安装", FONTS_PROMPT),
+                ("5", "MCP 服务器安装", MCP_PROMPT),
+                ("7", "字体安装", FONTS_PROMPT),
             ):
                 out = session.choose(entry, prompt)
                 require(title in out, "未进入 " + title)
@@ -225,7 +225,7 @@ def main():
 
         # 休闲娱乐占位菜单: 可进入、显示占位提示、不触发安装、可返回
         with MenuSession(env) as session:
-            out = session.choose("11", ENT_PROMPT)
+            out = session.choose("4", ENT_PROMPT)
             require("休闲娱乐" in out, "未进入休闲娱乐菜单")
             require("暂无可安装条目" in out, "休闲娱乐占位菜单缺少占位提示")
             require(not any(marker in out for marker in INSTALL_MARKERS), "休闲娱乐菜单触发安装")
@@ -250,7 +250,7 @@ def main():
             expected = " ".join("--" + component for component in TOOL_IDS)
             require("TOOLS_INSTALL|" + expected + "\r\n" in out, "全部工具安装派发错误或混入日常软件")
             session.choose("q", MAIN_PROMPT)
-            out = session.choose("4", MCP_PROMPT)
+            out = session.choose("5", MCP_PROMPT)
             require("memory MCP (已配置)" in out, "MCP 未显示已配置状态")
             require("Future service MCP" in out, "MCP 新增服务被菜单隐藏")
             require(out.count("[三选一]") == 3, "MCP 代码智能缺少三选一提示")
@@ -260,7 +260,7 @@ def main():
             out = session.choose("9", MCP_PROMPT)
             require("MCP_INSTALL|" + " ".join(MCP_IDS) + "\r\n" in out, "MCP 全部安装派发错误")
             session.choose("b", MAIN_PROMPT)
-            session.choose("6", FONTS_PROMPT)
+            session.choose("7", FONTS_PROMPT)
             out = session.choose("2", FONTS_PROMPT)
             require("FONTS_INSTALL|jetbrains-mono\r\n" in out, "JetBrains Mono 单项安装派发错误")
             require("字体安装" in out, "字体安装后未留在当前子菜单")
@@ -285,7 +285,7 @@ def main():
         require(os.path.getsize(call_log) == previous_calls, "直接浏览字体菜单触发安装")
 
         with MenuSession(dict(env, MCP_EXIT="7")) as session:
-            session.choose("4", MCP_PROMPT)
+            session.choose("5", MCP_PROMPT)
             out = plain(session.choose("2", MCP_PROMPT))
             require("退出码 7" in out, "安装失败未提示退出码并返回子菜单")
             session.choose("b", MAIN_PROMPT)
@@ -293,7 +293,7 @@ def main():
 
         previous_calls = os.path.getsize(call_log)
         with MenuSession(dict(env, MCP_NPX_BIN="joe-test-missing-npx")) as session:
-            out = plain(session.choose("4", MCP_PROMPT))
+            out = plain(session.choose("5", MCP_PROMPT))
             require("Node/npx: 缺失" in out, "MCP 菜单未显示 npx 缺失状态")
             for choice in ("2", "9"):
                 out = session.choose(choice, MCP_PROMPT)
@@ -304,7 +304,7 @@ def main():
         require(os.path.getsize(call_log) == previous_calls, "缺 npx 时发生安装派发")
 
         with MenuSession(dict(env, LIST_FAIL="1")) as session:
-            out = session.choose("4", MAIN_PROMPT)
+            out = session.choose("5", MAIN_PROMPT)
             require("读取 MCP 列表失败" in out, "MCP 列表加载失败未提示并返回主菜单")
             session.finish()
 

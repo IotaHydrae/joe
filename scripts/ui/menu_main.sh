@@ -187,16 +187,17 @@ main_menu() {
         printf '  1) 终端美化      zsh / 按需加载 / 补全与高亮\n'
         printf '  2) 日常软件      浏览器 / 笔记 / 微信 / QQ / Rime输入法\n'
         printf '  3) 开发工具      Node/Python/AI CLI/编辑器\n'
-        printf '  4) MCP 服务器    代码智能/文件系统/浏览器\n'
-        printf '  5) 代理技能      技能组与分类选择\n'
-        printf '  6) 字体安装      Fixedsys Excelsior / JetBrains Mono\n'
+        printf '  4) 休闲娱乐     游戏 / mod 工具 (占位)\n'
         printf '\n'
-        printf '  7) 安装状态      工具 / MCP / 技能汇总\n'
-        printf '  8) 环境体检      doctor 逐项诊断\n'
-        printf '  9) 配置管理      备份/恢复/同步\n'
-        printf '  10) 统一更新     各工具官方自更新\n'
+        printf '  5) MCP 服务器    代码智能/文件系统/浏览器\n'
+        printf '  6) 代理技能      技能组与分类选择\n'
+        printf '  7) 字体安装      Fixedsys Excelsior / JetBrains Mono\n'
         printf '\n'
-        printf '  11) 休闲娱乐     游戏 / mod 工具 (占位)\n'
+        printf '  8) 安装状态      工具 / MCP / 技能汇总\n'
+        printf '  9) 环境体检      doctor 逐项诊断\n'
+        printf '  10) 配置管理     备份/恢复/同步\n'
+        printf '  11) 统一更新     各工具官方自更新\n'
+        printf '\n'
         printf '  12) 新手引导     quick-start 推荐配置\n'
         printf '\n'
         printf '  q) 退出\n\n'
@@ -208,14 +209,14 @@ main_menu() {
             1) run_action shell ;;
             2) apps_menu ;;
             3) tools_menu ;;
-            4) mcp_menu ;;
-            5) run_action skills ;;
-            6) fonts_menu ;;
-            7) run_action status ;;
-            8) run_action doctor ;;
-            9) config_menu ;;
-            10) run_action update ;;
-            11) entertainment_menu ;;
+            4) entertainment_menu ;;
+            5) mcp_menu ;;
+            6) run_action skills ;;
+            7) fonts_menu ;;
+            8) run_action status ;;
+            9) run_action doctor ;;
+            10) config_menu ;;
+            11) run_action update ;;
             12) run_action quick-start ;;
             q|Q) return 0 ;;
             '') continue ;;
