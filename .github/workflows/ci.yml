@@ -31,11 +31,19 @@ jobs:
           exit $fail
 
       - name: ShellCheck
-        uses: ludeeus/action-shellcheck@master
-        with:
-          scandir: '.'
-          severity: warning
-        # 排除项集中在仓库根 .shellcheckrc (本地与 CI 共用)
+        run: |
+          set -e
+          # 固定 shellcheck 版本, 避免 @master/最新版静默引入新检查把 CI 弄红
+          sc_version=0.10.0
+          curl -fsSL --retry 3 \
+            -o /tmp/shellcheck.tar.xz \
+            "https://github.com/koalaman/shellcheck/releases/download/v${sc_version}/shellcheck-v${sc_version}.linux.x86_64.tar.xz"
+          tar -xJf /tmp/shellcheck.tar.xz -C /tmp
+          sc="/tmp/shellcheck-v${sc_version}/shellcheck"
+          "$sc" --version
+          # 遵守仓库根 .shellcheckrc (本地与 CI 共用); warning 及以上视为失败
+          mapfile -t files < <(git ls-files '*.sh' '*.bash')
+          "$sc" -S warning "${files[@]}"
 
       - name: 可执行位检查
         run: |
