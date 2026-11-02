@@ -18,15 +18,9 @@ ZSH_FORBIDDEN="$ZSH_BOX/forbidden.log"
 ZSH_LOG="$ZSH_BOX/runtime.log"
 mkdir -p "$ZSH_REPO" "$ZSH_BIN" "$ZSH_HOME"
 
-# 交互式 zsh (-i) 能否运行取决于 zsh 构建/终端 (CI 上会报 "not interactive and
-# can't open terminal")。探测一次; 失败则跳过这几项需要在真实交互 shell 下做的检查。
-HAVE_TTY=false
-_probe_home="$(mktemp -d)"
-if env -u ZDOTDIR HOME="$_probe_home" TERM=xterm-256color \
-    zsh -i -c 'exit 0' >/dev/null 2>&1; then
-    HAVE_TTY=true
-fi
-rm -rf -- "$_probe_home"
+# zsh -i 需要一个终端; 用 script(util-linux) 提供 pty, 使 CI 无 tty 时也能验证
+# 交互启动 (否则 zsh 会报 "not interactive and can't open terminal")。
+SCRIPT_PTY="$(command -v script || true)"
 cp "$ROOT_DIR/install.sh" "$ZSH_REPO/install.sh"
 cp -a "$ROOT_DIR/scripts" "$ZSH_REPO/scripts"
 cp -a "$ROOT_DIR/templates" "$ZSH_REPO/templates"
@@ -55,14 +49,24 @@ run_shell() {
         bash "$ZSH_REPO/install.sh" shell --configure-only "$@"
 }
 
+# 交互式启动: 优先用 script 提供 pty (zsh -i 需要终端)。zsh 的 stderr 重定向到
+# $ZSH_BOX/zsh-runtime.err, 便于调用方断言"启动无错误"; pty 输出去掉 CR。
 run_zsh() {
-    env -u ZDOTDIR HOME="$ZSH_HOME" XDG_CACHE_HOME="$ZSH_HOME/.cache" \
-        XDG_CONFIG_HOME="$ZSH_HOME/.config" PATH="$ZSH_BIN:$PATH" \
-        ZSH="$ZSH_HOME/.oh-my-zsh" ZSH_CUSTOM="$ZSH_HOME/.oh-my-zsh/custom" \
-        HISTFILE="$ZSH_HOME/.zsh_history" ZSH_COMPDUMP="$ZSH_HOME/.zcompdump" \
-        NVM_DIR="$ZSH_HOME/.nvm" PYENV_ROOT="$ZSH_HOME/.pyenv" \
-        ZSH_TEST_LOG="$ZSH_LOG" DISABLE_AUTO_UPDATE=true TERM=xterm-256color \
-        zsh "$@"
+    local env_args=( -u ZDOTDIR
+        HOME="$ZSH_HOME" XDG_CACHE_HOME="$ZSH_HOME/.cache"
+        XDG_CONFIG_HOME="$ZSH_HOME/.config" PATH="$ZSH_BIN:$PATH"
+        ZSH="$ZSH_HOME/.oh-my-zsh" ZSH_CUSTOM="$ZSH_HOME/.oh-my-zsh/custom"
+        HISTFILE="$ZSH_HOME/.zsh_history" ZSH_COMPDUMP="$ZSH_HOME/.zcompdump"
+        NVM_DIR="$ZSH_HOME/.nvm" PYENV_ROOT="$ZSH_HOME/.pyenv"
+        ZSH_TEST_LOG="$ZSH_LOG" DISABLE_AUTO_UPDATE=true TERM=xterm-256color )
+    if [ -n "$SCRIPT_PTY" ]; then
+        local inner="zsh" q a
+        for a in "$@"; do printf -v q '%q' "$a"; inner+=" $q"; done
+        inner+=" 2>$(printf '%q' "$ZSH_BOX/zsh-runtime.err")"
+        env "${env_args[@]}" "$SCRIPT_PTY" -qec "$inner" /dev/null | tr -d '\r'
+    else
+        env "${env_args[@]}" zsh "$@" 2> "$ZSH_BOX/zsh-runtime.err"
+    fi
 }
 
 cat > "$ZSH_HOME/.zshrc" <<'RC'
@@ -160,20 +164,16 @@ if [[ ${1:-} == init ]]; then
 fi
 PYENV
     chmod +x "$ZSH_HOME/.pyenv/bin/pyenv"
-    if $HAVE_TTY; then
-    run_zsh -i -c 'print -r -- JOE_ZSH_OK' > "$ZSH_BOX/runtime.out" 2> "$ZSH_BOX/runtime.err"
-    [[ ! -s "$ZSH_BOX/runtime.err" ]] || fail "优化后的启动产生错误: $(cat "$ZSH_BOX/runtime.err")"
+    run_zsh -i -c 'print -r -- JOE_ZSH_OK' > "$ZSH_BOX/runtime.out"
+    [[ ! -s "$ZSH_BOX/zsh-runtime.err" ]] || fail "优化后的启动产生错误: $(cat "$ZSH_BOX/zsh-runtime.err")"
     [[ $(cat "$ZSH_LOG") == $'omz\np10k\np10k-config\nfzf-completion\nfzf-bindings\ncustom\nautosuggestions\nhighlighting' ]] || fail "组件重复加载、顺序错误或启动时加载了 nvm/pyenv: $(cat "$ZSH_LOG")"
     grep -qx JOE_ZSH_OK "$ZSH_BOX/runtime.out" || fail "交互式 shell 启动失败"
     : > "$ZSH_LOG"
-    run_zsh -i -c 'nvm --version; nvm --version; pyenv --version' > "$ZSH_BOX/runtime.out" 2> "$ZSH_BOX/runtime.err"
+    run_zsh -i -c 'nvm --version; nvm --version; pyenv --version' > "$ZSH_BOX/runtime.out"
     [[ $(grep -c '^nvm-init$' "$ZSH_LOG") -eq 1 ]] || fail "nvm 按需初始化未只执行一次"
     grep -q '^pyenv:init ' "$ZSH_LOG" || fail "pyenv 未按需初始化"
     grep -q '^pyenv:--version$' "$ZSH_LOG" || fail "pyenv 初始化后未派发请求"
-    [[ ! -s "$ZSH_BOX/runtime.err" ]] || fail "按需初始化产生错误: $(cat "$ZSH_BOX/runtime.err")"
-    else
-        printf 'SKIP: 无控制终端, 跳过交互式启动/按需初始化检查\n' >&2
-    fi
+    [[ ! -s "$ZSH_BOX/zsh-runtime.err" ]] || fail "按需初始化产生错误: $(cat "$ZSH_BOX/zsh-runtime.err")"
 else
     printf 'SKIP: 未安装 zsh, 跳过交互运行时检查\n'
 fi
@@ -194,13 +194,13 @@ run_shell --no-p10k --no-default-plugins > "$ZSH_BOX/out"
 grep -qx 'plugins=(git)' "$ZSH_HOME/.zshrc" || fail "--no-default-plugins 未保留最小插件配置"
 grep -qx 'JOE_ZSH_USE_P10K=0' "$ZSH_HOME/.zshrc" || fail "--no-p10k 未关闭主题初始化"
 [[ ! -e $ZSH_FORBIDDEN ]] || fail "configure-only 调用了下载/提权命令"
-if command -v zsh >/dev/null 2>&1 && $HAVE_TTY; then
+if command -v zsh >/dev/null 2>&1; then
     mkdir -p "$ZSH_HOME/.cache"
     printf 'print -r -- instant-cache >> "$ZSH_TEST_LOG"\n' > \
         "$ZSH_HOME/.cache/p10k-instant-prompt-$(id -un).zsh"
     : > "$ZSH_LOG"
-    run_zsh -i -c 'print -r -- JOE_BARE_OK' > "$ZSH_BOX/runtime.out" 2> "$ZSH_BOX/runtime.err"
-    [[ ! -s "$ZSH_BOX/runtime.err" ]] || fail "可选组件缺失时启动报错: $(cat "$ZSH_BOX/runtime.err")"
+    run_zsh -i -c 'print -r -- JOE_BARE_OK' > "$ZSH_BOX/runtime.out"
+    [[ ! -s "$ZSH_BOX/zsh-runtime.err" ]] || fail "可选组件缺失时启动报错: $(cat "$ZSH_BOX/zsh-runtime.err")"
     grep -qx JOE_BARE_OK "$ZSH_BOX/runtime.out" || fail "可选组件缺失时无法启动"
     [[ ! -s "$ZSH_LOG" ]] || fail "--no-p10k 仍加载了 instant prompt 缓存"
 fi
