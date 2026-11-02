@@ -770,9 +770,15 @@ test_project_skills() {
     fi
     proj="$box/home/proj"
 
+    # 桩一个已安装的 claude, 使项目级符号链接的创建与宿主机是否装代理无关
+    local stub="$box/stub-bin"
+    mkdir -p "$stub"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$stub/claude"
+    chmod +x "$stub/claude"
+
     # 安装/更新/列出必须 --project; 缺省时报错, 不再写入全局 ~/.agents/skills
     rc=0
-    out=$(cd "$box" && HOME="$box/home" timeout 30 bash install.sh skills install gdb </dev/null 2>&1) || rc=$?
+    out=$(cd "$box" && HOME="$box/home" PATH="$stub:$PATH" timeout 30 bash install.sh skills install gdb </dev/null 2>&1) || rc=$?
     if [[ $out == *"需要 --project"* ]]; then
         test_pass "skills 无 --project 时拒绝"
     else
@@ -780,7 +786,7 @@ test_project_skills() {
     fi
 
     # 项目级安装: 实体副本在 <proj>/.agents/skills, 代理目录符号链接指向它
-    out=$(cd "$box" && HOME="$box/home" timeout 60 bash install.sh skills --project "$proj" gdb 2>&1) || true
+    out=$(cd "$box" && HOME="$box/home" PATH="$stub:$PATH" timeout 60 bash install.sh skills --project "$proj" gdb 2>&1) || true
     if [ -f "$proj/.agents/skills/gdb/SKILL.md" ] \
         && [ -L "$proj/.claude/skills/gdb" ] \
         && [ "$(readlink -f "$proj/.claude/skills/gdb")" = "$(readlink -f "$proj/.agents/skills/gdb")" ] \
@@ -791,7 +797,7 @@ test_project_skills() {
     fi
 
     # 幂等重装: 内容未变则跳过
-    out=$(cd "$box" && HOME="$box/home" timeout 60 bash install.sh skills --project "$proj" gdb 2>&1) || true
+    out=$(cd "$box" && HOME="$box/home" PATH="$stub:$PATH" timeout 60 bash install.sh skills --project "$proj" gdb 2>&1) || true
     if [[ $out == *"已是最新, 跳过"* ]]; then
         test_pass "项目级技能幂等"
     else

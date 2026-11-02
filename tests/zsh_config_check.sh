@@ -17,6 +17,16 @@ ZSH_BIN="$ZSH_BOX/bin"
 ZSH_FORBIDDEN="$ZSH_BOX/forbidden.log"
 ZSH_LOG="$ZSH_BOX/runtime.log"
 mkdir -p "$ZSH_REPO" "$ZSH_BIN" "$ZSH_HOME"
+
+# 交互式 zsh (-i) 能否运行取决于 zsh 构建/终端 (CI 上会报 "not interactive and
+# can't open terminal")。探测一次; 失败则跳过这几项需要在真实交互 shell 下做的检查。
+HAVE_TTY=false
+_probe_home="$(mktemp -d)"
+if env -u ZDOTDIR HOME="$_probe_home" TERM=xterm-256color \
+    zsh -i -c 'exit 0' >/dev/null 2>&1; then
+    HAVE_TTY=true
+fi
+rm -rf -- "$_probe_home"
 cp "$ROOT_DIR/install.sh" "$ZSH_REPO/install.sh"
 cp -a "$ROOT_DIR/scripts" "$ZSH_REPO/scripts"
 cp -a "$ROOT_DIR/templates" "$ZSH_REPO/templates"
@@ -150,6 +160,7 @@ if [[ ${1:-} == init ]]; then
 fi
 PYENV
     chmod +x "$ZSH_HOME/.pyenv/bin/pyenv"
+    if $HAVE_TTY; then
     run_zsh -i -c 'print -r -- JOE_ZSH_OK' > "$ZSH_BOX/runtime.out" 2> "$ZSH_BOX/runtime.err"
     [[ ! -s "$ZSH_BOX/runtime.err" ]] || fail "优化后的启动产生错误: $(cat "$ZSH_BOX/runtime.err")"
     [[ $(cat "$ZSH_LOG") == $'omz\np10k\np10k-config\nfzf-completion\nfzf-bindings\ncustom\nautosuggestions\nhighlighting' ]] || fail "组件重复加载、顺序错误或启动时加载了 nvm/pyenv: $(cat "$ZSH_LOG")"
@@ -160,6 +171,9 @@ PYENV
     grep -q '^pyenv:init ' "$ZSH_LOG" || fail "pyenv 未按需初始化"
     grep -q '^pyenv:--version$' "$ZSH_LOG" || fail "pyenv 初始化后未派发请求"
     [[ ! -s "$ZSH_BOX/runtime.err" ]] || fail "按需初始化产生错误: $(cat "$ZSH_BOX/runtime.err")"
+    else
+        printf 'SKIP: 无控制终端, 跳过交互式启动/按需初始化检查\n' >&2
+    fi
 else
     printf 'SKIP: 未安装 zsh, 跳过交互运行时检查\n'
 fi
@@ -180,7 +194,7 @@ run_shell --no-p10k --no-default-plugins > "$ZSH_BOX/out"
 grep -qx 'plugins=(git)' "$ZSH_HOME/.zshrc" || fail "--no-default-plugins 未保留最小插件配置"
 grep -qx 'JOE_ZSH_USE_P10K=0' "$ZSH_HOME/.zshrc" || fail "--no-p10k 未关闭主题初始化"
 [[ ! -e $ZSH_FORBIDDEN ]] || fail "configure-only 调用了下载/提权命令"
-if command -v zsh >/dev/null 2>&1; then
+if command -v zsh >/dev/null 2>&1 && $HAVE_TTY; then
     mkdir -p "$ZSH_HOME/.cache"
     printf 'print -r -- instant-cache >> "$ZSH_TEST_LOG"\n' > \
         "$ZSH_HOME/.cache/p10k-instant-prompt-$(id -un).zsh"
