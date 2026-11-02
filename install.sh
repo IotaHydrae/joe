@@ -152,6 +152,7 @@ detect_command() {
     if [ "$LEGACY_DEVTOOLS" = true ] && [ $# -gt 0 ]; then
         case "$1" in
             --list) COMMAND_ARGS=(list) ;;
+            --check) COMMAND_ARGS=(check) ;;
             -h|--help)
                 # 帮助由旧脚本从文件头注释渲染 (含「依赖」「说明」两节)
                 exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/install_devtools.sh" --help

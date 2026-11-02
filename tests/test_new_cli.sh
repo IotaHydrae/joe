@@ -329,6 +329,15 @@ STUB
     assert_forward "fonts install <id>" "jetbrains-mono" fonts install jetbrains-mono
     assert_forward "fonts install --all/--dry-run" "--dry-run --all" fonts install --dry-run --all
 
+    # 旧 devtools 的 --check 必须走 check 动作 (曾误当作组件名 install --check)
+    local dt_out
+    dt_out=$(DEVTOOLS_SCRIPT="$FWD_STUB" timeout 10 bash install.sh devtools --check 2>&1) || true
+    if [[ $(tail -n1 <<<"$dt_out") == "FWD|--check" ]]; then
+        test_pass "devtools --check 透传安装器"
+    else
+        test_fail "devtools --check 未透传: $dt_out"
+    fi
+
     # 旧语法必须逐字透传 (转换层只认动作词)
     # 交互选择走 MCP TUI; 非交互终端下应拒绝而不是转发给安装器
     local tui_out=""
