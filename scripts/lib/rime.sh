@@ -210,7 +210,9 @@ rime_configure_files() {
 }
 
 rime_deploy_data() {
-    local rime_dir="${1:-$(rime_data_dir)}" shared="${2:-/usr/share/rime-data}"
+    local rime_dir shared
+    rime_dir="$(rime_data_dir)"
+    shared="/usr/share/rime-data"
     command -v rime_deployer >/dev/null 2>&1 \
         || { warn "缺少 rime_deployer, 无法编译词库; 请安装 librime 部署工具"; return 1; }
     [ -f "$rime_dir/default.yaml" ] && [ -f "$rime_dir/rime_ice.schema.yaml" ] \
