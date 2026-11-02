@@ -112,15 +112,10 @@ usage() {
 EOF
 }
 
-
-die() {
-    printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2
-    exit 1
-}
-
-info() {
-    printf '\033[0;34m[INFO]\033[0m %s\n' "$*"
-}
+# info/ok/warn/die 由共享库提供
+_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/log.sh
+. "$_ROOT_DIR/scripts/lib/log.sh"
 
 # 检测命令类型和参数
 detect_command() {

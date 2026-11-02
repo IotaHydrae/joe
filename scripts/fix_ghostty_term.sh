@@ -7,10 +7,10 @@ set -euo pipefail
 
 CONFIG="$HOME/.config/ghostty/config"
 
-info() { printf '\033[0;34m[INFO]\033[0m %s\n' "$*"; }
-ok() { printf '\033[0;32m[SUCCESS]\033[0m %s\n' "$*"; }
-warn() { printf '\033[1;33m[WARNING]\033[0m %s\n' "$*"; }
-die() { printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
+# info/ok/warn/die 由共享库提供
+_FGT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/log.sh
+. "$_FGT_DIR/lib/log.sh"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  Ghostty TERM 修复工具"

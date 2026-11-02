@@ -80,11 +80,9 @@ if [ -n "$ONLY" ]; then
     fi
 fi
 
-c_g() { printf '\033[0;32m%s\033[0m' "$1"; }
-c_r() { printf '\033[0;31m%s\033[0m' "$1"; }
-c_y() { printf '\033[1;33m%s\033[0m' "$1"; }
-c_b() { printf '\033[1;36m%s\033[0m' "$1"; }
-c_d() { printf '\033[2m%s\033[0m' "$1"; }
+# 颜色包装由 scripts/lib/log.sh 提供
+# shellcheck source=lib/log.sh
+. "$SCRIPT_DIR/lib/log.sh"
 
 OK=0; SKIP=0; FAILED=0; DRY=0; FAILED_ITEMS=()
 

@@ -76,12 +76,10 @@ make_tmp() {
 }
 
 # ---------------------------------------------------------------------------
-# 小工具函数
+# 小工具函数 (info/ok/warn/die 由 scripts/lib/log.sh 提供)
 # ---------------------------------------------------------------------------
-info()  { printf '\033[0;34m[INFO]\033[0m %s\n' "$*"; }
-ok()    { printf '\033[0;32m[SUCCESS]\033[0m %s\n' "$*"; }
-warn()  { printf '\033[1;33m[WARNING]\033[0m %s\n' "$*"; }
-die()   { printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
+# shellcheck source=lib/log.sh
+. "$SCRIPT_DIR/lib/log.sh"
 
 load_nvm() {
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"

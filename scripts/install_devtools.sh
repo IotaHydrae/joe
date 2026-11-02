@@ -125,13 +125,8 @@ check_prerequisites() {
 }
 
 # ---------------------------------------------------------------------------
-# 小工具函数
+# 小工具函数 (info/ok/warn/die 由 scripts/lib/log.sh 提供)
 # ---------------------------------------------------------------------------
-info()  { printf '\033[0;34m[INFO]\033[0m %s\n' "$*"; }
-ok()    { printf '\033[0;32m[SUCCESS]\033[0m %s\n' "$*"; }
-warn()  { printf '\033[1;33m[WARNING]\033[0m %s\n' "$*"; }
-die()   { printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
-
 # 临时文件登记 + 退出清理 (下载中途失败不残留 /tmp/chatgpt.rpm 之类文件)
 TMP_FILES=()
 cleanup_tmp() {
@@ -161,6 +156,8 @@ make_tmp() {
 # 支持 apt (Debian/Ubuntu/Mint) / pacman (Arch/CachyOS) / dnf (Fedora) / zypper (openSUSE)
 # 并处理版本差异, 例如 Ubuntu 24.04 的 t64 重命名 (libfuse2 -> libfuse2t64)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/log.sh
+. "$SCRIPT_DIR/lib/log.sh"
 for _lib in lib_distro.sh lib_github.sh lib_ghostty.sh lib_node.sh; do
     if [ -f "$SCRIPT_DIR/$_lib" ]; then
         # shellcheck disable=SC1090

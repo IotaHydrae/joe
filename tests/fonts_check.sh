@@ -15,6 +15,7 @@ cp "$ROOT_DIR/install.sh" "$FONT_REPO/install.sh"
 cp "$ROOT_DIR/scripts/install_fonts.sh" "$FONT_REPO/scripts/install_fonts.sh"
 cp "$ROOT_DIR/scripts/commands/fonts.sh" "$FONT_REPO/scripts/commands/fonts.sh"
 cp "$ROOT_DIR/scripts/lib/fonts.sh" "$FONT_REPO/scripts/lib/fonts.sh"
+cp "$ROOT_DIR/scripts/lib/log.sh" "$FONT_REPO/scripts/lib/log.sh"
 cp -a "$ROOT_DIR/fonts" "$FONT_REPO/fonts"
 
 cat > "$FONT_BIN/fc-cache" <<'STUB'
