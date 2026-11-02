@@ -67,6 +67,8 @@ fi
 # ---------------------------------------------------------------------------
 # shellcheck source=lib/log.sh
 . "$SCRIPT_DIR/lib/log.sh"
+# shellcheck source=lib/agents.sh
+. "$SCRIPT_DIR/lib/agents.sh"
 
 # 分类只用于筛选, 技能清单仍从 SKILL.md 自动发现。
 if [ -f "$SKILLS_SRC/categories.tsv" ]; then
@@ -75,20 +77,6 @@ if [ -f "$SKILLS_SRC/categories.tsv" ]; then
         SKILL_CATEGORIES["$skill"]="$category"
     done < "$SKILLS_SRC/categories.tsv"
 fi
-
-# 命令探测: PATH 或常见安装路径
-_has_bin() {
-    local name="$1"
-    command -v "$name" >/dev/null 2>&1 && return 0
-    [ -x "$HOME/.local/bin/$name" ] && return 0
-    [ -x "$HOME/.mimocode/bin/$name" ] && return 0
-    [ -x "$HOME/.grok/bin/$name" ] && return 0
-    local f
-    for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
-        [ -x "$f" ] && return 0
-    done
-    return 1
-}
 
 # ---------------------------------------------------------------------------
 # 目标目录 (按已安装的代理)

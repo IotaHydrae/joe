@@ -56,30 +56,16 @@ fi
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # 临时文件登记 + 退出清理 (uv 安装脚本等)
-TMP_FILES=()
-cleanup_tmp() {
-    if [ ${#TMP_FILES[@]} -gt 0 ]; then
-        rm -f -- "${TMP_FILES[@]}"
-    fi
-}
-trap cleanup_tmp EXIT
-
-make_tmp() {
-    local __var="$1" __suffix="${2:-}" __f
-    if [ -n "$__suffix" ]; then
-        __f=$(mktemp --suffix="$__suffix")
-    else
-        __f=$(mktemp)
-    fi
-    TMP_FILES+=("$__f")
-    printf -v "$__var" '%s' "$__f"
-}
+# shellcheck source=lib/tmp.sh
+. "$SCRIPT_DIR/lib/tmp.sh"
 
 # ---------------------------------------------------------------------------
 # 小工具函数 (info/ok/warn/die 由 scripts/lib/log.sh 提供)
 # ---------------------------------------------------------------------------
 # shellcheck source=lib/log.sh
 . "$SCRIPT_DIR/lib/log.sh"
+# shellcheck source=lib/agents.sh
+. "$SCRIPT_DIR/lib/agents.sh"
 
 load_nvm() {
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
@@ -89,21 +75,6 @@ load_nvm() {
     return 0
 }
 
-
-
-# 命令探测: 优先 PATH, 其次 nvm 的 node 版本目录与 ~/.local/bin
-_has_bin() {
-    local name="$1"
-    command -v "$name" >/dev/null 2>&1 && return 0
-    [ -x "$HOME/.local/bin/$name" ] && return 0
-    [ -x "$HOME/.mimocode/bin/$name" ] && return 0   # MiMo Code 官方安装路径
-    [ -x "$HOME/.grok/bin/$name" ] && return 0       # Grok Build 官方安装路径
-    local f
-    for f in "$HOME"/.nvm/versions/node/*/bin/"$name"; do
-        [ -x "$f" ] && return 0
-    done
-    return 1
-}
 
 has_claude()   { _has_bin claude; }
 has_codex()    { _has_bin codex; }
