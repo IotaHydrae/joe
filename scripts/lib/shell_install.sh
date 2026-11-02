@@ -1,0 +1,544 @@
+#!/usr/bin/env bash
+# =============================================================================
+# joe lib/shell_install — zsh / Oh My Zsh / 插件的安装与配置函数
+# =============================================================================
+# 由 install_shell.sh 在定义好全局变量 (SCRIPT_DIR/LOG_FILE/OMZ 目录/颜色)
+# 之后 source; 仅定义函数, 调用时才使用这些全局量。
+# =============================================================================
+
+log() {
+    local level="$1"
+    shift
+    local message="$*"
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+
+    # Log to file
+    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+
+    # Print to console with colors
+    case "$level" in
+        INFO)
+            echo -e "${BLUE}[INFO]${NC} $message"
+            ;;
+        SUCCESS)
+            echo -e "${GREEN}[SUCCESS]${NC} $message"
+            ;;
+        WARNING)
+            echo -e "${YELLOW}[WARNING]${NC} $message"
+            ;;
+        ERROR)
+            echo -e "${RED}[ERROR]${NC} $message"
+            ;;
+        PROGRESS)
+            echo -e "${CYAN}[PROGRESS]${NC} $message"
+            ;;
+    esac
+}
+
+# Show progress (current/total) with task name
+show_progress() {
+    local task="$1"
+    PROGRESS_CURRENT=$((PROGRESS_CURRENT + 1))
+    if [ "$PROGRESS_TOTAL" -gt 0 ]; then
+        log PROGRESS "[$PROGRESS_CURRENT/$PROGRESS_TOTAL] $task"
+    fi
+}
+
+# Calculate total steps based on enabled options
+calculate_total_steps() {
+    PROGRESS_TOTAL=3  # Base: dependencies check, zsh, Oh My Zsh
+
+    $NO_CONFIG || PROGRESS_TOTAL=$((PROGRESS_TOTAL + 1))
+    $NO_FONTS || PROGRESS_TOTAL=$((PROGRESS_TOTAL + 1))
+    $NO_P10K || PROGRESS_TOTAL=$((PROGRESS_TOTAL + 2))  # powerlevel10k + config
+    $NO_FASTFETCH || PROGRESS_TOTAL=$((PROGRESS_TOTAL + 1))
+    $NO_GHOSTTY_IME || PROGRESS_TOTAL=$((PROGRESS_TOTAL + 1))
+
+    PROGRESS_TOTAL=$((PROGRESS_TOTAL + 4))  # plugins, fzf, and final zsh configuration
+}
+
+# Function to print help message
+show_help() {
+    cat << EOF
+Usage: ./install.sh shell [OPTIONS]
+
+Installs and configures zsh with Oh My Zsh, powerlevel10k, and other tools.
+
+Options:
+    -h, --help              Show this help message and exit
+    -n, --dry-run           Simulate installation without making changes
+    --configure-only       Optimize existing zsh config offline, without installing components
+    --no-fonts              Skip font installation
+    --no-config             Skip .config directory copying
+    --no-p10k               Skip powerlevel10k configuration
+    --no-fastfetch          Skip fastfetch installation and execution
+    --no-default-plugins    Skip enabling default Oh My Zsh plugins
+    --no-ghostty-ime        Skip the Ghostty AppImage input method (IME) fix
+    --clean-backups         Clean up old backup files (keeps last $BACKUP_RETENTION)
+    -u, --update            Update installed components instead of installing
+EOF
+}
+
+# Parse command line arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                SHOW_HELP=true
+                shift
+                ;;
+            -n|--dry-run)
+                DRY_RUN=true
+                log INFO "Dry run mode enabled - no changes will be made"
+                shift
+                ;;
+            --configure-only)
+                CONFIGURE_ONLY=true
+                shift
+                ;;
+            --no-fonts)
+                NO_FONTS=true
+                shift
+                ;;
+            --no-config)
+                NO_CONFIG=true
+                shift
+                ;;
+            --no-p10k)
+                NO_P10K=true
+                shift
+                ;;
+            --no-fastfetch)
+                NO_FASTFETCH=true
+                shift
+                ;;
+            --no-default-plugins)
+                NO_DEFAULT_PLUGINS=true
+                shift
+                ;;
+            --no-ghostty-ime)
+                NO_GHOSTTY_IME=true
+                shift
+                ;;
+            --clean-backups)
+                CLEAN_BACKUPS=true
+                shift
+                ;;
+            -u|--update)
+                UPDATE_MODE=true
+                shift
+                ;;
+            *)
+                log ERROR "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Execute command or just log if dry run
+run_cmd() {
+    if $DRY_RUN; then
+        log INFO "Dry run: Would execute: $*"
+    else
+        "$@"
+    fi
+}
+
+# Check if a command exists
+check_dependency() {
+    if ! command -v "$1" &> /dev/null; then
+        log ERROR "$1 is not installed. Please install $1 first."
+        exit 1
+    fi
+}
+
+# Check system prerequisites before installation
+check_system_prerequisites() {
+    local issues=0
+
+    # Check disk space (need at least 5GB free in HOME)
+    local home_avail
+    home_avail=$(df -BG "$HOME" 2>/dev/null | awk 'NR==2 {gsub(/G/,"",$4); print $4}')
+    if [ -n "$home_avail" ] && [ "$home_avail" -lt 5 ]; then
+        log WARNING "Low disk space: ${home_avail}GB available (recommend at least 5GB)"
+        issues=$((issues + 1))
+    fi
+
+    # Check if we're on a supported distribution
+    local distro_id=""
+    if [ -r /etc/os-release ]; then
+        distro_id=$(grep "^ID=" /etc/os-release | cut -d= -f2 | tr -d '"')
+    fi
+
+    case "$distro_id" in
+        ubuntu|debian|linuxmint|pop|arch|cachyos|manjaro|fedora|opensuse*)
+            log INFO "Detected supported distribution: $distro_id"
+            ;;
+        *)
+            log WARNING "Distribution '$distro_id' has not been tested. Installation may fail."
+            issues=$((issues + 1))
+            ;;
+    esac
+
+    # For Linux Mint, check Ubuntu base version
+    if [ "$distro_id" = "linuxmint" ]; then
+        if ! grep -q "UBUNTU_CODENAME" /etc/os-release 2>/dev/null; then
+            log WARNING "Cannot determine Ubuntu base version for Linux Mint"
+            issues=$((issues + 1))
+        fi
+    fi
+
+    return "$issues"
+}
+
+# Detect package manager
+detect_package_manager() {
+    if command -v apt &> /dev/null; then
+        echo "apt"
+    elif command -v pacman &> /dev/null; then
+        echo "pacman"
+    elif command -v dnf &> /dev/null; then
+        echo "dnf"
+    elif command -v zypper &> /dev/null; then
+        echo "zypper"
+    else
+        echo "unknown"
+    fi
+}
+
+# Install package using detected package manager
+install_package() {
+    local package="$1"
+    local pkg_manager=$(detect_package_manager)
+    log INFO "Installing $package using $pkg_manager..."
+    case "$pkg_manager" in
+        apt)
+            run_cmd $SUDO_CMD apt update
+            run_cmd $SUDO_CMD apt install -y "$package"
+            ;;
+        pacman)
+            run_cmd $SUDO_CMD pacman -S --needed --noconfirm "$package"
+            ;;
+        dnf)
+            run_cmd $SUDO_CMD dnf install -y "$package"
+            ;;
+        zypper)
+            run_cmd $SUDO_CMD zypper install -y "$package"
+            ;;
+        *)
+            log ERROR "Unsupported package manager $pkg_manager. Please install $package manually."
+            return 1
+            ;;
+    esac
+    log SUCCESS "$package installed successfully"
+}
+
+# Try to install package without failing
+try_install_package() {
+    local package="$1"
+    local pkg_manager=$(detect_package_manager)
+    case "$pkg_manager" in
+        apt)
+            run_cmd $SUDO_CMD apt update -y || true
+            run_cmd $SUDO_CMD apt install -y "$package" || true
+            ;;
+        pacman)
+            run_cmd $SUDO_CMD pacman -S --needed --noconfirm "$package" || true
+            ;;
+        dnf)
+            run_cmd $SUDO_CMD dnf install -y "$package" || true
+            ;;
+        zypper)
+            run_cmd $SUDO_CMD zypper install -y "$package" || true
+            ;;
+        *)
+            log WARNING "Unsupported package manager, skipping $package installation"
+            ;;
+    esac
+}
+
+# Install zsh
+install_zsh() {
+    install_package zsh
+}
+
+# Try to install fastfetch without failing the script
+try_install_fastfetch() {
+    if $NO_FASTFETCH; then
+        log INFO "Skipping fastfetch installation (--no-fastfetch)"
+        return
+    fi
+
+    log INFO "Attempting to install fastfetch..."
+    try_install_package fastfetch
+}
+
+# Copy files/directories with backup
+copy_with_backup() {
+    local src="$1"
+    local dest="$2"
+
+    local dest_dir=$(dirname "$dest")
+    if [ ! -d "$dest_dir" ]; then
+        log INFO "Creating directory $dest_dir"
+        run_cmd mkdir -p "$dest_dir"
+    fi
+
+    if [ -e "$dest" ]; then
+        local backup="${dest}.bak.$(date +%Y%m%d%H%M%S)"
+        local n=0
+        while [ -e "$backup" ]; do
+            n=$((n + 1))
+            backup="${dest}.bak.$(date +%Y%m%d%H%M%S).${n}"
+        done
+        log INFO "Backing up existing $dest to $backup"
+        # Copy to the backup first; only remove the original once the backup exists,
+        # so a failed backup never leaves the current config missing.
+        run_cmd cp -r -- "$dest" "$backup"
+        run_cmd rm -rf -- "$dest"
+    fi
+
+    log INFO "Copying $src to $dest"
+    run_cmd cp -r -- "$src" "$dest"
+}
+
+# Clean up old backup files in a directory
+clean_backups_in_dir() {
+    local dir="$1"
+    if [ -d "$dir" ]; then
+        find "$dir" -mindepth 1 -maxdepth 1 \( -type f -o -type d -o -type l \) -name '*.bak.[0-9]*' -printf '%T+ %p\n' | sort -r | tail -n +$((BACKUP_RETENTION + 1)) | cut -d' ' -f2- | while read -r file; do
+            log INFO "Removing old backup: $file"
+            run_cmd rm -rf -- "$file"
+        done
+    fi
+}
+
+# Clean up old backup files
+clean_backups() {
+    log INFO "Cleaning up old backup files (keeping last $BACKUP_RETENTION)..."
+
+    clean_backups_in_dir ~/.config
+    clean_backups_in_dir ~/.local/share/fonts
+
+    log SUCCESS "Backup cleanup complete"
+}
+
+# Clone git repo if not exists
+git_clone_shallow() {
+    local repo_url="$1"
+    local target_dir="$2"
+    local name="$3"
+
+    if [ ! -d "$target_dir" ]; then
+        log INFO "Installing $name..."
+        run_cmd git clone --depth=1 "$repo_url" "$target_dir"
+    elif [ ! -d "$target_dir/.git" ]; then
+        log WARNING "$target_dir exists but is not a git repository; remove it to reinstall $name"
+    else
+        log INFO "$name is already installed"
+    fi
+}
+
+# Install Oh My Zsh by cloning the repository.
+#
+# The upstream `sh -c "$(curl -fsSL ...)"` one-liner hides its own failures:
+# when the download fails the command substitution expands to an empty string,
+# `sh -c ""` still exits 0, and the caller has no way to notice that nothing
+# was installed. Cloning the repository instead keeps the same network path as
+# the other components, works on hosts where raw.githubusercontent.com is
+# unreachable, and reports a non-zero status on failure.
+install_omz() {
+    if ! git_clone_shallow https://github.com/ohmyzsh/ohmyzsh.git "$OMZ_INSTALL_DIR" "Oh My Zsh"; then
+        log ERROR "Cloning Oh My Zsh failed"
+        log ERROR "Check access to https://github.com/ohmyzsh/ohmyzsh.git and re-run this script"
+        exit 1
+    fi
+}
+
+# Abort when Oh My Zsh is missing after the install step.
+#
+# Every later step (plugins=(), powerlevel10k, autosuggestions) assumes a
+# working Oh My Zsh; continuing without it is what leaves ~/.zshrc full of
+# fragments that never load the framework.
+verify_omz_installed() {
+    if $DRY_RUN; then
+        return 0
+    fi
+
+    if [ -f "$OMZ_INSTALL_DIR/oh-my-zsh.sh" ]; then
+        return 0
+    fi
+
+    log ERROR "Oh My Zsh is not installed at $OMZ_INSTALL_DIR"
+    log ERROR "Check access to https://github.com/ohmyzsh/ohmyzsh.git and re-run this script"
+    exit 1
+}
+
+# Install optional widgets only; the shared template controls their load order.
+install_zsh_plugin() {
+    local repo_url="$1" target_dir="$2" plugin="$3"
+    if [ -d "$OMZ_INSTALL_DIR/plugins/$plugin" ] || [ -d "$OMZ_INSTALL_DIR/custom/plugins/$plugin" ]; then
+        log INFO "$plugin is already provided by Oh My Zsh"
+        return 0
+    fi
+    git_clone_shallow "$repo_url" "$target_dir" "$plugin"
+}
+
+# Keep installer messages level-prefixed while the helper also works standalone.
+apply_zsh_configuration() {
+    local result line
+    if ! result=$(configure_zshrc); then
+        log ERROR "Could not update zsh configuration; the existing file was preserved"
+        return 1
+    fi
+    while IFS= read -r line; do
+        [[ -z $line ]] || log INFO "$line"
+    done <<< "$result"
+}
+
+# Update git repo
+git_update_repo() {
+    local repo_dir="$1"
+    local name="$2"
+    shift 2
+    local -a extra_cmd=("$@")
+
+    if [ -d "$repo_dir" ]; then
+        log INFO "Updating $name..."
+        run_cmd git -C "$repo_dir" pull || true
+        if [ ${#extra_cmd[@]} -gt 0 ]; then
+            run_cmd "${extra_cmd[@]}" || true
+        fi
+    fi
+}
+
+# Update installed components
+update_components() {
+    log INFO "Updating installed components..."
+
+    git_update_repo "$OMZ_INSTALL_DIR" "Oh My Zsh"
+    if ! $NO_P10K; then
+        git_update_repo "$PL10K_INSTALL_DIR" "powerlevel10k"
+    fi
+    git_update_repo "$ZSH_AUTOSUGGESTIONS_DIR" "zsh-autosuggestions"
+    git_update_repo "$ZSH_SYNTAX_HIGHLIGHTING_DIR" "zsh-syntax-highlighting"
+    git_update_repo ~/.fzf "fzf" "$HOME/.fzf/install" --bin
+
+    log SUCCESS "Components update complete"
+}
+
+# ── Ghostty AppImage input method (IME) fix ─────────────────────────────────
+#
+# The official Ghostty AppImage bundles its own GTK (4.20 at the time of
+# writing) but ships no GTK input method modules, while its AppRun keeps
+# GTK_PATH confined to the AppImage itself. The bundled GTK therefore finds no
+# libim-*.so, logs
+#
+#     warning(glib): WARNING: Gtk: No IM module matching GTK_IM_MODULE=ibus found
+#
+# and opens a window that cannot be typed into with an IME (no Chinese input),
+# even though every other application on the host works.
+#
+# The AppImage runtime (uruntime) exports every entry of an optional
+# "<AppImage>.env" file that sits next to the AppImage, before AppRun runs.
+# Pointing GTK_PATH at a directory that only exposes the host's GTK4 immodules
+# lets the bundled GTK load the host's ibus/fcitx5 module again. GTK searches
+# both "<GTK_PATH>/immodules" and "<GTK_PATH>/<binary version>/immodules"; the
+# first layout is used here.
+#
+# Everything below is idempotent: re-running only refreshes the symlinks and
+# the .env file.
+
+# Locate the Ghostty AppImage, honoring an explicit $GHOSTTY_APPIMAGE override.
+find_ghostty_appimage() {
+    local candidate
+    for candidate in "${GHOSTTY_APPIMAGE:-}" \
+                     ~/.local/bin/Ghostty.AppImage \
+                     ~/.local/bin/*[Gg]hostty*.AppImage \
+                     ~/Applications/*[Gg]hostty*.AppImage; do
+        if [ -n "$candidate" ] && [ -f "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Locate the host GTK4 input method modules (ibus-gtk4, fcitx5-frontend-gtk4).
+find_gtk4_immodule_dir() {
+    local dir
+    for dir in /usr/lib/*/gtk-4.0/4.0.0/immodules \
+               /usr/lib64/gtk-4.0/4.0.0/immodules \
+               /usr/lib/gtk-4.0/4.0.0/immodules; do
+        if compgen -G "$dir/libim-*.so" > /dev/null; then
+            printf '%s\n' "$dir"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Let the Ghostty AppImage use the host's GTK input method modules.
+fix_ghostty_appimage_ime() {
+    if $NO_GHOSTTY_IME; then
+        log INFO "Skipping the Ghostty AppImage input method fix (--no-ghostty-ime)"
+        return 0
+    fi
+
+    local appimage
+    if ! appimage=$(find_ghostty_appimage); then
+        log INFO "No Ghostty AppImage found in ~/.local/bin or ~/Applications; skipping the input method fix"
+        return 0
+    fi
+
+    local immodule_src
+    if ! immodule_src=$(find_gtk4_immodule_dir); then
+        log WARNING "No GTK4 input method modules on this host (install ibus-gtk4 or fcitx5-frontend-gtk4); skipping the Ghostty input method fix"
+        return 0
+    fi
+
+    log INFO "Configuring $appimage to use the host input method modules..."
+    local immodule_dir="$GHOSTTY_IMMODULE_DIR/immodules"
+    run_cmd mkdir -p "$immodule_dir"
+
+    # Symlink instead of copying, so the modules keep matching the host packages.
+    local module
+    for module in "$immodule_src"/libim-*.so; do
+        if [ -e "$module" ]; then
+            run_cmd ln -sfn "$module" "$immodule_dir/$(basename "$module")"
+        fi
+    done
+
+    # Drop links whose target is gone (e.g. after uninstalling an IM frontend).
+    local link
+    for link in "$immodule_dir"/libim-*.so; do
+        if [ -L "$link" ] && [ ! -e "$link" ]; then
+            log WARNING "Removing stale input method link $(basename "$link")"
+            run_cmd rm -f -- "$link"
+        fi
+    done
+
+    local env_file="${appimage}.env"
+    local gtk_path_line="GTK_PATH=$GHOSTTY_IMMODULE_DIR"
+
+    if [ -f "$env_file" ] && grep -qxF "$gtk_path_line" "$env_file"; then
+        log INFO "$env_file already points GTK_PATH at the input method modules"
+    elif $DRY_RUN; then
+        log INFO "Dry run: Would write '$gtk_path_line' to $env_file"
+    else
+        # Keep any unrelated entries the file may hold, replace the GTK_PATH one.
+        local merged
+        merged=$(mktemp)
+        if [ -f "$env_file" ]; then
+            grep -v '^GTK_PATH=' -- "$env_file" > "$merged" || true
+        fi
+        printf '%s\n' "$gtk_path_line" >> "$merged"
+        chmod 644 "$merged"
+        mv -- "$merged" "$env_file"
+        log INFO "Wrote '$gtk_path_line' to $env_file"
+    fi
+
+    log SUCCESS "Ghostty AppImage input method fix applied (restart Ghostty for it to take effect)"
+}
