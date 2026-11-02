@@ -16,7 +16,7 @@
 #   其余三个阶段 --yes 时传 --all; doctor 只报告, 失败不计入阶段失败
 #
 # 环境变量:
-#   JOE_DIR    克隆/使用目录 (默认 ~/iotahydrae/joe)
+#   JOE_DIR    克隆/使用目录 (默认 ~/.joe, 与一行安装的引导目录一致)
 #   JOE_REPO   git 地址 (默认 SSH, 失败自动回退 HTTPS)
 #   PROXY_URL  代理, 如 http://host:7890
 #
@@ -38,7 +38,7 @@ fi
 ASSUME_YES=false
 ONLY=""
 SKIP=""
-JOE_DIR="${JOE_DIR:-$HOME/iotahydrae/joe}"
+JOE_DIR="${JOE_DIR:-$HOME/.joe}"
 JOE_REPO="${JOE_REPO:-git@github.com:IotaHydrae/joe.git}"
 JOE_REPO_HTTPS="https://github.com/IotaHydrae/joe.git"
 

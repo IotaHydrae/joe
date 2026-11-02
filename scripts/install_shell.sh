@@ -4,30 +4,14 @@
 set -euo pipefail
 
 # Assets remain at the repository root; resolve it independently of cwd.
+# 一行安装/引导统一由 install.sh 负责 (它是唯一入口); 本脚本只从仓库内运行。
 SCRIPT_DIR="$(pwd)"
 if [ -f "${BASH_SOURCE[0]:-}" ]; then
     SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
     cd "$SCRIPT_DIR"
-fi
-
-# When the script is piped through `curl ... | bash`, there is no script
-# file: clone this repository and re-execute from the clone so that
-# repo-local assets (.config, fonts, .p10k.zsh) are included as well.
-if [ ! -f "${BASH_SOURCE[0]:-}" ]; then
-    JOE_INSTALL_DIR="${JOE_INSTALL_DIR:-$HOME/.joe}"
-    if [ ! -d "$JOE_INSTALL_DIR/.git" ]; then
-        if [ -e "$JOE_INSTALL_DIR" ]; then
-            echo "ERROR: $JOE_INSTALL_DIR exists but is not a joe git repository; remove it or set JOE_INSTALL_DIR to another location" >&2
-            exit 1
-        fi
-        if ! command -v git >/dev/null 2>&1; then
-            echo "ERROR: git is required for one-line installation" >&2
-            exit 1
-        fi
-        echo "Cloning joe repository to $JOE_INSTALL_DIR..."
-        git clone --depth=1 https://github.com/IotaHydrae/joe.git "$JOE_INSTALL_DIR"
-    fi
-    exec bash "$JOE_INSTALL_DIR/install.sh" shell "$@"
+else
+    echo "ERROR: install_shell.sh 需从仓库内运行; 一行安装请用 ./install.sh shell (或 curl .../install.sh | bash)" >&2
+    exit 1
 fi
 
 # Configuration and constants
