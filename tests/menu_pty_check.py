@@ -19,7 +19,8 @@ import termios
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MAIN_PROMPT = "选择 [1-11/q]: "
+MAIN_PROMPT = "选择 [1-12/q]: "
+ENT_PROMPT = "选择操作 [b]: "
 TOOLS_PROMPT = "选择操作 [1-16/b]: "
 APPS_PROMPT = "选择操作 [1-7/b]: "
 MCP_PROMPT = "选择操作 [1-9/b]: "
@@ -214,13 +215,26 @@ def main():
                     out = session.choose(invalid, prompt)
                     require("请输入有效编号" in out, title + "未拒绝非法编号")
                 session.choose("b", MAIN_PROMPT)
-            session.choose("", MAIN_PROMPT)
+            session.choose("b", MAIN_PROMPT)
             out = session.choose("zz", MAIN_PROMPT)
             require("请输入有效编号" in out, "主菜单未拒绝非法输入")
             session.finish()
             require(not any(marker in session.text for marker in INSTALL_MARKERS), "浏览菜单触发安装")
             require("\x1b[?25l" not in session.text, "编号菜单仍进入了全屏 TUI")
         require(not os.path.exists(call_log), "浏览菜单调用了安装器")
+
+        # 休闲娱乐占位菜单: 可进入、显示占位提示、不触发安装、可返回
+        with MenuSession(env) as session:
+            out = session.choose("11", ENT_PROMPT)
+            require("休闲娱乐" in out, "未进入休闲娱乐菜单")
+            require("暂无可安装条目" in out, "休闲娱乐占位菜单缺少占位提示")
+            require(not any(marker in out for marker in INSTALL_MARKERS), "休闲娱乐菜单触发安装")
+            out = session.choose("zz", ENT_PROMPT)
+            require("请输入有效编号" in out, "休闲娱乐菜单未拒绝非法输入")
+            session.choose("b", MAIN_PROMPT)
+            session.finish()
+        require(not os.path.exists(call_log), "浏览休闲娱乐菜单调用了安装器")
+
         os.rmdir(os.path.join(home, ".pyenv"))
 
         with MenuSession(env) as session:

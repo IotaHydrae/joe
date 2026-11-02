@@ -107,6 +107,8 @@ Install Model Context Protocol servers for AI coding assistants:
 
 Main menu item 4 (MCP servers) also uses a numbered list with configured status, individual or all-server installation, and `b` to return. Code intelligence services are marked as alternatives (choose one), and Node/npx is checked before installation.
 
+Main menu item 11 "休闲娱乐" (Entertainment) is a placeholder entry with no items yet (pending games / mod tools); content will be added there later.
+
 - **filesystem** / **git**: File and code management
 - **memory**: Conversation memory
 - **context7**: Real-time documentation lookup

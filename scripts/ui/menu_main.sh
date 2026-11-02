@@ -162,6 +162,22 @@ config_menu() {
     done
 }
 
+# 休闲娱乐占位菜单: 尚无条目, 仅提供返回主菜单。
+entertainment_menu() {
+    local choice
+    while true; do
+        printf '\n── 休闲娱乐 ──\n'
+        printf '  暂无可安装条目 (待补充游戏 / mod 工具等)。\n'
+        printf '  b) 返回主菜单\n'
+        printf '选择操作 [b]: '
+        IFS= read -r choice || return 0
+        case "$choice" in
+            b|B|q|Q|'') return 0 ;;
+            *) printf '请输入有效编号或 b。\n' ;;
+        esac
+    done
+}
+
 main_menu() {
     local choice
     while true; do
@@ -180,11 +196,12 @@ main_menu() {
         printf '  9) 配置管理      备份/恢复/同步\n'
         printf '  10) 统一更新     各工具官方自更新\n'
         printf '\n'
-        printf '  11) 新手引导     quick-start 推荐配置\n'
+        printf '  11) 休闲娱乐     游戏 / mod 工具 (占位)\n'
+        printf '  12) 新手引导     quick-start 推荐配置\n'
         printf '\n'
         printf '  q) 退出\n\n'
         printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-        printf '选择 [1-11/q]: '
+        printf '选择 [1-12/q]: '
 
         IFS= read -r choice || return 0
         case "$choice" in
@@ -198,7 +215,8 @@ main_menu() {
             8) run_action doctor ;;
             9) config_menu ;;
             10) run_action update ;;
-            11) run_action quick-start ;;
+            11) entertainment_menu ;;
+            12) run_action quick-start ;;
             q|Q) return 0 ;;
             '') continue ;;
             *) printf '请输入有效编号或 q。\n' ;;
