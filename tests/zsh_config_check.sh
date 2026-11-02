@@ -3,6 +3,9 @@
 
 set -euo pipefail
 
+# 目录统一 0755, 避免 compinit 把可写目录判为"不安全"。
+umask 022
+
 if ! command -v zsh >/dev/null 2>&1; then
     printf 'SKIP: 未安装 zsh, 无法验证交互配置\n' >&2
     exit 2
@@ -39,6 +42,14 @@ fail() {
     exit 1
 }
 
+# 交互式启动的 stderr 检查: compinit 在缺终端/不安全目录的 CI 上会打印
+# "insecure directories" 之类的环境警告, 属噪声; 其余任何输出都算启动错误。
+assert_clean_startup() {
+    local err="$1" msg="$2" extra
+    extra="$(grep -vE 'insecure directories|Ignore insecure directories' "$err" || true)"
+    [[ -z "$extra" ]] || fail "$msg: $extra"
+}
+
 run_shell() {
     env -u ZDOTDIR HOME="$ZSH_HOME" XDG_CACHE_HOME="$ZSH_HOME/.cache" \
         XDG_CONFIG_HOME="$ZSH_HOME/.config" PATH="$ZSH_BIN:$PATH" \
@@ -58,12 +69,15 @@ run_zsh() {
         ZSH="$ZSH_HOME/.oh-my-zsh" ZSH_CUSTOM="$ZSH_HOME/.oh-my-zsh/custom"
         HISTFILE="$ZSH_HOME/.zsh_history" ZSH_COMPDUMP="$ZSH_HOME/.zcompdump"
         NVM_DIR="$ZSH_HOME/.nvm" PYENV_ROOT="$ZSH_HOME/.pyenv"
-        ZSH_TEST_LOG="$ZSH_LOG" DISABLE_AUTO_UPDATE=true TERM=xterm-256color )
+        ZSH_TEST_LOG="$ZSH_LOG" DISABLE_AUTO_UPDATE=true TERM=xterm-256color
+        skip_global_compinit=1 )
     if [ -n "$SCRIPT_PTY" ]; then
         local inner="zsh" q a
         for a in "$@"; do printf -v q '%q' "$a"; inner+=" $q"; done
         inner+=" 2>$(printf '%q' "$ZSH_BOX/zsh-runtime.err")"
-        env "${env_args[@]}" "$SCRIPT_PTY" -qec "$inner" /dev/null | tr -d '\r'
+        # pty 提供终端; 喂若干 'y' 以应答 compinit 的"不安全目录"确认提示 (CI 会触发)
+        printf 'y\ny\ny\ny\ny\ny\n' \
+            | env "${env_args[@]}" "$SCRIPT_PTY" -qec "$inner" /dev/null | tr -d '\r'
     else
         env "${env_args[@]}" zsh "$@" 2> "$ZSH_BOX/zsh-runtime.err"
     fi
@@ -165,7 +179,7 @@ fi
 PYENV
     chmod +x "$ZSH_HOME/.pyenv/bin/pyenv"
     run_zsh -i -c 'print -r -- JOE_ZSH_OK' > "$ZSH_BOX/runtime.out"
-    [[ ! -s "$ZSH_BOX/zsh-runtime.err" ]] || fail "优化后的启动产生错误: $(cat "$ZSH_BOX/zsh-runtime.err")"
+    assert_clean_startup "$ZSH_BOX/zsh-runtime.err" "优化后的启动产生错误"
     [[ $(cat "$ZSH_LOG") == $'omz\np10k\np10k-config\nfzf-completion\nfzf-bindings\ncustom\nautosuggestions\nhighlighting' ]] || fail "组件重复加载、顺序错误或启动时加载了 nvm/pyenv: $(cat "$ZSH_LOG")"
     grep -qx JOE_ZSH_OK "$ZSH_BOX/runtime.out" || fail "交互式 shell 启动失败"
     : > "$ZSH_LOG"
@@ -173,7 +187,7 @@ PYENV
     [[ $(grep -c '^nvm-init$' "$ZSH_LOG") -eq 1 ]] || fail "nvm 按需初始化未只执行一次"
     grep -q '^pyenv:init ' "$ZSH_LOG" || fail "pyenv 未按需初始化"
     grep -q '^pyenv:--version$' "$ZSH_LOG" || fail "pyenv 初始化后未派发请求"
-    [[ ! -s "$ZSH_BOX/zsh-runtime.err" ]] || fail "按需初始化产生错误: $(cat "$ZSH_BOX/zsh-runtime.err")"
+    assert_clean_startup "$ZSH_BOX/zsh-runtime.err" "按需初始化产生错误"
 else
     printf 'SKIP: 未安装 zsh, 跳过交互运行时检查\n'
 fi
@@ -200,7 +214,7 @@ if command -v zsh >/dev/null 2>&1; then
         "$ZSH_HOME/.cache/p10k-instant-prompt-$(id -un).zsh"
     : > "$ZSH_LOG"
     run_zsh -i -c 'print -r -- JOE_BARE_OK' > "$ZSH_BOX/runtime.out"
-    [[ ! -s "$ZSH_BOX/zsh-runtime.err" ]] || fail "可选组件缺失时启动报错: $(cat "$ZSH_BOX/zsh-runtime.err")"
+    assert_clean_startup "$ZSH_BOX/zsh-runtime.err" "可选组件缺失时启动报错"
     grep -qx JOE_BARE_OK "$ZSH_BOX/runtime.out" || fail "可选组件缺失时无法启动"
     [[ ! -s "$ZSH_LOG" ]] || fail "--no-p10k 仍加载了 instant prompt 缓存"
 fi
