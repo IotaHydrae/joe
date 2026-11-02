@@ -31,6 +31,7 @@
 #   ./install.sh devtools --qq       # 只装 Linux QQ
 #   ./install.sh devtools --rime     # 安装/修复 Rime 雾凇拼音, 保留个人词库
 #   ./install.sh devtools --obsidian # 只装 Obsidian 笔记 (官方 .deb / AppImage, 重跑可升级)
+#   ./install.sh devtools --steam   # 只装 Steam 游戏平台 (休闲娱乐)
 #   ./install.sh devtools --tui      # 交互式勾选界面 (TUI)
 #   ./install.sh devtools --list     # 列出可安装组件
 #   ./install.sh devtools --check    # 只报告本机适配情况 (发行版/包名解析/安装方式), 不做改动
@@ -53,6 +54,7 @@
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
 #   - brave, chatgpt, wechat, qq, rime, obsidian 为日常软件, 位于主菜单第 2 项, --all 时默认跳过
+#   - steam 为休闲娱乐, 位于主菜单第 4 项, --all 时默认跳过
 #   - Godot 从官方 latest release 获取稳定版并校验 SHA-512, 重跑 --godot 可升级
 #   - Blender 从官方 release 获取最新稳定版并校验 SHA-256, 重跑 --blender 可升级, 自动写入桌面菜单项
 #   - QQ 下载前实时获取官方临时签名; 签名失败时中止安装
@@ -73,13 +75,16 @@ INSTALL_ALL=false
 TUI_MODE=false
 
 # 安装顺序也是依赖顺序: node 必须先于依赖它的 AI CLI。
-COMPONENT_ORDER=(node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot blender wechat qq rime obsidian)
+COMPONENT_ORDER=(node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot blender wechat qq rime obsidian steam)
 
 # 日常软件 (不属于开发工具, --all 时跳过; 走主菜单第 2 项或显式 --<id> 参数安装)
 DAILY_IDS=(brave chatgpt wechat qq rime obsidian)
-is_daily_app() {
+# 休闲娱乐 (同样不属于开发工具, --all 时跳过; 走主菜单第 4 项或显式 --<id>)
+ENTERTAINMENT_IDS=(steam)
+# 日常软件与休闲娱乐都不该被 devtools --all 默认带上
+is_optional_app() {
     local id="$1" d
-    for d in "${DAILY_IDS[@]}"; do
+    for d in "${DAILY_IDS[@]}" "${ENTERTAINMENT_IDS[@]}"; do
         [ "$d" = "$id" ] && return 0
     done
     return 1
@@ -308,7 +313,7 @@ HAS_ARGS=false
 [ "$#" -gt 0 ] && HAS_ARGS=true
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --node|--python|--claude|--codex|--gemini|--opencode|--copilot|--grok|--zed|--ghostty|--vscode|--brave|--mimo|--chatgpt|--ccswitch|--godot|--blender|--wechat|--qq|--rime|--obsidian)
+        --node|--python|--claude|--codex|--gemini|--opencode|--copilot|--grok|--zed|--ghostty|--vscode|--brave|--mimo|--chatgpt|--ccswitch|--godot|--blender|--wechat|--qq|--rime|--obsidian|--steam)
             WANT[${1#--}]=1; shift ;;
         --ai)       WANT[claude]=1; WANT[codex]=1; shift ;;
         --all)      INSTALL_ALL=true; shift ;;
@@ -394,7 +399,7 @@ load_component() {
 }
 
 for _id in "${COMPONENT_ORDER[@]}"; do
-    if [ -n "${WANT[$_id]:-}" ] || ( $INSTALL_ALL && ! is_daily_app "$_id" ); then
+    if [ -n "${WANT[$_id]:-}" ] || ( $INSTALL_ALL && ! is_optional_app "$_id" ); then
         load_component "$_id"
         "component_${_id}_install"
     fi

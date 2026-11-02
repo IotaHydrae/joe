@@ -20,7 +20,7 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAIN_PROMPT = "选择 [1-12/q]: "
-ENT_PROMPT = "选择操作 [b]: "
+ENT_PROMPT = "选择操作 [1-2/b]: "
 TOOLS_PROMPT = "选择操作 [1-16/b]: "
 APPS_PROMPT = "选择操作 [1-7/b]: "
 MCP_PROMPT = "选择操作 [1-9/b]: "
@@ -200,6 +200,7 @@ def main():
             for entry, title, prompt in (
                 ("2", "日常软件安装", APPS_PROMPT),
                 ("3", "开发工具安装", TOOLS_PROMPT),
+                ("4", "休闲娱乐安装", ENT_PROMPT),
                 ("5", "MCP 服务器安装", MCP_PROMPT),
                 ("7", "字体安装", FONTS_PROMPT),
             ):
@@ -223,12 +224,13 @@ def main():
             require("\x1b[?25l" not in session.text, "编号菜单仍进入了全屏 TUI")
         require(not os.path.exists(call_log), "浏览菜单调用了安装器")
 
-        # 休闲娱乐占位菜单: 可进入、显示占位提示、不触发安装、可返回
+        # 休闲娱乐菜单: 列出 Steam 条目, 不触发安装, 可返回
         with MenuSession(env) as session:
             out = session.choose("4", ENT_PROMPT)
-            require("休闲娱乐" in out, "未进入休闲娱乐菜单")
-            require("暂无可安装条目" in out, "休闲娱乐占位菜单缺少占位提示")
-            require(not any(marker in out for marker in INSTALL_MARKERS), "休闲娱乐菜单触发安装")
+            require("休闲娱乐安装" in out, "未进入休闲娱乐菜单")
+            require("Steam" in out, "休闲娱乐菜单未列出 Steam")
+            require("全部安装" in out and "b) 返回主菜单" in out, "休闲娱乐菜单操作不完整")
+            require(not any(marker in out for marker in INSTALL_MARKERS), "浏览休闲娱乐菜单触发安装")
             out = session.choose("zz", ENT_PROMPT)
             require("请输入有效编号" in out, "休闲娱乐菜单未拒绝非法输入")
             session.choose("b", MAIN_PROMPT)

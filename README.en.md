@@ -107,7 +107,7 @@ Install Model Context Protocol servers for AI coding assistants:
 
 Main menu item 5 (MCP servers) also uses a numbered list with configured status, individual or all-server installation, and `b` to return. Code intelligence services are marked as alternatives (choose one), and Node/npx is checked before installation.
 
-Main menu item 4 "休闲娱乐" (Entertainment) is a placeholder entry with no items yet (pending games / mod tools); content will be added there later.
+Main menu item 4 "休闲娱乐" (Entertainment) holds games / mod tools (currently Steam) with the same numbered list and `b` to return. These entries are not included in `devtools --all`; install one directly with `./install.sh tools install steam`.
 
 - **filesystem** / **git**: File and code management
 - **memory**: Conversation memory
@@ -262,6 +262,7 @@ The repair also updates `~/.local/bin/joe-ghostty`: each window starts a separat
 --qq                   # Install official Linux QQ only
 --rime                 # Install/repair Rime (rime-ice), preserving personal dictionaries
 --obsidian             # Install Obsidian notes only (official .deb / AppImage; re-run to upgrade)
+--steam                # Install Steam only (entertainment; excluded from --all)
 ```
 
 Run `./install.sh tools install rime` again (or select Rime in main menu item 2) to repair an existing installation. It installs the Fcitx 5 GTK/Qt frontends and Rime Lua plugin, recompiles rime-ice, merges the input-method list and left Alt+Shift shortcuts, and selects Fcitx 5 through `im-config` when available. Personal dictionaries, other input methods, and unrelated environment variables are preserved. Changed configuration is backed up, keeping the latest five copies.

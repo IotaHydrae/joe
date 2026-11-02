@@ -162,20 +162,9 @@ config_menu() {
     done
 }
 
-# 休闲娱乐占位菜单: 尚无条目, 仅提供返回主菜单。
+# 休闲娱乐菜单: 复用通用编号列表 (Steam 等游戏 / mod 工具), --all 不默认安装。
 entertainment_menu() {
-    local choice
-    while true; do
-        printf '\n── 休闲娱乐 ──\n'
-        printf '  暂无可安装条目 (待补充游戏 / mod 工具等)。\n'
-        printf '  b) 返回主菜单\n'
-        printf '选择操作 [b]: '
-        IFS= read -r choice || return 0
-        case "$choice" in
-            b|B|q|Q|'') return 0 ;;
-            *) printf '请输入有效编号或 b。\n' ;;
-        esac
-    done
+    install_menu "休闲娱乐安装" tools "${ENTERTAINMENT_IDS[@]}"
 }
 
 main_menu() {

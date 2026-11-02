@@ -506,9 +506,24 @@ test_component_id_lists_agree() {
         test_fail "日常软件与开发工具有重叠: $overlap"
     fi
 
+    local entertainment_ids
+    entertainment_ids=$(timeout 10 bash -c '
+        set -euo pipefail
+        source scripts/lib/deps.sh
+        printf "%s\n" "${ENTERTAINMENT_IDS[@]}" | sort -u
+    ') || entertainment_ids=""
+    local ent_overlap
+    ent_overlap=$(comm -12 <(printf '%s\n%s\n' "$deps_ids" "$daily_ids" | sort -u) \
+        <(printf '%s\n' "$entertainment_ids"))
+    if [[ -z $ent_overlap ]]; then
+        test_pass "休闲娱乐清单与开发工具/日常软件无交集"
+    else
+        test_fail "休闲娱乐与其它清单有重叠: $ent_overlap"
+    fi
+
     # 新增组件也必须有自己的模块, 否则派发时会 die
     local id missing_module="" all_components
-    all_components=$(printf '%s\n%s\n' "$deps_ids" "$daily_ids" | sort -u)
+    all_components=$(printf '%s\n%s\n%s\n' "$deps_ids" "$daily_ids" "$entertainment_ids" | sort -u)
     for id in $all_components; do
         if [ ! -f "scripts/components/$id.sh" ] \
             || ! grep -q "^component_${id}_install()" "scripts/components/$id.sh"; then
@@ -521,12 +536,12 @@ test_component_id_lists_agree() {
         test_fail "缺少组件模块或接口:$missing_module"
     fi
 
-    # 派发顺序表包含开发工具与日常软件的所有组件
+    # 派发顺序表包含开发工具、日常软件与休闲娱乐的所有组件
     local order_ids
     order_ids=$(sed -n 's/^COMPONENT_ORDER=(\(.*\))$/\1/p' scripts/install_devtools.sh |
         tr ' ' '\n' | sort -u)
     if diff <(printf '%s\n' "$all_components") <(printf '%s\n' "$order_ids") >/dev/null; then
-        test_pass "COMPONENT_ORDER 覆盖全部开发工具与日常软件"
+        test_pass "COMPONENT_ORDER 覆盖全部开发工具/日常软件/休闲娱乐"
     else
         test_fail "COMPONENT_ORDER 与预期组件不一致"
         diff <(printf '%s\n' "$all_components") <(printf '%s\n' "$order_ids") || true
@@ -682,7 +697,7 @@ test_devtools_dispatch() {
         test_fail "无法复制仓库到沙箱"
         return
     fi
-    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot blender wechat qq rime obsidian; do
+    for id in node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot blender wechat qq rime obsidian steam; do
         printf '#!/usr/bin/env bash\ncomponent_%s_install() { echo "RUN:%s"; }\n' "$id" "$id" \
             > "$box/scripts/components/$id.sh"
     done
@@ -711,10 +726,10 @@ test_devtools_dispatch() {
     else
         test_fail "--all 派发数不符: $count"
     fi
-    if grep -qE '^RUN:(brave|chatgpt|wechat|qq|rime|obsidian)$' <<<"$out"; then
-        test_fail "--all 包含了日常软件"
+    if grep -qE '^RUN:(brave|chatgpt|wechat|qq|rime|obsidian|steam)$' <<<"$out"; then
+        test_fail "--all 包含了日常软件/休闲娱乐"
     else
-        test_pass "--all 未包含日常软件"
+        test_pass "--all 未包含日常软件/休闲娱乐"
     fi
 
     out=$(cd "$box" && timeout 60 bash scripts/install_devtools.sh --wechat --qq 2>&1) || true

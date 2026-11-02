@@ -109,7 +109,7 @@ Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名�
 
 主菜单第 5 项「MCP 服务器」同样使用编号列表，显示已配置状态，支持单项或全部安装，`b` 返回主菜单。代码智能服务会标记「三选一」，安装前会检查 Node/npx。
 
-主菜单第 4 项「休闲娱乐」是占位入口，暂无条目（待补充游戏 / mod 工具等），后续往这里加内容。
+主菜单第 4 项「休闲娱乐」用于游戏 / mod 相关工具（目前含 Steam），使用同样的编号列表，`b` 返回主菜单。这些条目不参与 `devtools --all`；可单独用 `./install.sh tools install steam` 安装。
 
 - **filesystem** / **git**：文件和代码管理
 - **memory**：对话记忆
@@ -264,6 +264,7 @@ Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名�
 --qq                   # 只装 Linux QQ
 --rime                 # 安装/修复 Rime 雾凇拼音, 保留个人词库
 --obsidian             # 只装 Obsidian 笔记 (官方 .deb / AppImage, 重跑可升级)
+--steam                # 只装 Steam 游戏平台 (休闲娱乐, 不参与 --all)
 ```
 
 重复运行 `./install.sh tools install rime`（或主菜单第 2 项选择 Rime）会修复已有安装：补齐 Fcitx 5 的 GTK/Qt 前端和 Rime Lua 插件，重新编译雾凇，合并输入法列表与左 Alt+Shift 快捷键，并通过 `im-config`（可用时）选择 Fcitx 5。保留个人词库、其他输入法和无关环境变量；变更前备份配置，保留最近 5 份。
