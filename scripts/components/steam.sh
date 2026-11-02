@@ -58,7 +58,12 @@ component_steam_install() {
             ;;
     esac
 
-    _steam_present || command -v flatpak >/dev/null 2>&1 \
-        || die "Steam 安装失败, 请检查网络或包管理器输出"
+    # 原生包会在 PATH 或 /usr/games 下生成 steam; Flatpak 安装不生成该系统二进制,
+    # 由 flatpak install 的退出码负责失败(VALVE 包已写入 ~/.local/share/flatpak)。
+    case "$PM" in
+        apt|pacman)
+            _steam_present || die "Steam 安装失败, 请检查网络或包管理器输出"
+            ;;
+    esac
     ok "Steam 安装完成 (首次启动会下载客户端并更新, 需要联网)"
 }

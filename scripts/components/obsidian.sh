@@ -7,6 +7,11 @@
 # pick_shell_rc, append_shell_cfg, print_ai_followup, 以及 scripts/lib_*.sh。
 # =============================================================================
 
+# deb 安装生成 /usr/bin/obsidian, AppImage 路径在 ~/.local/bin/obsidian。
+_obsidian_present() {
+    command -v obsidian >/dev/null 2>&1 || [ -x "$HOME/.local/bin/obsidian" ]
+}
+
 component_obsidian_install() {
     info "=== 安装 Obsidian (个人知识库) ==="
 
@@ -20,10 +25,8 @@ component_obsidian_install() {
         || die "无法确定 Obsidian 版本。可设置 OBSIDIAN_VERSION=vX.Y.Z 后重试, 或从 https://obsidian.md 手动安装"
     local ver="${tag#v}"
 
-    # 已是最新则跳过; deb 安装出 obsidian 命令, AppImage 路径在 ~/.local/bin/obsidian。
-    # 重跑本命令且 stamp 落后于最新 tag 时按新版本重装 (升级)。
-    if { command -v obsidian >/dev/null 2>&1 || [ -x "$HOME/.local/bin/obsidian" ]; } \
-        && [ "$installed_tag" = "$tag" ]; then
+    # 已是最新则跳过; 重跑本命令且 stamp 落后于最新 tag 时按新版本重装 (升级)。
+    if _obsidian_present && [ "$installed_tag" = "$tag" ]; then
         info "Obsidian 已是 $tag"
         return 0
     fi
@@ -80,7 +83,7 @@ EOF
             ;;
     esac
 
-    if command -v obsidian >/dev/null 2>&1 || [ -x "$HOME/.local/bin/obsidian" ]; then
+    if _obsidian_present; then
         mkdir -p "$(dirname "$stamp")"
         printf '%s\n' "$tag" > "$stamp"
         ok "Obsidian 安装完成 ($tag)"

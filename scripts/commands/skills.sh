@@ -40,25 +40,26 @@ forward() {
     exec bash "$SKILLS_SCRIPT" "$@"
 }
 
+# 新语法动作词 (旧语法里以 --list/--tui 等选项形式出现, 不算动作)
+_is_action() {
+    case "${1:-}" in
+        list|status|categories|install|update|tui) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # 动作词只在开头 (或紧跟 --project <dir> 之后) 才是新语法动作;
 # 出现在 --category/--tui/--list 等旧语法选项中间时原样透传, 不当作动作。
 ACTION=""
 REST=("$@")
-case "${1:-}" in
-    list|status|categories|install|update|tui)
-        ACTION="$1"
-        REST=("${@:2}")
-        ;;
-    --project)
-        # --project <dir> 之后若紧跟动作词, 视为新语法动作
-        case "${3:-}" in
-            list|status|categories|install|update|tui)
-                ACTION="$3"
-                REST=("$1" "$2" "${@:4}")
-                ;;
-        esac
-        ;;
-esac
+if _is_action "${1:-}"; then
+    ACTION="$1"
+    REST=("${@:2}")
+elif [ "${1:-}" = "--project" ] && _is_action "${3:-}"; then
+    # --project <dir> 之后若紧跟动作词, 视为新语法动作
+    ACTION="$3"
+    REST=("$1" "$2" "${@:4}")
+fi
 
 case "$ACTION" in
     '')          forward "$@" ;;
