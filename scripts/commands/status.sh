@@ -37,10 +37,11 @@ SKILLS_SCRIPT="${SKILLS_SCRIPT:-$_SCRIPT_DIR/../install_skills.sh}"
 
 usage() {
     cat <<'EOF'
-用法: status [--short]
+用法: status [--short] [--project <目录>]
 
-    --short    单行输出 (tools 8/15 | mcp 4/7 | skills 12/150)
-    -h         显示此帮助
+    --short          单行输出 (tools 8/15 | mcp 4/7 | skills 12/150)
+    --project <目录> 统计该项目的技能安装状态 (缺省 = 当前目录)
+    -h               显示此帮助
 
 细节诊断: ./install.sh doctor
 EOF
@@ -54,7 +55,7 @@ count_installed() {
         printf "n/a"
         return 0
     fi
-    if ! listing=$(bash "$script" --list 2>/dev/null); then
+    if ! listing=$(bash "$script" --list --project "$PROJECT_DIR" 2>/dev/null); then
         printf "n/a"
         return 0
     fi
@@ -64,11 +65,20 @@ count_installed() {
 }
 
 SHORT=false
-for arg in "$@"; do
-    case "$arg" in
-        --short) SHORT=true ;;
+PROJECT_DIR="$PWD"
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --short) SHORT=true; shift ;;
+        --project)
+            PROJECT_DIR="${2:-}"
+            if [ -z "$PROJECT_DIR" ]; then
+                printf "错误: --project 需要项目目录\n" >&2
+                exit 1
+            fi
+            shift 2
+            ;;
         -h|--help) usage; exit 0 ;;
-        *) printf "未知选项: %s (查看 --help)\n" "$arg" >&2; exit 1 ;;
+        *) printf "未知选项: %s (查看 --help)\n" "$1" >&2; exit 1 ;;
     esac
 done
 

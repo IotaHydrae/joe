@@ -229,7 +229,7 @@ run_stage() {
 run_stage shell     "终端美化 (zsh/OMZ)" ./scripts/install_shell.sh
 run_stage devtools  "开发工具"           ./scripts/install_devtools.sh --all
 run_stage mcp       "MCP 服务器"         ./scripts/install_mcp_servers.sh --all
-run_stage skills    "代理技能"           ./scripts/install_skills.sh --all
+run_stage skills    "代理技能"           ./scripts/install_skills.sh --all --project "$PWD"
 
 # ---------------------------------------------------------------------------
 # 4. 体检

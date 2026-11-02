@@ -23,6 +23,9 @@ usage() {
     update [技能...]      重跑安装器刷新符号链接
     tui                   强制进入 TUI
 
+选项:
+    --project <目录>      目标项目 (安装/更新/列出必需; 技能装到该项目的 .agents/skills)
+
 旧语法 (--list / --categories / --category <name> / --tui / --all / 位置技能名)
 原样转发给安装器, 完整选项见: skills --help
 
@@ -37,18 +40,32 @@ forward() {
     exec bash "$SKILLS_SCRIPT" "$@"
 }
 
-ACTION="${1:-}"
-
-# 仅识别新动作词; 其余参数原样转发
-case "$ACTION" in
-    '')          forward ;;
-    -h|--help)   usage; forward --help ;;
-    list|status) shift; forward --list "$@" ;;
-    categories)  shift; forward --categories "$@" ;;
-    tui)         forward --tui ;;
-    install|update)
-        shift
-        forward "$@"
+# 动作词只在开头 (或紧跟 --project <dir> 之后) 才是新语法动作;
+# 出现在 --category/--tui/--list 等旧语法选项中间时原样透传, 不当作动作。
+ACTION=""
+REST=("$@")
+case "${1:-}" in
+    list|status|categories|install|update|tui)
+        ACTION="$1"
+        REST=("${@:2}")
         ;;
-    *)           forward "$@" ;;
+    --project)
+        # --project <dir> 之后若紧跟动作词, 视为新语法动作
+        case "${3:-}" in
+            list|status|categories|install|update|tui)
+                ACTION="$3"
+                REST=("$1" "$2" "${@:4}")
+                ;;
+        esac
+        ;;
+esac
+
+case "$ACTION" in
+    '')          forward "$@" ;;
+    list|status) forward --list "${REST[@]}" ;;
+    categories)  forward --categories "${REST[@]}" ;;
+    tui)         forward --tui "${REST[@]}" ;;
+    install|update)
+        forward "${REST[@]}"
+        ;;
 esac

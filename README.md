@@ -145,17 +145,17 @@ Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名�
 - **low-level-dev-skills**：142 个底层开发技能，按 25 个分类选择
 
 ```bash
-./install.sh skills                # 技能组 → 分类 → 按需勾选
-./install.sh skills list           # 列出技能及安装状态
-./install.sh skills categories     # 列出分类及技能数量
-./install.sh skills install gdb    # 只装 GDB 技能
-./install.sh skills gdb            # 旧写法, 同样有效
-./install.sh skills --category kernel-dev --tui  # 直接打开内核驱动分类
+./install.sh skills --project /path/to/proj                # 技能组 → 分类 → 按需勾选 (装到该项目)
+./install.sh skills --project /path/to/proj list           # 列出该项目技能及安装状态
+./install.sh skills categories                             # 列出分类及技能数量 (无需项目)
+./install.sh skills --project /path/to/proj install gdb    # 只装 GDB 技能到该项目
+./install.sh skills --project /path/to/proj gdb            # 旧写法, 同样有效
+./install.sh skills --project /path/to/proj --category kernel-dev --tui  # 直接打开内核驱动分类
 ```
 
 技能菜单分为「原有/本地技能（8 个）」和「low-level-dev-skills（142 个、25 个分类）」。后者先选分类，再勾选该分类的技能；默认不勾选任何项。编号进入，`b`/`q` 返回上一级；安装完成或退出勾选列表后返回当前菜单，可继续选择其他分类。指定 `--category` 则直接打开过滤后的列表，完成后退出安装器。非交互安装须指定技能名或显式使用 `--all`。
 
-技能只在 `~/.agents/skills` 保留一份实体副本。Claude Code、Codex、Gemini、OpenCode、Grok Build、MiMo 和 Copilot 的技能目录使用指向它的符号链接。
+技能是**项目级**安装：必须用 `--project <目录>` 指定目标项目（仅 `categories` 与 `--help` 可省略）。实体副本放在 `<project>/.agents/skills/`，Gemini、OpenCode、MiMo 会从该目录自动发现；Claude Code、Codex、Grok Build、Copilot 的项目级 skills 目录用符号链接指向它。不再写入全局 `~/.agents/skills`，避免所有代理在每轮对话都扫描全部技能、浪费 token。`status` 与 `doctor` 用 `--project <目录>` 检查指定项目的技能（缺省当前目录）。
 
 ## 常用命令
 

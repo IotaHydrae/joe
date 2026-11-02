@@ -144,17 +144,17 @@ Add professional skill templates for AI assistants:
 - **low-level-dev-skills**: 142 low-level development skills across 25 categories
 
 ```bash
-./install.sh skills                # Skill group → category → checklist
-./install.sh skills list           # List skills and installation status
-./install.sh skills categories     # List categories and skill counts
-./install.sh skills install gdb    # Install GDB skill only
-./install.sh skills gdb            # Legacy syntax, same result
-./install.sh skills --category kernel-dev --tui  # Open the kernel driver category directly
+./install.sh skills --project /path/to/proj                # Skill group → category → checklist (into that project)
+./install.sh skills --project /path/to/proj list           # List skills and installation status for that project
+./install.sh skills categories                             # List categories and skill counts (no project needed)
+./install.sh skills --project /path/to/proj install gdb    # Install GDB skill into that project
+./install.sh skills --project /path/to/proj gdb            # Legacy syntax, same result
+./install.sh skills --project /path/to/proj --category kernel-dev --tui  # Open the kernel driver category directly
 ```
 
 The skills menu separates existing/local skills (8) from low-level-dev-skills (142 skills in 25 categories). Choose a category, then select individual skills; nothing is preselected. Enter a number to open a submenu; `b`/`q` goes back one level. Installing or leaving a checklist returns to the current menu so you can choose another category. With `--category`, the installer opens a filtered checklist directly and exits afterward. Non-interactive installation requires skill names or an explicit `--all`.
 
-The only real copy lives in `~/.agents/skills`. Claude Code, Codex, Gemini, OpenCode, Grok Build, MiMo, and Copilot skill directories are symlinks to that copy.
+Skills are installed **per project**: you must pass `--project <dir>` to choose the target (only `categories` and `--help` may omit it). The real copy lives at `<project>/.agents/skills/`, which Gemini, OpenCode, and MiMo discover automatically; Claude Code, Codex, Grok Build, and Copilot get project-level skill directories symlinked to it. Nothing is written to global `~/.agents/skills`, so agents no longer scan every skill in every session and waste tokens. `status` and `doctor` check a project's skills with `--project <dir>` (default: current directory).
 
 ## Common Commands
 

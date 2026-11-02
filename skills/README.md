@@ -9,10 +9,11 @@
 在仓库根目录按需安装：
 
 ```bash
-./install.sh skills engineering-embedded-linux-driver-engineer
+./install.sh skills --project <项目目录> engineering-embedded-linux-driver-engineer
 ```
 
-也可以运行 `./install.sh skills --tui`，进入「原有/本地技能」后勾选；默认不勾选任何技能。
+也可以运行 `./install.sh skills --project <项目目录> --tui`，进入「原有/本地技能」后勾选；默认不勾选任何技能。
+技能为项目级安装，必须显式指定 `--project <目录>`。
 
 ### low-level-dev-skills 技能集
 
@@ -21,11 +22,11 @@
 从仓库根目录按分类浏览或按技能名安装：
 
 ```bash
-./install.sh skills  # low-level-dev-skills → 分类 → 按需勾选
+./install.sh skills --project <项目目录>              # low-level-dev-skills → 分类 → 按需勾选
 ./install.sh skills --categories
-./install.sh skills --category kernel-dev --category kernel --tui
-./install.sh skills device-tree bus-drivers-i2c-spi gdb cross-gcc
-./install.sh skills --category kernel-dev --all  # 显式安装该分类全部技能
+./install.sh skills --project <项目目录> --category kernel-dev --category kernel --tui
+./install.sh skills --project <项目目录> device-tree bus-drivers-i2c-spi gdb cross-gcc
+./install.sh skills --project <项目目录> --category kernel-dev --all  # 显式安装该分类全部技能
 ```
 
 默认先选技能组，再进入 low-level-dev-skills 的分类子菜单，142 个技能按 25 个分类展示。编号进入，`b`/`q` 返回上一级；安装后或退出勾选列表后返回当前菜单。指定 `--category` 则直接打开过滤后的勾选列表，完成后退出安装器。
@@ -64,26 +65,27 @@ description: 一句话说明何时该用我 (代理先只看到这段, 要具体
 
 ## 安装位置
 
-`./install.sh skills` 会把技能复制到以下目录（按已安装的代理）：
+技能是**项目级**安装：必须用 `--project <目录>` 指定目标项目（`<project>` 替换为你的项目根路径），
+把技能复制到以下目录（按已安装的代理）：
 
 | 目录 | 归属 |
 |---|---|
-| `~/.agents/skills/` | 通用（跨工具约定） |
-| `~/.claude/skills/` | Claude Code |
-| `~/.codex/skills/` | Codex CLI |
-| `~/.config/mimocode/skills/` | MiMo Code（原生路径） |
-| `~/.copilot/skills/` | GitHub Copilot（目录存在时） |
+| `<project>/.agents/skills/` | 通用实体副本（Gemini / OpenCode / MiMo 自动发现） |
+| `<project>/.claude/skills/` | Claude Code（符号链接） |
+| `<project>/.codex/skills/` | Codex CLI（符号链接） |
+| `<project>/.grok/skills/` | Grok Build（符号链接） |
+| `<project>/.copilot/skills/` | GitHub Copilot（符号链接，目录存在时） |
 
-> MiMo Code 还会扫描 `~/.claude`、`~/.agents`、`~/.codex`、`~/.opencode` 下的 `skills/**/SKILL.md`，
-> 因此安装到这些目录即可同时被多个代理发现。
+> Gemini / OpenCode / MiMo 会从项目 `.agents/skills/` 自动发现技能，无需符号链接。
+> 不再写入全局 `~/.agents/skills`，避免代理在每轮对话都扫描全部技能、浪费 token。
 
 ## 添加新技能
 
 ```bash
 mkdir -p skills/<skill-name>
 $EDITOR skills/<skill-name>/SKILL.md
-../install.sh skills --list        # 确认已被识别
-../install.sh skills --tui          # 勾选安装
+../install.sh skills categories                  # 确认技能被识别
+../install.sh skills --project <项目目录> --tui    # 勾选安装到指定项目
 ```
 
 脚本是**幂等**的：内容有变化的技能会更新，未变化的跳过。

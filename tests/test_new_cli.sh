@@ -358,6 +358,11 @@ STUB
     assert_forward "skills --category 透传" "--category kernel-dev --tui" skills --category kernel-dev --tui
     assert_forward "skills --all 透传" "--all" skills --all
 
+    # 项目级: 动作词在 --project <dir> 之后时仍被识别为动作, 位置不变地透传
+    assert_forward "skills install --project 在动作前" "--project /p gdb" skills --project /p install gdb
+    assert_forward "skills list --project 在动作前" "--list --project /p" skills --project /p list
+    assert_forward "skills 位置技能 + --project" "--project /p gdb" skills --project /p gdb
+
     rm -f "$FWD_STUB"
 }
 
@@ -728,6 +733,48 @@ test_devtools_dispatch() {
     else
         test_fail "缺失模块未报错"
     fi
+}
+
+test_project_skills() {
+    test_info "测试项目级技能安装"
+
+    local box proj out rc
+    make_repo_box; box=$TMP_PATH
+    if ! cp -a "$ROOT_DIR/." "$box/"; then
+        test_fail "无法复制仓库到沙箱"
+        return
+    fi
+    proj="$box/home/proj"
+
+    # 安装/更新/列出必须 --project; 缺省时报错, 不再写入全局 ~/.agents/skills
+    rc=0
+    out=$(cd "$box" && HOME="$box/home" timeout 30 bash install.sh skills install gdb </dev/null 2>&1) || rc=$?
+    if [[ $out == *"需要 --project"* ]]; then
+        test_pass "skills 无 --project 时拒绝"
+    else
+        test_fail "skills 无 --project 未拒绝 (rc=$rc): $out"
+    fi
+
+    # 项目级安装: 实体副本在 <proj>/.agents/skills, 代理目录符号链接指向它
+    out=$(cd "$box" && HOME="$box/home" timeout 60 bash install.sh skills --project "$proj" gdb 2>&1) || true
+    if [ -f "$proj/.agents/skills/gdb/SKILL.md" ] \
+        && [ -L "$proj/.claude/skills/gdb" ] \
+        && [ "$(readlink -f "$proj/.claude/skills/gdb")" = "$(readlink -f "$proj/.agents/skills/gdb")" ] \
+        && [ ! -e "$box/home/.agents/skills" ]; then
+        test_pass "技能装进项目 .agents/skills, 代理目录符号链接, 未写全局"
+    else
+        test_fail "项目级安装结构不符: $(find "$proj" -maxdepth 3 2>/dev/null | tr '\n' ' ')"
+    fi
+
+    # 幂等重装: 内容未变则跳过
+    out=$(cd "$box" && HOME="$box/home" timeout 60 bash install.sh skills --project "$proj" gdb 2>&1) || true
+    if [[ $out == *"已是最新, 跳过"* ]]; then
+        test_pass "项目级技能幂等"
+    else
+        test_fail "项目级技能未幂等: $out"
+    fi
+
+    rm -rf "$box"
 }
 
 test_update_only() {
@@ -1113,6 +1160,7 @@ test_tools_list_version_failure
 test_repair_forwards_args
 test_ghostty_backup_convention
 test_devtools_dispatch
+test_project_skills
 test_update_only
 test_daily_app_packages
 test_qq_download_signing

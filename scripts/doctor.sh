@@ -9,6 +9,7 @@
 #   ./install.sh doctor --mcp        # 额外实际连接每个 MCP (慢, 每个约 10-30s)
 #   ./install.sh doctor --quiet      # 只输出问题项
 #   ./install.sh doctor --json       # 机器可读输出
+#   ./install.sh doctor --project <目录>  # 检查该项目的代理技能 (缺省 = 当前目录)
 #
 # 退出码: 0 = 无失败项, 1 = 有失败项(缺失/不可用)
 # 未安装的 AI CLI、桌面 AI 工具和未选择的 MCP 记为跳过, 不算失败。
@@ -35,13 +36,22 @@ fi
 CHECK_MCP_CONN=false
 QUIET=false
 JSON=false
-for a in "$@"; do
-    case "$a" in
-        --mcp)   CHECK_MCP_CONN=true ;;
-        --quiet) QUIET=true ;;
-        --json)  JSON=true ;;
+PROJECT_DIR="$PWD"
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --mcp)   CHECK_MCP_CONN=true; shift ;;
+        --quiet) QUIET=true; shift ;;
+        --json)  JSON=true; shift ;;
+        --project)
+            PROJECT_DIR="${2:-}"
+            if [ -z "$PROJECT_DIR" ]; then
+                echo "错误: --project 需要项目目录" >&2
+                exit 2
+            fi
+            shift 2
+            ;;
         -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-        *) echo "未知选项: $a" >&2; exit 2 ;;
+        *) echo "未知选项: $1" >&2; exit 2 ;;
     esac
 done
 
@@ -168,18 +178,15 @@ expected_skills() {
     done
 }
 
-# 代理端技能目录
+# 代理端技能目录 (项目级: 实体副本在 <project>/.agents/skills, 其余为符号链接)
 skill_dirs() {
-    find_bin claude >/dev/null 2>&1 && echo "$HOME/.claude/skills"
-    find_bin codex  >/dev/null 2>&1 && echo "$HOME/.codex/skills"
-    find_bin gemini >/dev/null 2>&1 && echo "$HOME/.gemini/skills"
-    find_bin opencode >/dev/null 2>&1 && echo "$HOME/.config/opencode/skills"
-    find_bin grok >/dev/null 2>&1 && echo "$HOME/.grok/skills"
-    find_bin mimo   >/dev/null 2>&1 && echo "$HOME/.config/mimocode/skills"
+    echo "$PROJECT_DIR/.agents/skills"
+    find_bin claude >/dev/null 2>&1 && echo "$PROJECT_DIR/.claude/skills"
+    find_bin codex  >/dev/null 2>&1 && echo "$PROJECT_DIR/.codex/skills"
+    find_bin grok   >/dev/null 2>&1 && echo "$PROJECT_DIR/.grok/skills"
     if find_bin copilot >/dev/null 2>&1 || [ -d "$HOME/.copilot" ]; then
-        echo "$HOME/.copilot/skills"
+        echo "$PROJECT_DIR/.copilot/skills"
     fi
-    echo "$HOME/.agents/skills"
     return 0
 }
 

@@ -5,29 +5,30 @@
 # 把 ./skills/<name>/SKILL.md 安装到各 AI 代理的 skills 目录。
 #
 # 用法:
-#   ./install.sh skills                # 技能组 → 分类 → 勾选, 默认不预选
-#   ./install.sh skills --tui          # 同上; 带 --category 时直接进入分类勾选
-#   ./install.sh skills --all          # 显式安装全部技能
-#   ./install.sh skills --list         # 列出技能及安装状态
-#   ./install.sh skills --categories   # 列出分类及技能数量
-#   ./install.sh skills --category kernel-dev --tui  # 按分类勾选, 可重复 --category
-#   ./install.sh skills --category kernel-dev --all  # 显式安装该分类全部技能
-#   ./install.sh skills <name> [...]   # 只装指定技能
-#   ./install.sh skills engineering-embedded-linux-driver-engineer  # 只装嵌入式驱动技能
+#   ./install.sh skills --project <dir>                # 技能组 → 分类 → 勾选 (安装到指定项目)
+#   ./install.sh skills --project <dir> --tui          # 同上; 带 --category 时直接进入分类勾选
+#   ./install.sh skills --project <dir> --all          # 显式安装全部技能到该项目
+#   ./install.sh skills --project <dir> --list         # 列出技能及安装状态
+#   ./install.sh skills --categories                   # 列出分类及技能数量 (无需项目)
+#   ./install.sh skills --project <dir> --category kernel-dev --tui  # 按分类勾选, 可重复 --category
+#   ./install.sh skills --project <dir> --category kernel-dev --all  # 显式安装该分类全部技能
+#   ./install.sh skills --project <dir> <name> [...]   # 只装指定技能到该项目
+#   ./install.sh skills --project <dir> engineering-embedded-linux-driver-engineer
 #
 # 新语法别名 (由 scripts/commands/skills.sh 转换, 行为与上面的旧写法一致):
-#   ./install.sh skills list                                  # = --list
-#   ./install.sh skills categories                            # = --categories
-#   ./install.sh skills install <name>                        # = <name>
-#   ./install.sh skills install --category kernel-dev --all   # = --category kernel-dev --all
+#   ./install.sh skills --project <dir> list                        # = --list
+#   ./install.sh skills categories                                  # = --categories
+#   ./install.sh skills --project <dir> install <name>              # = --project <dir> <name>
+#   ./install.sh skills --project <dir> install --category kernel-dev --all
 #
 # TUI 按键: ↑/↓ 移动, PgUp/PgDn 翻页, Home/End 首尾, 空格 勾选,
 #           a 全选, n 全不选, i 仅未装, 回车 开始, q 退出
 #
-# 安装位置:
-#   ~/.agents/skills/<name>/   唯一的实体副本
-#   其他已安装代理的 skills 目录放指向该副本的符号链接
-#   (Claude Code / Codex / Gemini / OpenCode / Grok Build / MiMo / 已安装的 Copilot)
+# 安装位置 (项目级, 必须显式指定 --project):
+#   <project>/.agents/skills/<name>/   唯一的实体副本
+#   (Gemini / OpenCode / MiMo 会从项目 .agents/skills/ 自动发现, 无需符号链接)
+#   其余已安装代理的项目级 skills 目录放指向该副本的符号链接:
+#   .claude/skills (Claude Code) / .codex/skills (Codex) / .grok/skills (Grok) / .copilot/skills (Copilot)
 #
 # 说明:
 #   - 默认菜单分为原有/本地技能和 low-level-dev-skills; 后者按分类进入勾选
@@ -37,7 +38,7 @@
 #   - --category 可与 --list/--tui/--all/技能名组合; 未分类的技能属于 local
 #   - 相关技能与系统工具不自动安装; 仅复制显式选择的技能目录
 #   - 幂等: 内容有变则更新, 无变化跳过
-#   - MiMo Code 也会扫描 ~/.claude、~/.agents、~/.codex 下的 skills, 故可复用
+#   - 安装/更新/列出均需 --project; 仅 --categories 与 --help 可省略
 # =============================================================================
 
 set -euo pipefail
@@ -47,6 +48,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILLS_SRC="$REPO_ROOT/skills"
 CATEGORY_FILTERS=()
 declare -A SKILL_CATEGORIES=()
+PROJECT_DIR=""
 
 # 多字节文本按"字符"处理 (POSIX locale 下 bash 按字节截断会切坏中文)
 if [ -z "${LC_ALL:-}" ]; then
@@ -93,16 +95,15 @@ _has_bin() {
 # ---------------------------------------------------------------------------
 # 目标目录 (按已安装的代理)
 # ---------------------------------------------------------------------------
+# 项目级目标目录: 实体副本固定放 <project>/.agents/skills (Gemini/OpenCode/MiMo 自动发现),
+# 其余代理的项目级 skills 目录 (Claude Code/Codex/Grok/Copilot) 用符号链接指向它。
 skill_targets() {
-    echo "$HOME/.agents/skills"                       # 通用, 总是装
-    _has_bin claude && echo "$HOME/.claude/skills"
-    _has_bin codex  && echo "$HOME/.codex/skills"
-    _has_bin gemini && echo "$HOME/.gemini/skills"
-    _has_bin opencode && echo "$HOME/.config/opencode/skills"
-    _has_bin grok && echo "$HOME/.grok/skills"
-    _has_bin mimo   && echo "$HOME/.config/mimocode/skills"
+    echo "$PROJECT_DIR/.agents/skills"                 # 通用实体副本, 总是装
+    _has_bin claude && echo "$PROJECT_DIR/.claude/skills"
+    _has_bin codex  && echo "$PROJECT_DIR/.codex/skills"
+    _has_bin grok   && echo "$PROJECT_DIR/.grok/skills"
     if _has_bin copilot || [ -d "$HOME/.copilot" ]; then
-        echo "$HOME/.copilot/skills"
+        echo "$PROJECT_DIR/.copilot/skills"
     fi
     return 0
 }
@@ -170,7 +171,7 @@ skill_field() {
 }
 
 canonical_skill_dir() {
-    printf '%s\n' "$HOME/.agents/skills/$1"
+    printf '%s\n' "$PROJECT_DIR/.agents/skills/$1"
 }
 
 # 实体副本与源一致, 且其他目标都是指向该副本的符号链接
@@ -181,7 +182,7 @@ skill_installed() {
     [ -f "$canon/SKILL.md" ] && diff -rq "$srcdir" "$canon" >/dev/null 2>&1 || return 1
     while IFS= read -r dir; do
         [ -n "$dir" ] || continue
-        [ "$dir" = "$HOME/.agents/skills" ] && continue
+        [ "$dir" = "$PROJECT_DIR/.agents/skills" ] && continue
         [ -L "$dir/$name" ] || return 1
         [ "$(readlink -f "$dir/$name")" = "$(readlink -f "$canon")" ] || return 1
     done < <(skill_targets)
@@ -226,7 +227,7 @@ install_skill() {
 
     while IFS= read -r dir; do
         [ -n "$dir" ] || continue
-        [ "$dir" = "$HOME/.agents/skills" ] && continue
+        [ "$dir" = "$PROJECT_DIR/.agents/skills" ] && continue
         dest="$dir/$name"
         if [ -L "$dest" ] && [ "$(readlink -f "$dest")" = "$(readlink -f "$canon")" ]; then
             continue
@@ -242,7 +243,7 @@ install_skill() {
     done < <(skill_targets)
 
     if [ "$updated" -gt 0 ]; then
-        ok "$name: 已安装/更新 (实体副本 ~/.agents/skills, 其余为符号链接)"
+        ok "$name: 已安装/更新 (实体副本 $PROJECT_DIR/.agents/skills, 其余为符号链接)"
     else
         info "$name: 已是最新, 跳过"
     fi
@@ -421,6 +422,9 @@ while [[ $# -gt 0 ]]; do
         --all)       ALL_MODE=true; shift ;;
         --list|-l)   LIST_MODE=true; shift ;;
         --categories) CATEGORIES_MODE=true; shift ;;
+        --project)
+            [ "$#" -ge 2 ] && [[ "$2" != -* ]] || die "--project 需要项目目录 (安装到该项目 .agents/skills)"
+            PROJECT_DIR="$2"; shift 2 ;;
         --category)
             [ "$#" -ge 2 ] && [[ "$2" != -* ]] || die "--category 需要分类名 (查看 --categories)"
             CATEGORY_FILTERS+=("$2"); shift 2 ;;
@@ -436,6 +440,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 $HELP_MODE && usage
+
+# 安装/更新/列出都需要 --project (项目级); 仅 --categories 与 --help 可省略。
+if [ -z "$PROJECT_DIR" ] && { $LIST_MODE || $ALL_MODE || $TUI_MODE || [ "${#TARGETS[@]}" -gt 0 ]; }; then
+    die "需要 --project <项目目录> (技能安装到项目级, 不再写入 ~/.agents/skills)"
+fi
+
 for category in "${CATEGORY_FILTERS[@]}"; do
     known=false
     for skill in local "${SKILL_CATEGORIES[@]}"; do
@@ -490,5 +500,7 @@ if $TUI_MODE; then
 fi
 
 [ "${#TARGETS[@]}" -gt 0 ] || die "没有要安装的技能"
+
+[ -n "$PROJECT_DIR" ] || die "需要 --project <项目目录> (技能安装到项目级, 不再写入 ~/.agents/skills)"
 
 install_selection "${TARGETS[@]}"
