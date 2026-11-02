@@ -868,9 +868,11 @@ test_mcp_config_write() {
     bin=$(mktemp -d)
     printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/npx"
     printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/claude"
-    chmod +x "$bin/npx" "$bin/claude"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/codex"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/mimo"
+    chmod +x "$bin/npx" "$bin/claude" "$bin/codex" "$bin/mimo"
 
-    # 隔离 HOME 与 PATH, 只保留桩 npx/claude, 避免写入宿主机真实配置
+    # 隔离 HOME 与 PATH, 只保留桩 npx/claude/codex/mimo, 避免写入宿主机真实配置
     out=$(HOME="$home" PATH="$bin:/usr/bin:/bin" FILESYSTEM_DIRS="/tmp" \
         timeout 30 bash scripts/install_mcp_servers.sh filesystem 2>&1) || true
 
@@ -878,9 +880,25 @@ test_mcp_config_write() {
         && grep -q '"filesystem"' "$home/.claude.json" \
         && grep -q '"command": "npx"' "$home/.claude.json" \
         && grep -q '@modelcontextprotocol/server-filesystem' "$home/.claude.json"; then
-        test_pass "filesystem MCP 写入 Claude 配置"
+        test_pass "filesystem MCP 写入 Claude 配置 (JSON)"
     else
-        test_fail "MCP 配置未按预期写入: $out"
+        test_fail "Claude 配置未按预期写入: $out"
+    fi
+
+    if [ -f "$home/.codex/config.toml" ] \
+        && grep -q '\[mcp_servers.filesystem\]' "$home/.codex/config.toml" \
+        && grep -q '@modelcontextprotocol/server-filesystem' "$home/.codex/config.toml"; then
+        test_pass "filesystem MCP 写入 Codex 配置 (TOML)"
+    else
+        test_fail "Codex TOML 配置不符: $(cat "$home/.codex/config.toml" 2>/dev/null)"
+    fi
+
+    if [ -f "$home/.config/mimocode/mimocode.jsonc" ] \
+        && grep -q '"filesystem"' "$home/.config/mimocode/mimocode.jsonc" \
+        && grep -q '@modelcontextprotocol/server-filesystem' "$home/.config/mimocode/mimocode.jsonc"; then
+        test_pass "filesystem MCP 写入 MiMo 配置 (JSONC)"
+    else
+        test_fail "MiMo JSONC 配置不符: $(cat "$home/.config/mimocode/mimocode.jsonc" 2>/dev/null)"
     fi
 
     # 重复安装幂等: 命令未变时标记 same, 配置不变
@@ -893,6 +911,54 @@ test_mcp_config_write() {
     fi
 
     rm -rf "$home" "$bin"
+}
+
+test_game_component_helpers() {
+    test_info "测试 obsidian/steam 组件辅助"
+
+    local out rc tmp bin
+    # obsidian_latest_tag: OBSIDIAN_VERSION 覆盖并校验格式
+    out=$(OBSIDIAN_VERSION=v9.9.9 bash -c 'source scripts/lib_github.sh; obsidian_latest_tag') || true
+    if [[ $out == v9.9.9 ]]; then
+        test_pass "obsidian_latest_tag 使用 OBSIDIAN_VERSION"
+    else
+        test_fail "obsidian 版本覆盖不符: $out"
+    fi
+
+    rc=0
+    out=$(OBSIDIAN_VERSION='bad tag' bash -c 'source scripts/lib_github.sh; obsidian_latest_tag' 2>/dev/null) || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        test_pass "obsidian_latest_tag 拒绝非法版本"
+    else
+        test_fail "非法版本未被拒绝: $out"
+    fi
+
+    # _obsidian_present: 仅 ~/.local/bin 存在时判定已安装 (PATH 置空排除宿主机)
+    local bash_bin
+    bash_bin="$(command -v bash)"
+    tmp=$(mktemp -d)
+    mkdir -p "$tmp/.local/bin"
+    printf '#!/bin/sh\n' > "$tmp/.local/bin/obsidian"
+    chmod +x "$tmp/.local/bin/obsidian"
+    rc=0
+    HOME="$tmp" PATH=/nonexistent "$bash_bin" -c 'source scripts/components/obsidian.sh; _obsidian_present' || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        test_pass "_obsidian_present 识别 ~/.local/bin"
+    else
+        test_fail "_obsidian_present 未识别 ~/.local/bin (rc=$rc, pwd=$(pwd))"
+    fi
+    rm -rf "$tmp"
+
+    # _steam_present: PATH 中的 steam 启动器 (/usr/games 由系统包提供)
+    bin=$(mktemp -d)
+    printf '#!/bin/sh\nexit 0\n' > "$bin/steam"
+    chmod +x "$bin/steam"
+    if PATH="$bin:/usr/bin:/bin" bash -c 'source scripts/components/steam.sh; _steam_present'; then
+        test_pass "_steam_present 识别 PATH 中的 steam"
+    else
+        test_fail "_steam_present 未识别 PATH 中的 steam"
+    fi
+    rm -rf "$bin"
 }
 
 test_daily_app_packages() {
@@ -1222,6 +1288,7 @@ test_devtools_dispatch
 test_project_skills
 test_update_only
 test_mcp_config_write
+test_game_component_helpers
 test_daily_app_packages
 test_qq_download_signing
 test_vendor_download_resume
