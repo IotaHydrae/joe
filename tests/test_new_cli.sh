@@ -860,6 +860,41 @@ STUB
     fi
 }
 
+test_mcp_config_write() {
+    test_info "测试 MCP 配置写入"
+
+    local home bin out
+    home=$(mktemp -d)
+    bin=$(mktemp -d)
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/npx"
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$bin/claude"
+    chmod +x "$bin/npx" "$bin/claude"
+
+    # 隔离 HOME 与 PATH, 只保留桩 npx/claude, 避免写入宿主机真实配置
+    out=$(HOME="$home" PATH="$bin:/usr/bin:/bin" FILESYSTEM_DIRS="/tmp" \
+        timeout 30 bash scripts/install_mcp_servers.sh filesystem 2>&1) || true
+
+    if [ -f "$home/.claude.json" ] \
+        && grep -q '"filesystem"' "$home/.claude.json" \
+        && grep -q '"command": "npx"' "$home/.claude.json" \
+        && grep -q '@modelcontextprotocol/server-filesystem' "$home/.claude.json"; then
+        test_pass "filesystem MCP 写入 Claude 配置"
+    else
+        test_fail "MCP 配置未按预期写入: $out"
+    fi
+
+    # 重复安装幂等: 命令未变时标记 same, 配置不变
+    out=$(HOME="$home" PATH="$bin:/usr/bin:/bin" FILESYSTEM_DIRS="/tmp" \
+        timeout 30 bash scripts/install_mcp_servers.sh filesystem 2>&1) || true
+    if [[ $out == *"已配置且命令未变, 跳过"* ]]; then
+        test_pass "重复安装 MCP 配置幂等"
+    else
+        test_fail "重复安装行为不明: $out"
+    fi
+
+    rm -rf "$home" "$bin"
+}
+
 test_daily_app_packages() {
     test_info "测试微信/QQ 安装包地址与校验"
 
@@ -1186,6 +1221,7 @@ test_ghostty_backup_convention
 test_devtools_dispatch
 test_project_skills
 test_update_only
+test_mcp_config_write
 test_daily_app_packages
 test_qq_download_signing
 test_vendor_download_resume
