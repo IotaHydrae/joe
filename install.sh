@@ -112,10 +112,16 @@ usage() {
 EOF
 }
 
-# info/ok/warn/die 由共享库提供
-_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/lib/log.sh
-. "$_ROOT_DIR/scripts/lib/log.sh"
+# info/ok/warn/die 优先用共享库; curl | bash 引导阶段仓库尚未克隆,
+# 此时退回最小定义, 保证 detect_command 的 die/info 可用。
+_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || pwd)"
+if [ -f "$_ROOT_DIR/scripts/lib/log.sh" ]; then
+    # shellcheck source=scripts/lib/log.sh
+    . "$_ROOT_DIR/scripts/lib/log.sh"
+else
+    die()  { printf '\033[0;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
+    info() { printf '\033[0;34m[INFO]\033[0m %s\n' "$*"; }
+fi
 
 # 检测命令类型和参数
 detect_command() {
