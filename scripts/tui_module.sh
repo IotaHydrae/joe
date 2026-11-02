@@ -94,6 +94,7 @@ if ! declare -F tui_component_installed >/dev/null 2>&1; then
             wechat)   command -v wechat >/dev/null 2>&1 || command -v wechat-universal >/dev/null 2>&1 ;;
             qq)       command -v qq >/dev/null 2>&1 || command -v linuxqq >/dev/null 2>&1 ;;
             rime)     rime_installation_ready ;;
+            obsidian) command -v obsidian >/dev/null 2>&1 || [ -x "$HOME/.local/bin/obsidian" ] ;;
             *)        return 1 ;;
         esac
     }
@@ -123,6 +124,7 @@ if ! declare -F tui_component_name >/dev/null 2>&1; then
             wechat)   echo "微信 Linux 原生版" ;;
             qq)       echo "Linux QQ" ;;
             rime)     echo "Rime 雾凇拼音输入法" ;;
+            obsidian) echo "Obsidian 个人知识库" ;;
             *)        echo "$1" ;;
         esac
     }

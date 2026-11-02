@@ -66,7 +66,7 @@ Main menu item 3 (development tools) uses the same numbered list as item 2 (dail
 - **Terminal**: Ghostty
 - **Game Engine**: Latest official stable Godot release (x86_64 / ARM64), verified with SHA-512; latest official stable Blender release (x86_64 / ARM64), verified with SHA-256 and registered in the desktop menu. Run `./install.sh tools install godot` or `blender` to install or upgrade; skips the download when already current
 - **Others**: MiMo Code, CC Switch
-- **Daily apps**: Brave Browser, ChatGPT Desktop, official Linux WeChat and QQ, Rime input method (rime-ice). Main menu item 2, or `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime`. Not included in `devtools --all`, `tools install --all`, or `quick-start --yes`
+- **Daily apps**: Brave Browser, ChatGPT Desktop, official Linux WeChat and QQ, Rime input method (rime-ice), Obsidian notes. Main menu item 2, or `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime` / `obsidian`. Not included in `devtools --all`, `tools install --all`, or `quick-start --yes`
 
 Linux QQ reads the package URL from the official configuration and requests a temporary signed download link from the official API before downloading, avoiding HTTP 403 on unsigned links. Installation stops if signing or validation fails.
 
@@ -259,6 +259,7 @@ The repair also updates `~/.local/bin/joe-ghostty`: each window starts a separat
 --wechat               # Install official Linux WeChat only
 --qq                   # Install official Linux QQ only
 --rime                 # Install/repair Rime (rime-ice), preserving personal dictionaries
+--obsidian             # Install Obsidian notes only (official .deb / AppImage; re-run to upgrade)
 ```
 
 Run `./install.sh tools install rime` again (or select Rime in main menu item 2) to repair an existing installation. It installs the Fcitx 5 GTK/Qt frontends and Rime Lua plugin, recompiles rime-ice, merges the input-method list and left Alt+Shift shortcuts, and selects Fcitx 5 through `im-config` when available. Personal dictionaries, other input methods, and unrelated environment variables are preserved. Changed configuration is backed up, keeping the latest five copies.

@@ -21,7 +21,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAIN_PROMPT = "选择 [1-11/q]: "
 TOOLS_PROMPT = "选择操作 [1-16/b]: "
-APPS_PROMPT = "选择操作 [1-6/b]: "
+APPS_PROMPT = "选择操作 [1-7/b]: "
 MCP_PROMPT = "选择操作 [1-9/b]: "
 FONTS_PROMPT = "选择操作 [1-3/b]: "
 TOOL_IDS = (

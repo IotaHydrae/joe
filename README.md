@@ -74,7 +74,7 @@ cd joe
 - **终端**：Ghostty
 - **游戏开发**：Godot 官方最新稳定版（x86_64 / ARM64），安装前校验 SHA-512；Blender 官方最新稳定版（x86_64 / ARM64），安装前校验 SHA-256，自动写入桌面菜单项。`./install.sh tools install godot` / `blender` 可安装或升级，已是最新时跳过下载
 - **其他**：MiMo Code、CC Switch
-- **日常软件**：Brave 浏览器、ChatGPT Desktop、微信 Linux 原生版、Linux QQ、Rime 雾凇拼音输入法。主菜单第 2 项，或 `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime`。不包含在 `devtools --all`、`tools install --all` 和 `quick-start --yes` 中
+- **日常软件**：Brave 浏览器、ChatGPT Desktop、微信 Linux 原生版、Linux QQ、Rime 雾凇拼音输入法、Obsidian 笔记。主菜单第 2 项，或 `./install.sh tools install brave` / `chatgpt` / `wechat` / `qq` / `rime` / `obsidian`。不包含在 `devtools --all`、`tools install --all` 和 `quick-start --yes` 中
 
 Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名接口获取临时链接，避免未签名链接返回 HTTP 403。签名获取或验证失败时会中止安装。
 
@@ -261,6 +261,7 @@ Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名�
 --wechat               # 只装微信 Linux 原生版
 --qq                   # 只装 Linux QQ
 --rime                 # 安装/修复 Rime 雾凇拼音, 保留个人词库
+--obsidian             # 只装 Obsidian 笔记 (官方 .deb / AppImage, 重跑可升级)
 ```
 
 重复运行 `./install.sh tools install rime`（或主菜单第 2 项选择 Rime）会修复已有安装：补齐 Fcitx 5 的 GTK/Qt 前端和 Rime Lua 插件，重新编译雾凇，合并输入法列表与左 Alt+Shift 快捷键，并通过 `im-config`（可用时）选择 Fcitx 5。保留个人词库、其他输入法和无关环境变量；变更前备份配置，保留最近 5 份。

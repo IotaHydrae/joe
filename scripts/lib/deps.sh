@@ -35,10 +35,11 @@ declare -A COMPONENT_DEPS=(
     [wechat]=""
     [qq]=""
     [rime]=""
+    [obsidian]=""
 )
 
 # 日常软件列表 (主菜单日常软件项管理, 不作为开发工具列出)
-DAILY_IDS=(brave chatgpt wechat qq rime)
+DAILY_IDS=(brave chatgpt wechat qq rime obsidian)
 
 # 组件分组定义 (仅包含开发工具)
 declare -A COMPONENT_GROUPS=(
@@ -78,6 +79,7 @@ declare -A COMPONENT_NAMES=(
     [wechat]="微信"
     [qq]="QQ"
     [rime]="Rime 雾凇拼音"
+    [obsidian]="Obsidian"
 )
 
 # 列表与 TUI 共用的分组顺序和标题
@@ -255,6 +257,9 @@ is_installed() {
             ;;
         rime)
             rime_installation_ready
+            ;;
+        obsidian)
+            command -v obsidian >/dev/null 2>&1 || [ -x "$HOME/.local/bin/obsidian" ]
             ;;
         *)
             return 1

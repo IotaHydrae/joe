@@ -71,6 +71,25 @@ ccswitch_latest_tag() {
     printf '%s\n' "$tag"
 }
 
+# Obsidian 发布标签。OBSIDIAN_VERSION 可覆盖 (须为 vX.Y.Z 形式的 tag)。
+obsidian_latest_tag() {
+    local tag
+    if [ -n "${OBSIDIAN_VERSION:-}" ]; then
+        tag="$OBSIDIAN_VERSION"
+    else
+        command -v python3 >/dev/null 2>&1 || return 1
+        tag="$(curl -fsSL --connect-timeout 15 --max-time 30 \
+            https://api.github.com/repos/obsidianmd/obsidian-releases/releases/latest \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))')" || return 1
+    fi
+    case "$tag" in
+        *[!a-zA-Z0-9._-]*) return 1 ;;
+        v[0-9]*) ;;
+        *) return 1 ;;
+    esac
+    printf '%s\n' "$tag"
+}
+
 # 经 GitHub 镜像下载 (部分网络下直连 GitHub releases 会中途截断)
 # 用法: github_mirror_download <完整GitHub URL> <输出文件> [重试次数] [超时秒数]
 github_mirror_download() {

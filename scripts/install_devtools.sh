@@ -30,6 +30,7 @@
 #   ./install.sh devtools --wechat   # 只装微信 Linux 原生版
 #   ./install.sh devtools --qq       # 只装 Linux QQ
 #   ./install.sh devtools --rime     # 安装/修复 Rime 雾凇拼音, 保留个人词库
+#   ./install.sh devtools --obsidian # 只装 Obsidian 笔记 (官方 .deb / AppImage, 重跑可升级)
 #   ./install.sh devtools --tui      # 交互式勾选界面 (TUI)
 #   ./install.sh devtools --list     # 列出可安装组件
 #   ./install.sh devtools --check    # 只报告本机适配情况 (发行版/包名解析/安装方式), 不做改动
@@ -51,7 +52,7 @@
 #   - Rime 修复会重启当前会话输入法; 已打开的应用需重开以加载 GTK 输入法模块
 #   - 所有需要外网下载的步骤都尊重 https_proxy/http_proxy 环境变量
 #   - 系统包名按发行版自动映射 (apt/dnf/pacman/zypper)
-#   - brave, chatgpt, wechat, qq, rime 为日常软件, 位于主菜单第 2 项, --all 时默认跳过
+#   - brave, chatgpt, wechat, qq, rime, obsidian 为日常软件, 位于主菜单第 2 项, --all 时默认跳过
 #   - Godot 从官方 latest release 获取稳定版并校验 SHA-512, 重跑 --godot 可升级
 #   - Blender 从官方 release 获取最新稳定版并校验 SHA-256, 重跑 --blender 可升级, 自动写入桌面菜单项
 #   - QQ 下载前实时获取官方临时签名; 签名失败时中止安装
@@ -72,10 +73,10 @@ INSTALL_ALL=false
 TUI_MODE=false
 
 # 安装顺序也是依赖顺序: node 必须先于依赖它的 AI CLI。
-COMPONENT_ORDER=(node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot blender wechat qq rime)
+COMPONENT_ORDER=(node python claude codex gemini opencode copilot grok zed ghostty vscode brave mimo chatgpt ccswitch godot blender wechat qq rime obsidian)
 
 # 日常软件 (不属于开发工具, --all 时跳过; 走主菜单第 2 项或显式 --<id> 参数安装)
-DAILY_IDS=(brave chatgpt wechat qq rime)
+DAILY_IDS=(brave chatgpt wechat qq rime obsidian)
 is_daily_app() {
     local id="$1" d
     for d in "${DAILY_IDS[@]}"; do
@@ -254,6 +255,7 @@ cmd_check() {
         pacman) printf '  %-12s %s\n' ccswitch "AppImage + fuse2" ;;
         dnf|zypper) printf '  %-12s %s\n' ccswitch "官方 .rpm" ;;
     esac
+    printf '  %-12s %s\n' obsidian "官方 .deb (apt) / AppImage (~/.local/bin, 其他)"
     printf '  %-12s %s\n' node   "Node LTS (nvm 仅在安装时使用, 日常只设置 PATH)"
     printf '  %-12s %s\n' python "pyenv (需构建依赖)"
     printf '  %-12s %s\n' claude "官方安装脚本, 失败时回退 npm"
@@ -306,7 +308,7 @@ HAS_ARGS=false
 [ "$#" -gt 0 ] && HAS_ARGS=true
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --node|--python|--claude|--codex|--gemini|--opencode|--copilot|--grok|--zed|--ghostty|--vscode|--brave|--mimo|--chatgpt|--ccswitch|--godot|--blender|--wechat|--qq|--rime)
+        --node|--python|--claude|--codex|--gemini|--opencode|--copilot|--grok|--zed|--ghostty|--vscode|--brave|--mimo|--chatgpt|--ccswitch|--godot|--blender|--wechat|--qq|--rime|--obsidian)
             WANT[${1#--}]=1; shift ;;
         --ai)       WANT[claude]=1; WANT[codex]=1; shift ;;
         --all)      INSTALL_ALL=true; shift ;;
