@@ -181,7 +181,8 @@ PYENV
     run_zsh -i -c 'print -r -- JOE_ZSH_OK' > "$ZSH_BOX/runtime.out"
     assert_clean_startup "$ZSH_BOX/zsh-runtime.err" "优化后的启动产生错误"
     [[ $(cat "$ZSH_LOG") == $'omz\np10k\np10k-config\nfzf-completion\nfzf-bindings\ncustom\nautosuggestions\nhighlighting' ]] || fail "组件重复加载、顺序错误或启动时加载了 nvm/pyenv: $(cat "$ZSH_LOG")"
-    grep -qx JOE_ZSH_OK "$ZSH_BOX/runtime.out" || fail "交互式 shell 启动失败"
+    # compinit 的"不安全目录"提示会与后续输出拼在同一行, 故用子串匹配
+    grep -q 'JOE_ZSH_OK' "$ZSH_BOX/runtime.out" || fail "交互式 shell 启动失败"
     : > "$ZSH_LOG"
     run_zsh -i -c 'nvm --version; nvm --version; pyenv --version' > "$ZSH_BOX/runtime.out"
     [[ $(grep -c '^nvm-init$' "$ZSH_LOG") -eq 1 ]] || fail "nvm 按需初始化未只执行一次"
@@ -215,7 +216,7 @@ if command -v zsh >/dev/null 2>&1; then
     : > "$ZSH_LOG"
     run_zsh -i -c 'print -r -- JOE_BARE_OK' > "$ZSH_BOX/runtime.out"
     assert_clean_startup "$ZSH_BOX/zsh-runtime.err" "可选组件缺失时启动报错"
-    grep -qx JOE_BARE_OK "$ZSH_BOX/runtime.out" || fail "可选组件缺失时无法启动"
+    grep -q 'JOE_BARE_OK' "$ZSH_BOX/runtime.out" || fail "可选组件缺失时无法启动"
     [[ ! -s "$ZSH_LOG" ]] || fail "--no-p10k 仍加载了 instant prompt 缓存"
 fi
 
