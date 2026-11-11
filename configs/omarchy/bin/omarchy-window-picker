@@ -38,7 +38,21 @@ fi
 if (( picker_list_only != 3 )); then
     picker_clients=$(hyprctl -j clients)
     picker_active=$(hyprctl -j activewindow | jq -r '.address // ""')
-    picker_windows=$(jq -c --arg active "$picker_active" '
+    # Feishu currently omits its native Wayland app id. Confirm its executable
+    # before supplying the installed desktop id; a matching title is not enough.
+    picker_known_apps=()
+    while IFS=$'\t' read -r picker_address picker_pid; do
+        [[ $picker_address =~ ^0x[0-9a-fA-F]+$ && $picker_pid =~ ^[1-9][0-9]{0,9}$ ]] || continue
+        picker_executable=$(readlink -f -- "/proc/$picker_pid/exe") || continue
+        if [[ $picker_executable == /opt/bytedance/feishu/feishu ]]; then
+            picker_known_apps+=("$picker_address")
+        fi
+    done < <(jq -r '.[] | select((.class // "") == "") | [.address, (.pid | tostring)] | @tsv' <<<"$picker_clients")
+    picker_known_json='[]'
+    if (( ${#picker_known_apps[@]} > 0 )); then
+        picker_known_json=$(printf '%s\n' "${picker_known_apps[@]}" | jq -R . | jq -s .)
+    fi
+    picker_windows=$(jq -c --arg active "$picker_active" --argjson feishu "$picker_known_json" '
         # Fullwidth punctuation prevents rich-text interpretation in menu widgets.
         # Flatten control characters so a title cannot create extra menu rows.
         def safe_text:
@@ -79,6 +93,11 @@ if (( picker_list_only != 3 )); then
             | (if $title == "" then $location else "\($title) · \($location)" end) as $detail
             | {
                 address: $window.address,
+                appId: ($window.class // ""),
+                initialAppId: ($window.initialClass // ""),
+                desktopId: (if $feishu | index($window.address) then "bytedance-feishu" else "" end),
+                label: $label,
+                detail: $detail,
                 value: ($label + "\t" + $detail),
                 option: ("▣\t" + $label + "\t" + $detail)
               }

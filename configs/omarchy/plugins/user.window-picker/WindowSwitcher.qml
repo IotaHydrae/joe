@@ -1,9 +1,9 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import "file:/usr/share/omarchy/shell/plugins/menu" as Stock
+import "file:/usr/share/omarchy/shell/services" as StockServices
 
-// Reuse Omarchy's menu, theme, search, pointer handling, and keyboard navigation.
+// Keep the Alt-held session logic separate from the themed window list.
 Item {
   id: root
   property var shell: null
@@ -19,6 +19,23 @@ Item {
   property bool accepted: false
   property bool showReady: false
   property bool loaded: false
+
+  StockServices.AppLibrary { id: appLibrary }
+
+  function decorate(window, index) {
+    var entry = null
+    var ids = [window.desktopId, window.appId, window.initialAppId]
+    for (var i = 0; i < ids.length && !entry; i++) {
+      if (typeof ids[i] === "string" && ids[i].length <= 512 && ids[i])
+        entry = DesktopEntries.heuristicLookup(ids[i])
+    }
+    // Desktop icons resolve through the local application library. Unmatched
+    // windows receive a themed generic icon, never a URL from a window title.
+    return Object.assign({}, window, {
+      label: entry ? String(index + 1) + ". " + appLibrary.entryName(entry) : window.label,
+      iconSource: appLibrary.iconSource(entry && entry.icon ? entry.icon : "application-x-executable")
+    })
+  }
 
   function open(payloadJson) {
     var p
@@ -68,8 +85,7 @@ Item {
         finish(windows[index].value)
       }
     } else if (showReady && !menu.opened) {
-      menu.openDmenu({ mode: "select", prompt: "切换窗口：搜索名称或标题",
-        options: windows.map(function(w) { return w.option }), width: 640, maxHeight: 620 })
+      menu.openWindows(windows)
       menu.select(Number(steps))
     }
   }
@@ -86,13 +102,15 @@ Item {
   function close() {
     closed = true
     delay.stop()
-    menu.cancel()
+    menu.opened = false
+    menu.filterText = ""
   }
 
   function status() {
     return JSON.stringify({session: session, serial: serial, steps: steps, closed: closed,
       opened: menu.opened, selected: menu.selectedIndex, filter: menu.filterText,
-      addresses: windows.map(function(w) { return w.address })})
+      addresses: windows.map(function(w) { return w.address }),
+      icons: windows.map(function(w) { return { address: w.address, source: w.iconSource } })})
   }
 
   Timer { id: delay; interval: 150; onTriggered: { root.showReady = true; root.settle() } }
@@ -110,17 +128,15 @@ Item {
       if (code !== 0 || !Array.isArray(rows)) { root.close(); return }
       root.windows = root.addresses.map(function(a) {
         return rows.find(function(w) { return w.address === a })
-      }).filter(function(w) { return !!w })
+      }).filter(function(w) { return !!w }).map(root.decorate)
       root.loaded = true
       root.settle()
     }
   }
 
-  Stock.Menu {
+  WindowList {
     id: menu
-    shell: root.shell
-    omarchyPath: root.omarchyPath
-    // All click, search/Enter, cancellation, and Alt-release paths meet here.
-    function finishRequest(value) { root.finish(value) }
+    onChosen: function(value) { root.finish(value) }
+    onCancelled: root.close()
   }
 }

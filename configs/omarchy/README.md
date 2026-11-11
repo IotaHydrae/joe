@@ -12,7 +12,7 @@
 | `hypr/hyprland-snippet.lua` | 上述三个模块在主配置中各自的加载位置 |
 | `bin/omarchy-window-picker` | 提供窗口列表、JSON 数据和按地址聚焦，保留独立搜索菜单入口 |
 | `hypr/window-picker-bindings.lua` | Alt+Tab 快速切回最近窗口，按住时循环选择、松开 Alt 确认 |
-| `plugins/user.window-picker/` | 复用 Omarchy 菜单组件显示按住 Alt 时的延迟窗口列表 |
+| `plugins/user.window-picker/` | 按住 Alt 时显示带应用图标的窗口列表，沿用 Omarchy 的主题基础组件 |
 | `plugins/lsp.dock/` | 复用系统 Dock 外观组件，补齐飞书缺失的 Wayland 应用标识匹配 |
 | `bin/omarchy-feishu-window-map` | 根据窗口 PID 对应的可执行文件确认飞书窗口，供 Dock 兼容插件使用 |
 | `hypr/cursor-no-warp.lua` | 切换窗口、工作区及特殊工作区时保持鼠标位置 |
@@ -77,9 +77,9 @@ Hyprland 在同一工作区仍只给前台窗口原生内部最大化/全屏状�
 
 ## 可选：Alt+Tab 窗口切换器
 
-短按 **Alt+Tab** 会切回最近使用的上一个窗口。按住 Alt 超过 **150 ms** 会显示窗口列表；继续按 **Tab** 选下一项，**Shift+Tab** 选上一项，松开 **Alt** 确认切换。列表按最近使用顺序排列，当前窗口放在后面。该快捷键用于按住 Alt 循环、松开确认。需要按应用名或标题搜索时，单独运行无参数的 `omarchy-window-picker`，无需按住 Alt：在搜索菜单中按 **Enter** 或点击条目选择，**Esc** 先清空已有搜索，再按 **Esc** 取消。取消不改变当前窗口焦点。
+短按 **Alt+Tab** 会切回最近使用的上一个窗口。按住 Alt 超过 **150 ms** 会显示窗口列表；继续按 **Tab** 选下一项，**Shift+Tab** 选上一项，松开 **Alt** 确认切换。列表显示应用图标，应用名称与窗口标题、工作区信息分两行排列；没有匹配图标时使用通用应用图标。列表仍按最近使用顺序排列，当前窗口放在后面。需要单独按应用名或标题搜索时，运行无参数的 `omarchy-window-picker`，无需按住 Alt：该入口保留原来的文字搜索菜单，按 **Enter** 或点击条目选择，**Esc** 先清空已有搜索，再按 **Esc** 取消。取消不改变当前窗口焦点。
 
-切换器使用独立的 `user.window-picker` 插件复用 Omarchy 菜单组件，不替换正常系统菜单，也不需要安装新的软件依赖。从仓库根目录备份并安装脚本、Lua 绑定模块和插件目录：
+切换器使用独立的 `user.window-picker` 插件。`WindowList.qml` 复用 Omarchy 的 `OverlayWindow`、`FilterInput` 等主题基础组件，文字按纯文本显示，不替换正常系统菜单，也不需要安装新的软件依赖。图标从已安装应用的桌面入口解析；飞书没有上报应用标识时，脚本先确认 `/proc/<PID>/exe` 指向 `/opt/bytedance/feishu/feishu`，再关联飞书图标，不依赖 Dock 兼容插件的辅助脚本。从仓库根目录备份并安装脚本、Lua 绑定模块和整个插件目录：
 
 ```bash
 omarchy_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -89,12 +89,16 @@ omarchy_plugin_dir="$omarchy_config_dir/omarchy/plugins/user.window-picker"
 omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
 mkdir -p "$omarchy_bin_dir" "$omarchy_hypr_dir" "$(dirname -- "$omarchy_plugin_dir")"
 for omarchy_target in "$omarchy_bin_dir/omarchy-window-picker" \
-    "$omarchy_hypr_dir/window-picker-bindings.lua" "$omarchy_hypr_dir/bindings.lua" \
-    "$omarchy_plugin_dir"; do
+    "$omarchy_hypr_dir/window-picker-bindings.lua" "$omarchy_hypr_dir/bindings.lua"; do
     if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
         cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
     fi
 done
+if [[ -e "$omarchy_plugin_dir" || -L "$omarchy_plugin_dir" ]]; then
+    omarchy_plugin_backup="$omarchy_config_dir/omarchy/plugin-backups/user.window-picker.bak.$omarchy_backup_stamp"
+    mkdir -p "$(dirname -- "$omarchy_plugin_backup")"
+    cp -a -- "$omarchy_plugin_dir" "$omarchy_plugin_backup"
+fi
 install -m 755 -- configs/omarchy/bin/omarchy-window-picker \
     "$omarchy_bin_dir/omarchy-window-picker"
 install -m 644 -- configs/omarchy/hypr/window-picker-bindings.lua \
@@ -117,9 +121,11 @@ omarchy plugin enable user.window-picker
 require("hypr.window-picker-bindings")
 ```
 
-若仍有旧版直接调用脚本的三行绑定（`local window_picker` 及两条 `o.rebind`），删除那三行后再加载此模块，避免重复绑定。运行 `hyprctl reload` 和 `hyprctl configerrors` 后生效。
+若仍有旧版直接调用脚本的三行绑定（`local window_picker` 及两条 `o.rebind`），删除那三行后再加载此模块，避免重复绑定。运行 `hyprctl reload` 和 `hyprctl configerrors` 后生效。若插件更新后仍显示缓存的旧列表，运行一次 `omarchy restart shell`，无需重启应用或系统。
 
-脚本仍支持 `omarchy-window-picker --list` 查看窗口列表；`--json` 输出插件使用的窗口数据，`--focus ADDRESS` 聚焦指定窗口地址。直接运行 `omarchy-window-picker` 仍会打开独立搜索菜单。
+脚本仍支持 `omarchy-window-picker --list` 查看窗口列表，保留原来的文字格式；`--json` 输出插件使用的窗口数据，包括图标匹配所需的 `appId`、`initialAppId`、`desktopId` 和显示用的 `label`、`detail`；`--focus ADDRESS` 聚焦指定窗口地址。直接运行 `omarchy-window-picker` 仍会打开独立文字搜索菜单。
+
+图标列表已通过显示检查，覆盖 Brave、飞书、CC Switch、ChatGPT 等应用。切换检查通过快速切回、正反向选择、松开 Alt 确认、搜索回车、取消和延迟事件处理；辅助脚本检查保留 MRU 顺序、原文字列表格式及标题纯文本处理。
 
 撤销时从 `bindings.lua` 删除该模块加载及残留旧版三行绑定，运行 `omarchy plugin disable user.window-picker`，再执行 `hyprctl reload` 和 `hyprctl configerrors`。Omarchy 默认的 Alt+Tab / Shift+Alt+Tab 循环切换会恢复。确认没有其它引用后，可删除脚本、Lua 模块及 `~/.config/omarchy/plugins/user.window-picker` 目录。
 

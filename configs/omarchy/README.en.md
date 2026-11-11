@@ -12,7 +12,7 @@ These files preserve window fixes for Omarchy floating workspaces and a ChatGPT 
 | `hypr/hyprland-snippet.lua` | Show each of the three modules' positions in the main configuration |
 | `bin/omarchy-window-picker` | Provide window lists, JSON data, and focus by address; retain a standalone search menu |
 | `hypr/window-picker-bindings.lua` | Quickly return to the recent window, cycle while Alt is held, and confirm on release |
-| `plugins/user.window-picker/` | Reuse Omarchy's menu component for a delayed window list while Alt is held |
+| `plugins/user.window-picker/` | Show application icons in the held-Alt window list using Omarchy's themed base components |
 | `plugins/lsp.dock/` | Reuse the system Dock visuals while matching Feishu windows with missing Wayland application identities |
 | `bin/omarchy-feishu-window-map` | Verify Feishu windows through their PID executable for the Dock compatibility plugin |
 | `hypr/cursor-no-warp.lua` | Keep the pointer in place when switching windows, workspaces, and special workspaces |
@@ -77,9 +77,9 @@ Latest validation with Feishu, CC Switch, ChatGPT, and Chromium passed 22 checks
 
 ## Optional: Alt+Tab window switcher
 
-A quick **Alt+Tab** returns to the previously used window. Hold Alt for more than **150 ms** to show the window list; press **Tab** again to select the next item or **Shift+Tab** for the previous item, then release **Alt** to confirm. Windows are ordered by recent use, with the current window placed last. This shortcut uses held-Alt cycling and release-to-confirm. For application-name/title search, run `omarchy-window-picker` separately without arguments or holding Alt: use **Enter** or click an item to confirm in that search menu. **Esc** first clears an existing query; press **Esc** again to cancel. Cancellation keeps the current window focused.
+A quick **Alt+Tab** returns to the previously used window. Hold Alt for more than **150 ms** to show the window list; press **Tab** again to select the next item or **Shift+Tab** for the previous item, then release **Alt** to confirm. Each row shows an application icon, with the application name and window title/workspace information on two lines. Unmatched applications use a generic icon. Windows remain ordered by recent use, with the current window placed last. For a separate application-name/title search, run `omarchy-window-picker` without arguments or holding Alt: that entry retains the original text search menu. Use **Enter** or click an item to confirm, **Esc** to clear an existing query, then **Esc** again to cancel. Cancellation keeps the current window focused.
 
-The separate `user.window-picker` plugin reuses Omarchy's menu component without replacing the normal system menu or requiring additional software dependencies. From the repository root, back up existing files and install the helper script, Lua bindings module, and plugin directory:
+The separate `user.window-picker` plugin uses `WindowList.qml`, which reuses Omarchy's `OverlayWindow`, `FilterInput`, and other themed base components. Text is rendered as plain text. It does not replace the normal system menu or require additional software dependencies. Icons are resolved from installed desktop entries. When Feishu omits its application identity, the script first verifies that `/proc/<PID>/exe` resolves to `/opt/bytedance/feishu/feishu` before associating its icon; this does not depend on the Dock compatibility helper. From the repository root, back up existing files and install the helper script, Lua bindings module, and whole plugin directory:
 
 ```bash
 omarchy_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -89,12 +89,16 @@ omarchy_plugin_dir="$omarchy_config_dir/omarchy/plugins/user.window-picker"
 omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
 mkdir -p "$omarchy_bin_dir" "$omarchy_hypr_dir" "$(dirname -- "$omarchy_plugin_dir")"
 for omarchy_target in "$omarchy_bin_dir/omarchy-window-picker" \
-    "$omarchy_hypr_dir/window-picker-bindings.lua" "$omarchy_hypr_dir/bindings.lua" \
-    "$omarchy_plugin_dir"; do
+    "$omarchy_hypr_dir/window-picker-bindings.lua" "$omarchy_hypr_dir/bindings.lua"; do
     if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
         cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
     fi
 done
+if [[ -e "$omarchy_plugin_dir" || -L "$omarchy_plugin_dir" ]]; then
+    omarchy_plugin_backup="$omarchy_config_dir/omarchy/plugin-backups/user.window-picker.bak.$omarchy_backup_stamp"
+    mkdir -p "$(dirname -- "$omarchy_plugin_backup")"
+    cp -a -- "$omarchy_plugin_dir" "$omarchy_plugin_backup"
+fi
 install -m 755 -- configs/omarchy/bin/omarchy-window-picker \
     "$omarchy_bin_dir/omarchy-window-picker"
 install -m 644 -- configs/omarchy/hypr/window-picker-bindings.lua \
@@ -117,9 +121,11 @@ Add this line once at the end of the existing `hypr/bindings.lua`, keeping other
 require("hypr.window-picker-bindings")
 ```
 
-If the old three direct-script binding lines remain (`local window_picker` and two `o.rebind` calls), remove them before loading this module to avoid duplicate bindings. Run `hyprctl reload` and `hyprctl configerrors` to apply.
+If the old three direct-script binding lines remain (`local window_picker` and two `o.rebind` calls), remove them before loading this module to avoid duplicate bindings. Run `hyprctl reload` and `hyprctl configerrors` to apply. If a plugin update still shows the cached old list, run `omarchy restart shell` once; applications and the system do not need restarting.
 
-The helper still supports `omarchy-window-picker --list` for a window list. `--json` outputs the plugin's window data, and `--focus ADDRESS` focuses a specified window address. Running `omarchy-window-picker` without arguments still opens the standalone search menu.
+The helper still supports `omarchy-window-picker --list` with its original text format. `--json` outputs the plugin's window data, including `appId`, `initialAppId`, and `desktopId` for icon matching, plus `label` and `detail` for display. `--focus ADDRESS` focuses a specified window address. Running `omarchy-window-picker` without arguments still opens the standalone text search menu.
+
+Visual checks confirmed icons for Brave, Feishu, CC Switch, ChatGPT, and other applications. Switching checks passed quick return, forward/backward selection, Alt-release confirmation, search/Enter, cancellation, and delayed-event handling. Helper checks preserve MRU order, the original text-list format, and plain-text title handling.
 
 To undo, remove the module load and any old three-line direct bindings from `bindings.lua`, run `omarchy plugin disable user.window-picker`, then run `hyprctl reload` and `hyprctl configerrors`. Omarchy's default Alt+Tab / Shift+Alt+Tab cycling will return. Once unreferenced, the script, Lua module, and `~/.config/omarchy/plugins/user.window-picker` directory can be removed.
 
