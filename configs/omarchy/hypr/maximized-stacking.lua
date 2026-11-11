@@ -216,3 +216,25 @@ for _, window in ipairs(hl.get_windows()) do
   end
 end
 queue_focus(hl.get_active_window())
+
+-- Explicit user restores must also work while a different window owns the
+-- workspace's native fullscreen state. Clear memory before unsetting it so
+-- the replacement detector cannot mistake this request for a focus change.
+local M = {}
+function M.restore(window)
+  if not supported(window) then
+    return
+  end
+  local normal = read_rectangle(window, NORMAL_RECT)
+  pending_restore[window.address] = nil
+  remember(window, 0)
+  write_rectangle(window, NORMAL_RECT, nil)
+  write_rectangle(window, EXPANDED_RECT, nil)
+  if window.fullscreen ~= 0 then
+    hl.dispatch(hl.dsp.window.fullscreen({
+      mode = window.fullscreen == 1 and "maximized" or "fullscreen", action = "unset", window = window,
+    }))
+  end
+  apply_rectangle(window, normal)
+end
+return M

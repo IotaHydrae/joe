@@ -14,6 +14,9 @@
 | `hypr/window-picker-bindings.lua` | Alt+Tab 快速切回最近窗口，按住时循环选择、松开 Alt 确认 |
 | `plugins/user.window-picker/` | 复用 Omarchy 菜单组件显示按住 Alt 时的延迟窗口列表 |
 | `hypr/cursor-no-warp.lua` | 切换窗口、工作区及特殊工作区时保持鼠标位置 |
+| `hypr/mint-window-controls.lua` | Mint/Cinnamon 风格的锁屏、窗口、贴边、文件管理器和系统菜单快捷键 |
+| `hypr/show-desktop.lua` | 显示当前普通浮动工作区的桌面，再按还原本模块隐藏的窗口 |
+| `shell-taskbar-snippet.json` | 内置底部 Dock 自动隐藏设置合并参考，不能替换整份 `shell.json` |
 | `hypr/monitors.example.lua` | 本机 eDP-1 的 125% 缩放与 `GDK_SCALE=1` 示例，需按硬件调整 |
 | `applications/chatgpt.desktop` | 使用原生 Wayland 启动 ChatGPT Desktop |
 
@@ -117,6 +120,75 @@ require("hypr.window-picker-bindings")
 脚本仍支持 `omarchy-window-picker --list` 查看窗口列表；`--json` 输出插件使用的窗口数据，`--focus ADDRESS` 聚焦指定窗口地址。直接运行 `omarchy-window-picker` 仍会打开独立搜索菜单。
 
 撤销时从 `bindings.lua` 删除该模块加载及残留旧版三行绑定，运行 `omarchy plugin disable user.window-picker`，再执行 `hyprctl reload` 和 `hyprctl configerrors`。Omarchy 默认的 Alt+Tab / Shift+Alt+Tab 循环切换会恢复。确认没有其它引用后，可删除脚本、Lua 模块及 `~/.config/omarchy/plugins/user.window-picker` 目录。
+
+## 可选：Mint/Cinnamon 快捷键
+
+Super 为 Windows 徽标键。这组设置保留已有 Alt+Tab 切换器及其它个人绑定，仅替换表中冲突的默认快捷键：
+
+| 快捷键 | 动作 |
+|---|---|
+| Super+L | 锁屏，替换原来的布局切换 |
+| Ctrl+Alt+Delete | 打开系统菜单，替换原来的关闭所有窗口 |
+| Alt+F4 | 关闭当前窗口 |
+| Super+E | 打开现有 Nautilus 文件管理器 |
+| Super+D | 显示当前普通 Floating 工作区的桌面，再按还原 |
+| Super+左/右 | 当前浮动窗口贴到工作区左半屏/右半屏 |
+| Super+上/下 | 最大化/还原当前浮动窗口 |
+| Super+Ctrl+Alt+方向键 | 保留原来的方向聚焦操作 |
+| Super+Ctrl+Alt+L、Super+Alt+L | 分别向前、向后切换工作区布局 |
+
+方向键窗口操作只处理普通 Floating 工作区中的非固定浮动窗口，忽略输入法候选窗口；Tiling 和 Scrolling 中可使用备用方向聚焦键。贴边和最大化根据显示器当前预留区域计算空间，包括状态栏和其它面板。Super+D 只隐藏当前普通 Floating 工作区的窗口，不处理其它工作区、固定窗口或原本已最小化的窗口；再次按下只还原本模块隐藏且仍由它管理的窗口，并恢复原焦点与窗口状态。
+
+先按前文安装窗口修正。本模块需要本次更新的 `maximized-stacking.lua` 提供独立还原接口；已有旧版本时也要一并更新。然后在仓库根目录执行：
+
+```bash
+omarchy_hypr_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
+omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
+mkdir -p "$omarchy_hypr_dir"
+for omarchy_module in maximized-stacking mint-window-controls show-desktop; do
+    omarchy_target="$omarchy_hypr_dir/$omarchy_module.lua"
+    if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
+        cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
+    fi
+    install -m 644 -- "configs/omarchy/hypr/$omarchy_module.lua" "$omarchy_target"
+done
+cp -a -- "$omarchy_hypr_dir/bindings.lua" \
+    "$omarchy_hypr_dir/bindings.lua.bak.$omarchy_backup_stamp"
+```
+
+在现有 `hypr/bindings.lua` 末尾只添加一次下面一行，保留现有绑定和 Alt+Tab 模块；`show-desktop` 由它按需加载，不再添加单独的绑定或加载行：
+
+```lua
+require("hypr.mint-window-controls")
+```
+
+主配置仍按前文在默认 toggles 后加载 `hypr.maximized-stacking`。运行 `hyprctl reload` 和 `hyprctl configerrors` 应没有错误。锁屏和系统菜单的键位已替换，测试时不要误用原来的布局切换或关闭全部窗口操作。
+
+已用临时窗口验证左右半屏和原尺寸还原、两个最大化窗口独立还原、从最大化贴边、显示桌面及重载后恢复、保留独立最小化窗口、退出真正全屏，以及 Alt+F4 只关闭当前窗口；这些操作中鼠标位置保持不变。锁屏、系统菜单和文件管理器的绑定目标已静态核对。
+
+撤销前，在使用过 Super+D 的各工作区再次按它，还原隐藏窗口；再从 `bindings.lua` 删除 `require("hypr.mint-window-controls")`，运行 `hyprctl reload` 和 `hyprctl configerrors`。默认 Super+L、Ctrl+Alt+Delete 和方向聚焦绑定会恢复。确认没有其它引用后，可删除 `mint-window-controls.lua` 和 `show-desktop.lua`；`maximized-stacking.lua` 若仍用于前文窗口修正，应保留。若安装前已有同名个人快捷键，从备份恢复对应绑定。
+
+## 可选：底部 Dock 自动隐藏
+
+使用 Omarchy 内置 Dock，采用底部自动隐藏的方式：平时让出桌面空间，鼠标移到底部图标栏所在边缘时显示，移开后收起。窗口最大化时仍可从底部唤出；真正全屏时隐藏。固定应用、运行中应用切换、应用网格、右键菜单、拖拽排序和最小化窗口恢复沿用内置行为，顶部状态栏保持原布局。
+
+先备份现有配置，再通过内置命令合并 [`shell-taskbar-snippet.json`](shell-taskbar-snippet.json) 的两个设置：
+
+```bash
+omarchy_shell_config="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json"
+omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
+if [[ -e "$omarchy_shell_config" || -L "$omarchy_shell_config" ]]; then
+    cp -a -- "$omarchy_shell_config" "$omarchy_shell_config.bak.$omarchy_backup_stamp"
+fi
+omarchy dock position bottom
+omarchy dock autohide on
+```
+
+这些命令保留现有固定应用列表、其它插件和顶部栏设置。不要用片段覆盖整份 `shell.json`，也无需安装自定义 Dock 插件。设置会即时加载；自动隐藏的 Dock 不预留底部窗口工作区。
+
+本机已确认使用内置 `omarchy.dock`、底部位置和自动隐藏设置，底部预留为 **0 个逻辑像素**。
+
+撤销时用 `omarchy dock position <原位置>` 和 `omarchy dock autohide <on|off>` 恢复安装前的两个值；只还原这两个字段，保留后来修改的其它配置。
 
 ## 可选：切换时保持鼠标位置
 

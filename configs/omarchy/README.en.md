@@ -14,6 +14,9 @@ These files preserve window fixes for Omarchy floating workspaces and a ChatGPT 
 | `hypr/window-picker-bindings.lua` | Quickly return to the recent window, cycle while Alt is held, and confirm on release |
 | `plugins/user.window-picker/` | Reuse Omarchy's menu component for a delayed window list while Alt is held |
 | `hypr/cursor-no-warp.lua` | Keep the pointer in place when switching windows, workspaces, and special workspaces |
+| `hypr/mint-window-controls.lua` | Mint/Cinnamon-style lock, window, snapping, file-manager, and system-menu shortcuts |
+| `hypr/show-desktop.lua` | Show the current ordinary floating workspace's desktop, then restore the windows hidden by this module |
+| `shell-taskbar-snippet.json` | Built-in bottom Dock auto-hide settings to merge; not a replacement for the full `shell.json` |
 | `hypr/monitors.example.lua` | Hardware-specific example: eDP-1 at 125% and `GDK_SCALE=1` |
 | `applications/chatgpt.desktop` | Launch ChatGPT Desktop through native Wayland |
 
@@ -117,6 +120,75 @@ If the old three direct-script binding lines remain (`local window_picker` and t
 The helper still supports `omarchy-window-picker --list` for a window list. `--json` outputs the plugin's window data, and `--focus ADDRESS` focuses a specified window address. Running `omarchy-window-picker` without arguments still opens the standalone search menu.
 
 To undo, remove the module load and any old three-line direct bindings from `bindings.lua`, run `omarchy plugin disable user.window-picker`, then run `hyprctl reload` and `hyprctl configerrors`. Omarchy's default Alt+Tab / Shift+Alt+Tab cycling will return. Once unreferenced, the script, Lua module, and `~/.config/omarchy/plugins/user.window-picker` directory can be removed.
+
+## Optional: Mint/Cinnamon shortcuts
+
+Super is the Windows logo key. These settings retain the existing Alt+Tab switcher and other personal bindings, replacing only the conflicting default shortcuts shown below:
+
+| Shortcut | Action |
+|---|---|
+| Super+L | Lock the screen, replacing the former layout cycle |
+| Ctrl+Alt+Delete | Open the system menu, replacing close-all-windows |
+| Alt+F4 | Close the current window |
+| Super+E | Open the existing Nautilus file manager |
+| Super+D | Show the current ordinary Floating workspace's desktop; press again to restore |
+| Super+Left/Right | Snap the current floating window to the left/right half of the work area |
+| Super+Up/Down | Maximize/restore the current floating window |
+| Super+Ctrl+Alt+arrow | Retain directional window focus on an alternate shortcut |
+| Super+Ctrl+Alt+L, Super+Alt+L | Cycle workspace layouts forward and backward respectively |
+
+Arrow-key window operations handle unpinned floating windows on ordinary Floating workspaces and ignore input-method candidate windows. Use the alternate directional-focus shortcuts in Tiling and Scrolling. Snapping and maximization use the monitor's current reserved work area, including the status bar and other panels. Super+D hides only the current ordinary Floating workspace's windows, excluding other workspaces, pinned windows, and windows already minimized. Pressing it again restores only the windows it hid and still manages, including their previous focus and window states.
+
+Install the window fixes above first. This module requires the updated `maximized-stacking.lua` and its independent restore interface, so update that file even if an older version is already installed. Then run from the repository root:
+
+```bash
+omarchy_hypr_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
+omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
+mkdir -p "$omarchy_hypr_dir"
+for omarchy_module in maximized-stacking mint-window-controls show-desktop; do
+    omarchy_target="$omarchy_hypr_dir/$omarchy_module.lua"
+    if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
+        cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
+    fi
+    install -m 644 -- "configs/omarchy/hypr/$omarchy_module.lua" "$omarchy_target"
+done
+cp -a -- "$omarchy_hypr_dir/bindings.lua" \
+    "$omarchy_hypr_dir/bindings.lua.bak.$omarchy_backup_stamp"
+```
+
+Add this line once at the end of the existing `hypr/bindings.lua`, keeping existing bindings and the Alt+Tab module. It loads `show-desktop` when needed; do not add another binding or load for that module:
+
+```lua
+require("hypr.mint-window-controls")
+```
+
+The main configuration must still load `hypr.maximized-stacking` after the default toggles, as described above. Run `hyprctl reload` and `hyprctl configerrors`; there should be no errors. The lock and system-menu keys replace former actions, so do not invoke them expecting layout cycling or close-all-windows during testing.
+
+Disposable windows verified left/right snapping and normal-size restoration, independent restoration of two maximized windows, snapping from maximized state, showing/restoring the desktop across a config reload, leaving independently minimized windows hidden, exiting true fullscreen, and Alt+F4 closing only the active window. The pointer stayed fixed during these operations. Lock, system-menu, and file-manager binding targets were checked statically.
+
+To undo, first press Super+D again on each workspace where it hid windows. Remove `require("hypr.mint-window-controls")` from `bindings.lua`, then run `hyprctl reload` and `hyprctl configerrors`. Default Super+L, Ctrl+Alt+Delete, and directional-focus bindings return. Once unreferenced, remove `mint-window-controls.lua` and `show-desktop.lua`. Retain `maximized-stacking.lua` if it still provides the window fixes above. If personal shortcuts existed before installation, restore their corresponding bindings from the backup.
+
+## Optional: auto-hiding bottom Dock
+
+Use Omarchy's built-in Dock at the bottom with auto-hide enabled. It leaves desktop space free until the pointer reaches the bottom edge beneath its icon strip, then hides after the pointer leaves. It remains available from that edge when windows are maximized and stays hidden during true fullscreen. Pinned applications, running-app switching, the application grid, context menus, drag reordering, and minimized-window restoration keep their built-in behavior. The top status bar retains its layout.
+
+Back up the existing configuration, then use the built-in commands to merge the two settings from [`shell-taskbar-snippet.json`](shell-taskbar-snippet.json):
+
+```bash
+omarchy_shell_config="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/shell.json"
+omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
+if [[ -e "$omarchy_shell_config" || -L "$omarchy_shell_config" ]]; then
+    cp -a -- "$omarchy_shell_config" "$omarchy_shell_config.bak.$omarchy_backup_stamp"
+fi
+omarchy dock position bottom
+omarchy dock autohide on
+```
+
+These commands retain existing Dock pins, other plugins, and top-bar settings. Do not replace the full `shell.json` with the fragment; no custom Dock plugin is needed. Settings reload immediately, and an auto-hiding Dock reserves no bottom window work area.
+
+This machine was confirmed to use the built-in `omarchy.dock`, bottom placement, and auto-hide, with a bottom reservation of **0 logical pixels**.
+
+To undo, use `omarchy dock position <previous-position>` and `omarchy dock autohide <on|off>` to restore the previous two values. Restore only those fields, preserving other configuration changes made later.
 
 ## Optional: keep the pointer in place
 
