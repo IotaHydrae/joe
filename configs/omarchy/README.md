@@ -13,6 +13,8 @@
 | `bin/omarchy-window-picker` | 提供窗口列表、JSON 数据和按地址聚焦，保留独立搜索菜单入口 |
 | `hypr/window-picker-bindings.lua` | Alt+Tab 快速切回最近窗口，按住时循环选择、松开 Alt 确认 |
 | `plugins/user.window-picker/` | 复用 Omarchy 菜单组件显示按住 Alt 时的延迟窗口列表 |
+| `plugins/lsp.dock/` | 复用系统 Dock 外观组件，补齐飞书缺失的 Wayland 应用标识匹配 |
+| `bin/omarchy-feishu-window-map` | 根据窗口 PID 对应的可执行文件确认飞书窗口，供 Dock 兼容插件使用 |
 | `hypr/cursor-no-warp.lua` | 切换窗口、工作区及特殊工作区时保持鼠标位置 |
 | `hypr/mint-window-controls.lua` | Mint/Cinnamon 风格的锁屏、窗口、贴边、文件管理器和系统菜单快捷键 |
 | `hypr/show-desktop.lua` | 显示当前普通浮动工作区的桌面，再按还原本模块隐藏的窗口 |
@@ -184,11 +186,65 @@ omarchy dock position bottom
 omarchy dock autohide on
 ```
 
-这些命令保留现有固定应用列表、其它插件和顶部栏设置。不要用片段覆盖整份 `shell.json`，也无需安装自定义 Dock 插件。设置会即时加载；自动隐藏的 Dock 不预留底部窗口工作区。
+这些命令保留现有固定应用列表、其它插件和顶部栏设置。不要用片段覆盖整份 `shell.json`。自动隐藏本身无需自定义插件；需要识别飞书空应用标识窗口时，再安装下一节的兼容插件。设置会即时加载；自动隐藏的 Dock 不预留底部窗口工作区。
 
-本机已确认使用内置 `omarchy.dock`、底部位置和自动隐藏设置，底部预留为 **0 个逻辑像素**。
+底部自动隐藏设置已确认不会预留底部窗口空间，即 **0 个逻辑像素**；下一节的飞书兼容插件沿用相同设置。
 
 撤销时用 `omarchy dock position <原位置>` 和 `omarchy dock autohide <on|off>` 恢复安装前的两个值；只还原这两个字段，保留后来修改的其它配置。
+
+## 可选：飞书 Dock 兼容修正
+
+部分飞书原生 Wayland 窗口没有上报应用标识，系统 Dock 会将其过滤；本机的 `--class=bytedance-feishu` 启动参数未能修复该问题。此修正使用 `lsp.dock` 用户副本保留 Dock 的外观与操作，仅补充缺失标识的飞书窗口匹配。入口复用系统的 `DockWindow`、应用网格和 Dock 模型组件，不修改 `/usr/share/omarchy` 中的文件。
+
+辅助脚本读取 Hyprland 窗口列表，只在应用标识为空且 `/proc/<PID>/exe` 指向 `/opt/bytedance/feishu/feishu` 时确认飞书身份；插件同时核对窗口地址和 PID，不依赖窗口标题。已安装的飞书入口应为 `bytedance-feishu.desktop`。此修正保留现有底部自动隐藏、固定应用列表及其它插件，不会自动将飞书固定到 Dock。
+
+从仓库根目录备份并安装：
+
+```bash
+omarchy_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
+omarchy_bin_dir="$HOME/.local/bin"
+omarchy_plugin_dir="$omarchy_config_dir/omarchy/plugins/lsp.dock"
+omarchy_shell_config="$omarchy_config_dir/omarchy/shell.json"
+omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
+mkdir -p "$omarchy_bin_dir" "$(dirname -- "$omarchy_plugin_dir")"
+for omarchy_target in "$omarchy_bin_dir/omarchy-feishu-window-map" \
+    "$omarchy_shell_config"; do
+    if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
+        cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
+    fi
+done
+if [[ -e "$omarchy_plugin_dir" || -L "$omarchy_plugin_dir" ]]; then
+    omarchy_plugin_backup="$omarchy_config_dir/omarchy/plugin-backups/lsp.dock.bak.$omarchy_backup_stamp"
+    mkdir -p "$(dirname -- "$omarchy_plugin_backup")"
+    cp -a -- "$omarchy_plugin_dir" "$omarchy_plugin_backup"
+fi
+install -m 755 -- configs/omarchy/bin/omarchy-feishu-window-map \
+    "$omarchy_bin_dir/omarchy-feishu-window-map"
+mkdir -p "$omarchy_plugin_dir"
+cp -a -- configs/omarchy/plugins/lsp.dock/. "$omarchy_plugin_dir/"
+omarchy plugin validate "$omarchy_plugin_dir"
+omarchy-shell shell rescanPlugins
+omarchy plugin list
+```
+
+等待列表发现 `lsp.dock`，然后启用：
+
+```bash
+omarchy plugin enable lsp.dock
+```
+
+插件清单的 `clonedFrom: "omarchy.dock"` 使 Omarchy 将原 Dock 切换到用户副本；不要同时启用两个 Dock，也不要覆盖整份 `shell.json`。若仍加载缓存的旧组件，运行一次 `omarchy restart shell`，无需重启飞书或系统。升级 Omarchy 后，应确认此入口与系统 Dock 组件仍兼容。
+
+本机已验证飞书在运行列表中显示、Dock 激活动作切回已有窗口，以及最小化后从 Dock 恢复；切换时鼠标保持原位，仍只有一个 Dock 表面。辅助脚本和模型检查覆盖无关进程、伪造标题、地址/PID 不匹配和无效输入。可运行 `omarchy-shell user.feishu-dock status` 查看识别结果。
+
+撤销时执行以下命令，保留现有 Dock 位置、自动隐藏和固定应用设置：
+
+```bash
+omarchy plugin disable lsp.dock
+omarchy plugin enable omarchy.dock
+```
+
+确认已使用系统 Dock 后，可删除用户 `lsp.dock` 目录和 `~/.local/bin/omarchy-feishu-window-map`；若仍看到旧组件，运行一次 `omarchy restart shell`。
 
 ## 可选：切换时保持鼠标位置
 

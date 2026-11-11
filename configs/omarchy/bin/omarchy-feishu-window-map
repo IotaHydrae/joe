@@ -1,0 +1,28 @@
+#!/bin/bash
+set -euo pipefail
+
+# Resolve only missing application identities, using the process executable
+# rather than a window title that any application can choose.
+clients=$(hyprctl -j clients)
+candidates=$(jq -er '
+    if type != "array" then error("expected client list") else . end |
+    [.[] | select((.class // "") == "") | [.address, (.pid | tostring)] | @tsv] |
+    join("\n")
+' <<<"$clients")
+
+verified=()
+while IFS=$'\t' read -r address pid; do
+    [[ $address =~ ^0x[0-9a-fA-F]+$ && $pid =~ ^[1-9][0-9]{0,9}$ ]] || continue
+    executable=$(readlink -f -- "/proc/$pid/exe") || continue
+    [[ $executable == /opt/bytedance/feishu/feishu ]] || continue
+    verified+=("${address#0x}"$'\t'"$pid")
+done <<<"$candidates"
+
+if (( ${#verified[@]} == 0 )); then
+    printf '{}\n'
+else
+    printf '%s\n' "${verified[@]}" | jq -Rn '
+        [inputs | split("\t") | {key: (.[0] | ascii_downcase), value: (.[1] | tonumber)}] |
+        from_entries
+    '
+fi

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "lsp.dock",
+  "name": "Dock (Feishu compatibility)",
+  "version": "1.0.0",
+  "author": "Omarchy",
+  "description": "Recognize Feishu Wayland windows missing an application id; reuse the built-in dock UI",
+  "kinds": [
+    "service"
+  ],
+  "entryPoints": {
+    "service": "Dock.qml"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.dock"
+  }
+}

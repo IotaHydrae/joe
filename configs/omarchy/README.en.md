@@ -13,6 +13,8 @@ These files preserve window fixes for Omarchy floating workspaces and a ChatGPT 
 | `bin/omarchy-window-picker` | Provide window lists, JSON data, and focus by address; retain a standalone search menu |
 | `hypr/window-picker-bindings.lua` | Quickly return to the recent window, cycle while Alt is held, and confirm on release |
 | `plugins/user.window-picker/` | Reuse Omarchy's menu component for a delayed window list while Alt is held |
+| `plugins/lsp.dock/` | Reuse the system Dock visuals while matching Feishu windows with missing Wayland application identities |
+| `bin/omarchy-feishu-window-map` | Verify Feishu windows through their PID executable for the Dock compatibility plugin |
 | `hypr/cursor-no-warp.lua` | Keep the pointer in place when switching windows, workspaces, and special workspaces |
 | `hypr/mint-window-controls.lua` | Mint/Cinnamon-style lock, window, snapping, file-manager, and system-menu shortcuts |
 | `hypr/show-desktop.lua` | Show the current ordinary floating workspace's desktop, then restore the windows hidden by this module |
@@ -184,11 +186,65 @@ omarchy dock position bottom
 omarchy dock autohide on
 ```
 
-These commands retain existing Dock pins, other plugins, and top-bar settings. Do not replace the full `shell.json` with the fragment; no custom Dock plugin is needed. Settings reload immediately, and an auto-hiding Dock reserves no bottom window work area.
+These commands retain existing Dock pins, other plugins, and top-bar settings. Do not replace the full `shell.json` with the fragment. Auto-hide itself needs no custom plugin; install the next section's compatibility plugin only to recognize Feishu windows with empty application identities. Settings reload immediately, and an auto-hiding Dock reserves no bottom window work area.
 
-This machine was confirmed to use the built-in `omarchy.dock`, bottom placement, and auto-hide, with a bottom reservation of **0 logical pixels**.
+Bottom auto-hide was confirmed to reserve **0 logical pixels** of bottom window work area. The Feishu compatibility plugin below uses the same settings.
 
 To undo, use `omarchy dock position <previous-position>` and `omarchy dock autohide <on|off>` to restore the previous two values. Restore only those fields, preserving other configuration changes made later.
+
+## Optional: Feishu Dock compatibility
+
+Some native Wayland Feishu windows report no application identity and are filtered out by the system Dock. The `--class=bytedance-feishu` launch argument did not fix that behavior on this machine. This fix uses a `lsp.dock` user copy to retain the Dock's appearance and operations while adding identity matching for those Feishu windows. Its entry reuses the system `DockWindow`, application grid, and Dock model components without modifying files under `/usr/share/omarchy`.
+
+The helper reads Hyprland's client list and identifies Feishu only when the application identity is empty and `/proc/<PID>/exe` resolves to `/opt/bytedance/feishu/feishu`. The plugin cross-checks window address and PID instead of matching window titles. The installed Feishu desktop entry must be `bytedance-feishu.desktop`. This fix retains existing bottom auto-hide, pinned applications, and other plugins; it does not automatically pin Feishu.
+
+Back up and install from the repository root:
+
+```bash
+omarchy_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
+omarchy_bin_dir="$HOME/.local/bin"
+omarchy_plugin_dir="$omarchy_config_dir/omarchy/plugins/lsp.dock"
+omarchy_shell_config="$omarchy_config_dir/omarchy/shell.json"
+omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
+mkdir -p "$omarchy_bin_dir" "$(dirname -- "$omarchy_plugin_dir")"
+for omarchy_target in "$omarchy_bin_dir/omarchy-feishu-window-map" \
+    "$omarchy_shell_config"; do
+    if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
+        cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
+    fi
+done
+if [[ -e "$omarchy_plugin_dir" || -L "$omarchy_plugin_dir" ]]; then
+    omarchy_plugin_backup="$omarchy_config_dir/omarchy/plugin-backups/lsp.dock.bak.$omarchy_backup_stamp"
+    mkdir -p "$(dirname -- "$omarchy_plugin_backup")"
+    cp -a -- "$omarchy_plugin_dir" "$omarchy_plugin_backup"
+fi
+install -m 755 -- configs/omarchy/bin/omarchy-feishu-window-map \
+    "$omarchy_bin_dir/omarchy-feishu-window-map"
+mkdir -p "$omarchy_plugin_dir"
+cp -a -- configs/omarchy/plugins/lsp.dock/. "$omarchy_plugin_dir/"
+omarchy plugin validate "$omarchy_plugin_dir"
+omarchy-shell shell rescanPlugins
+omarchy plugin list
+```
+
+Wait until `lsp.dock` is discovered, then enable it:
+
+```bash
+omarchy plugin enable lsp.dock
+```
+
+The manifest's `clonedFrom: "omarchy.dock"` tells Omarchy to switch from the original Dock to the user copy. Do not enable both Docks simultaneously or overwrite the full `shell.json`. If the old component remains cached, run `omarchy restart shell` once; Feishu and the system do not need restarting. After upgrading Omarchy, confirm this entry still works with the system Dock components.
+
+Live checks confirmed that running Feishu appears in the Dock model, activation focuses its existing window, and activation restores it after minimizing. The pointer stayed fixed and exactly one Dock surface remained loaded. Helper and model checks cover unrelated processes, spoofed titles, address/PID mismatches, and invalid input. Run `omarchy-shell user.feishu-dock status` to inspect identity matching.
+
+To undo, run these commands while retaining existing Dock position, auto-hide, and pins:
+
+```bash
+omarchy plugin disable lsp.dock
+omarchy plugin enable omarchy.dock
+```
+
+Once the system Dock is in use, remove the user `lsp.dock` directory and `~/.local/bin/omarchy-feishu-window-map` if desired. Run `omarchy restart shell` once if an old component remains visible.
 
 ## Optional: keep the pointer in place
 
