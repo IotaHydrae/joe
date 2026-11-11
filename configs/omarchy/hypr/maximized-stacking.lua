@@ -1,8 +1,10 @@
--- Keep independent maximize choices on Omarchy floating workspaces. Hyprland
--- gives only one window native maximization at a time; remember the others and
--- restore their native maximization when they regain focus. A window tag keeps
--- this choice across config reloads without changing application protocols.
-local MAXIMIZED_TAG = "user-remembered-maximized"
+-- Keep each window's maximize/fullscreen choice on floating workspaces.
+-- Hyprland gives only one window native fullscreen state at a time. Tags
+-- preserve the others' choices, including across config reloads.
+local MODE_TAGS = {
+  [1] = "user-remembered-maximized",
+  [2] = "user-remembered-fullscreen",
+}
 local opening = {}
 local pending_restore = {}
 
@@ -17,15 +19,27 @@ end
 
 local function supported(window)
   return window and window.mapped and window.workspace and window.workspace.id >= 1
-    and window.floating and not window.pinned and window.fullscreen_handler == "default"
+    and not window.pinned and window.fullscreen_handler == "default"
     and window.title ~= "Fcitx5 Input Window" and tagged(window, "omarchy-floating-workspace")
 end
 
-local function remember(window, maximized)
-  if tagged(window, MAXIMIZED_TAG) ~= maximized then
-    hl.dispatch(hl.dsp.window.tag({
-      tag = (maximized and "+" or "-") .. MAXIMIZED_TAG, window = window,
-    }))
+local function remembered_mode(window)
+  for mode = 2, 1, -1 do
+    if tagged(window, MODE_TAGS[mode]) then
+      return mode
+    end
+  end
+  return 0
+end
+
+local function remember(window, mode)
+  for value, tag in pairs(MODE_TAGS) do
+    local enabled = value == mode
+    if tagged(window, tag) ~= enabled then
+      hl.dispatch(hl.dsp.window.tag({
+        tag = (enabled and "+" or "-") .. tag, window = window,
+      }))
+    end
   end
 end
 
@@ -36,20 +50,22 @@ local function queue_focus(window)
   local address = window.address
   hl.timer(function()
     local active = hl.get_active_window()
-    if not supported(active) or active.address ~= address or active.fullscreen == 2
-      or pending_restore[address] then
+    if not supported(active) or active.address ~= address or pending_restore[address] then
       return
     end
 
-    if active.fullscreen == 0 and tagged(active, MAXIMIZED_TAG) then
-      hl.dispatch(hl.dsp.window.fullscreen({ mode = "maximized", action = "set", window = active }))
+    local mode = remembered_mode(active)
+    if active.fullscreen == 0 and mode ~= 0 then
+      hl.dispatch(hl.dsp.window.fullscreen({
+        mode = mode == 2 and "fullscreen" or "maximized", action = "set", window = active,
+      }))
     end
-    if active.fullscreen ~= 1 then
+    if active.fullscreen == 0 then
       return
     end
 
     -- A focused floating window can retain permission to cover maximized
-    -- windows. Clear that permission when returning to a maximized window.
+    -- windows. Clear it when returning to either kind of fullscreen state.
     local windows = hl.get_workspace_windows(tostring(active.workspace.id))
     for index = #windows, 1, -1 do
       local other = windows[index]
@@ -67,11 +83,11 @@ hl.on("window.fullscreen", function(window)
     return
   end
   local address = window.address
-  if window.fullscreen == 1 then
+  if MODE_TAGS[window.fullscreen] then
     pending_restore[address] = nil
-    remember(window, true)
+    remember(window, window.fullscreen)
     queue_focus(window)
-  elseif window.fullscreen == 0 and tagged(window, MAXIMIZED_TAG) then
+  elseif window.fullscreen == 0 and remembered_mode(window) ~= 0 then
     -- Replacement first restores the old window, then maximizes the new one.
     -- Inspect the completed transition to distinguish that from a user restore.
     local request = {}
@@ -87,12 +103,14 @@ hl.on("window.fullscreen", function(window)
       end
       local replaced = opening[current.workspace.id] ~= nil
       for _, other in ipairs(hl.get_workspace_windows(tostring(current.workspace.id))) do
-        if other.address ~= address and other.fullscreen == 1 then
+        if other.address ~= address and other.fullscreen ~= 0 then
           replaced = true
           break
         end
       end
-      remember(current, replaced)
+      if not replaced then
+        remember(current, 0)
+      end
     end, { type = "oneshot", timeout = 1 })
   end
 end)
@@ -104,11 +122,17 @@ hl.on("window.open", function(window)
     or not tagged(window, "omarchy-floating-workspace") then
     return
   end
-  -- Omarchy also restores an existing maximized window when an app opens.
-  -- Keep its remembered choice; the new app can still appear in front normally.
+  -- Omarchy restores an existing maximized window when an app opens. Keep its
+  -- choice while allowing the new app to appear in front normally.
   local workspace = window.workspace.id
   local request = {}
   opening[workspace] = request
+  -- Initial fullscreen/active events precede window.open and the workspace
+  -- tag. Read the completed open state so newly launched apps are covered too.
+  if supported(window) and MODE_TAGS[window.fullscreen] then
+    remember(window, window.fullscreen)
+  end
+  queue_focus(window)
   hl.timer(function()
     if opening[workspace] == request then
       opening[workspace] = nil
@@ -123,8 +147,8 @@ hl.on("window.close", function(window)
 end)
 
 for _, window in ipairs(hl.get_windows()) do
-  if supported(window) and window.fullscreen == 1 then
-    remember(window, true)
+  if supported(window) and MODE_TAGS[window.fullscreen] then
+    remember(window, window.fullscreen)
   end
 end
 queue_focus(hl.get_active_window())

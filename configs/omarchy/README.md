@@ -6,21 +6,22 @@
 
 | 文件 | 用途 |
 |---|---|
+| `hypr/native-window-controls.lua` | 允许软件自带的窗口按钮请求最大化，精确跳过 Omarchy 默认的全局最大化抑制规则 |
 | `hypr/input-method-popups.lua` | 避免 Fcitx 的 X11 候选窗口触发 Omarchy 取消应用最大化 |
-| `hypr/maximized-stacking.lua` | 修正最大化窗口的前后层级，并记忆各窗口的最大化选择 |
-| `hypr/hyprland-snippet.lua` | 上述两个模块在主配置中的加载方式 |
+| `hypr/maximized-stacking.lua` | 修正最大化及全屏窗口的前后层级，并记忆各窗口各自的状态 |
+| `hypr/hyprland-snippet.lua` | 上述三个模块在主配置中各自的加载位置 |
 | `hypr/monitors.example.lua` | 本机 eDP-1 的 125% 缩放与 `GDK_SCALE=1` 示例，需按硬件调整 |
 | `applications/chatgpt.desktop` | 使用原生 Wayland 启动 ChatGPT Desktop |
 
 ## 恢复窗口修正
 
-在仓库根目录执行以下 Bash 命令，仅复制两个模块；已有同名文件先备份为 `.bak.<时间戳>`：
+在仓库根目录执行以下 Bash 命令，仅复制三个模块；已有同名文件先备份为 `.bak.<时间戳>`：
 
 ```bash
 omarchy_hypr_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
 omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
 mkdir -p "$omarchy_hypr_dir"
-for omarchy_module in input-method-popups maximized-stacking; do
+for omarchy_module in native-window-controls input-method-popups maximized-stacking; do
     omarchy_target="$omarchy_hypr_dir/$omarchy_module.lua"
     if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
         cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
@@ -31,20 +32,22 @@ cp -a -- "$omarchy_hypr_dir/hyprland.lua" \
     "$omarchy_hypr_dir/hyprland.lua.bak.$omarchy_backup_stamp"
 ```
 
-随后编辑现有的 `hyprland.lua`，找到：
+随后按 [`hypr/hyprland-snippet.lua`](hypr/hyprland-snippet.lua) 编辑现有的 `hyprland.lua`，保留其余内容。两处替换各留在原来的位置：
 
-```lua
-require("default.hypr.toggles")
-```
+1. 在个人模块之前，将 `require("default.hypr.omarchy")` 替换为：
 
-在这个位置用 [`hypr/hyprland-snippet.lua`](hypr/hyprland-snippet.lua) 中的两行替换它：
+   ```lua
+   require("hypr.native-window-controls").load_defaults()
+   ```
 
-```lua
-require("hypr.input-method-popups").load_toggles()
-require("hypr.maximized-stacking")
-```
+2. 在个人模块之后，将 `require("default.hypr.toggles")` 替换为下面两行：
 
-不要覆盖整份 `hyprland.lua`，也不要保留旧语句再追加一份；候选窗口修正需要在默认 toggles 注册事件时介入。若已加载这两个模块，各保留一次即可。只需要最大化修正时，保留原来的 `require("default.hypr.toggles")`，在其后加载 `hypr.maximized-stacking`；只需要候选窗口修正时，仅替换 toggles 语句。
+   ```lua
+   require("hypr.input-method-popups").load_toggles()
+   require("hypr.maximized-stacking")
+   ```
+
+不要覆盖整份 `hyprland.lua`，也不要保留被替换的原语句再追加一份。两个包装模块必须在默认配置注册对应规则或事件时介入；已加载的模块各保留一次即可。只需要窗口切换修正时，可保留原来的两个默认加载语句，仅在 toggles 之后加载 `hypr.maximized-stacking`。软件自带最大化按钮修正和输入法候选窗口修正也可各自单独安装。
 
 应用并检查：
 
@@ -53,9 +56,17 @@ hyprctl reload
 hyprctl configerrors
 ```
 
-`configerrors` 应没有错误。浮动工作区中用 **Alt+Tab** / **Shift+Alt+Tab** 双向切换，用 **Super+Alt+F** 最大化或还原（Super 为 Windows 徽标键）。分别最大化两个窗口，再反复切换，确认切回时恢复最大化；主动还原后应保持普通大小。使用 Fcitx 时也可检查输入候选框出现后，当前窗口仍保持最大化。
+`configerrors` 应没有错误。窗口切换修正重载后立即生效。默认最大化抑制属于静态窗口规则；此前已打开的软件需要关闭并重新打开一次，其自带最大化按钮才能采用新规则，无需重启系统。
 
-最大化选择通过窗口 tag 保存，可跨配置重载保留。Hyprland 在同一工作区仍只给一个窗口原生内部最大化状态，模块会在重新聚焦时恢复该窗口的最大化，而不是同时保留两个内部最大化状态。修正只处理 Omarchy 的普通浮动工作区，保留固定窗口和输入法候选窗口的特殊行为。
+浮动工作区中用 **Alt+Tab** / **Shift+Alt+Tab** 双向切换，用 **Super+Alt+F** 最大化或还原，用 **Super+F** 进入或退出真正全屏（Super 为 Windows 徽标键）。分别将多个窗口设为最大化或全屏，再反复切换，确认切回时恢复各自的状态；主动还原后应保持普通大小。也可启动一个初始全屏的应用，并在切走、切回和配置重载后检查其全屏状态。使用 Fcitx 时检查输入候选框出现后，当前窗口仍保持最大化。
+
+模块通过窗口 tag 分别记住最大化（内部 mode 1）和真正全屏（内部 mode 2），可跨配置重载保留，并补记应用打开时就已进入的状态。Hyprland 在同一工作区仍只给一个窗口原生内部最大化/全屏状态，模块会在重新聚焦时恢复该窗口自己的选择。修正适用于 Omarchy 的普通浮动工作区，不按应用名称区分，保留固定窗口、输入法候选窗口及其他布局全屏处理器的特殊行为。
+
+已使用飞书、CC Switch、ChatGPT 和 Chromium 验证混合最大化/全屏、正反向切换、主动还原、初始全屏启动和配置重载，共通过 22 项实际窗口检查；另在新开的 Foot 窗口中验证了应用自身发起的 Wayland 最大化和还原请求。
+
+## 撤销窗口修正
+
+在现有 `hyprland.lua` 中，将 `require("hypr.native-window-controls").load_defaults()` 改回 `require("default.hypr.omarchy")`，将 `require("hypr.input-method-popups").load_toggles()` 改回 `require("default.hypr.toggles")`，删除 `require("hypr.maximized-stacking")`。仅撤销部分修正时，只改对应加载语句。运行 `hyprctl reload` 和 `hyprctl configerrors`；若撤销了自带最大化按钮修正，重开相关软件后会重新采用默认静态规则。确认不再引用后，可删除对应用户模块，或从安装前的备份恢复所需文件。
 
 ## 恢复 ChatGPT 缩放修正
 

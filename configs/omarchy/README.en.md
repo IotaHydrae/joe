@@ -6,21 +6,22 @@ These files preserve window fixes for Omarchy floating workspaces and a ChatGPT 
 
 | File | Purpose |
 |---|---|
+| `hypr/native-window-controls.lua` | Allow application titlebars to request maximization by skipping only Omarchy's stock blanket maximize-suppression rule |
 | `hypr/input-method-popups.lua` | Prevent an Fcitx X11 candidate window from making Omarchy restore a maximized application |
-| `hypr/maximized-stacking.lua` | Fix maximized window stacking and remember each window's maximize choice |
-| `hypr/hyprland-snippet.lua` | Load the two modules from the main configuration |
+| `hypr/maximized-stacking.lua` | Fix maximized/fullscreen window stacking and remember each window's own state |
+| `hypr/hyprland-snippet.lua` | Show each of the three modules' positions in the main configuration |
 | `hypr/monitors.example.lua` | Hardware-specific example: eDP-1 at 125% and `GDK_SCALE=1` |
 | `applications/chatgpt.desktop` | Launch ChatGPT Desktop through native Wayland |
 
 ## Restore the window fixes
 
-Run these Bash commands from the repository root. They copy only the two modules, first backing up existing files as `.bak.<timestamp>`:
+Run these Bash commands from the repository root. They copy only the three modules, first backing up existing files as `.bak.<timestamp>`:
 
 ```bash
 omarchy_hypr_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
 omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
 mkdir -p "$omarchy_hypr_dir"
-for omarchy_module in input-method-popups maximized-stacking; do
+for omarchy_module in native-window-controls input-method-popups maximized-stacking; do
     omarchy_target="$omarchy_hypr_dir/$omarchy_module.lua"
     if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
         cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
@@ -31,20 +32,22 @@ cp -a -- "$omarchy_hypr_dir/hyprland.lua" \
     "$omarchy_hypr_dir/hyprland.lua.bak.$omarchy_backup_stamp"
 ```
 
-Edit the existing `hyprland.lua` and find:
+Edit the existing `hyprland.lua` using [`hypr/hyprland-snippet.lua`](hypr/hyprland-snippet.lua), keeping the rest of the file. Make both replacements at their original positions:
 
-```lua
-require("default.hypr.toggles")
-```
+1. Before the personal modules, replace `require("default.hypr.omarchy")` with:
 
-Replace it **at that position** with the two lines from [`hypr/hyprland-snippet.lua`](hypr/hyprland-snippet.lua):
+   ```lua
+   require("hypr.native-window-controls").load_defaults()
+   ```
 
-```lua
-require("hypr.input-method-popups").load_toggles()
-require("hypr.maximized-stacking")
-```
+2. After the personal modules, replace `require("default.hypr.toggles")` with these two lines:
 
-Keep the rest of `hyprland.lua`. Do not retain the original line and append another copy: the candidate-window fix must intervene while the default toggles register their events. If the modules are already loaded, keep only one load of each. For only the maximize fix, keep `require("default.hypr.toggles")` and load `hypr.maximized-stacking` afterward. For only the candidate-window fix, replace just the toggles line.
+   ```lua
+   require("hypr.input-method-popups").load_toggles()
+   require("hypr.maximized-stacking")
+   ```
+
+Do not replace the whole `hyprland.lua` or retain a replaced line and append another copy. The two wrappers must intervene while the default configuration registers the relevant rules or events. Keep only one load of each module. For only the window-switching fix, retain both original default loads and load `hypr.maximized-stacking` after the toggles. The native-button and input-method candidate fixes can each be installed separately too.
 
 Apply and validate:
 
@@ -53,9 +56,17 @@ hyprctl reload
 hyprctl configerrors
 ```
 
-`configerrors` should report no errors. In a floating workspace, use **Alt+Tab** / **Shift+Alt+Tab** to switch in either direction, and **Super+Alt+F** to maximize or restore (Super is the Windows logo key). Maximize two windows and switch repeatedly: the selected window should return maximized. An explicitly restored window should stay at normal size. With Fcitx, also check that showing a candidate window leaves the application maximized.
+`configerrors` should report no errors. The window-switching fix takes effect as soon as the configuration reloads. Maximize suppression is a static window rule: close and reopen applications that were already running once to apply the native-button fix. No system restart is needed.
 
-A window tag retains its maximize choice across configuration reloads. Hyprland still grants only one native internal maximized state per workspace; the module restores that state when a remembered window regains focus, rather than retaining two internal maximized states simultaneously. The fix handles ordinary Omarchy floating workspaces and preserves the special behavior of pinned windows and input-method candidate windows.
+In a floating workspace, use **Alt+Tab** / **Shift+Alt+Tab** to switch in either direction, **Super+Alt+F** to maximize or restore, and **Super+F** to enter or leave true fullscreen (Super is the Windows logo key). Set several windows to maximize or fullscreen and switch repeatedly: each selected window should return to its own state. An explicitly restored window should stay at normal size. Also launch an application in fullscreen and check its state after switching away and back, and after reloading the configuration. With Fcitx, check that showing a candidate window leaves the application maximized.
+
+Window tags remember maximization (internal mode 1) and true fullscreen (internal mode 2) separately across configuration reloads. The module also records states established before an application's open event. Hyprland still grants only one native internal maximized/fullscreen state per workspace; the module restores each window's own choice when it regains focus. The fix handles ordinary Omarchy floating workspaces without an application-name filter, and preserves pinned windows, input-method candidate windows, and fullscreen handlers belonging to other layouts.
+
+Validation with Feishu, CC Switch, ChatGPT, and Chromium passed 22 actual-window checks covering mixed maximization/fullscreen, switching in both directions, explicit restore, startup fullscreen, and configuration reloads. Application-originated Wayland maximize and restore requests were also verified in a newly opened Foot window.
+
+## Undo the window fixes
+
+In the existing `hyprland.lua`, change `require("hypr.native-window-controls").load_defaults()` back to `require("default.hypr.omarchy")`, change `require("hypr.input-method-popups").load_toggles()` back to `require("default.hypr.toggles")`, and remove `require("hypr.maximized-stacking")`. To undo only one fix, change just its corresponding load. Run `hyprctl reload` and `hyprctl configerrors`. After undoing the native-button fix, reopen affected applications to restore the default static rule. Once unreferenced, remove the relevant user modules or restore the needed files from their installation backups.
 
 ## Restore the ChatGPT scaling fix
 
