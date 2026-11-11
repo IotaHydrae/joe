@@ -12,6 +12,7 @@ These files preserve window fixes for Omarchy floating workspaces and a ChatGPT 
 | `hypr/hyprland-snippet.lua` | Show each of the three modules' positions in the main configuration |
 | `bin/omarchy-window-picker` | Reuse Omarchy's menu to search existing windows by application name or title, then click to select |
 | `hypr/window-picker-bindings.lua` | Replace Alt+Tab / Shift+Alt+Tab cycling with the window list |
+| `hypr/cursor-no-warp.lua` | Keep the pointer in place when switching windows, workspaces, and special workspaces |
 | `hypr/monitors.example.lua` | Hardware-specific example: eDP-1 at 125% and `GDK_SCALE=1` |
 | `applications/chatgpt.desktop` | Launch ChatGPT Desktop through native Wayland |
 
@@ -100,6 +101,34 @@ require("hypr.window-picker-bindings")
 If the three picker-binding lines from this archive are already present directly, replace them with the module load above rather than retaining both. Run `hyprctl reload` and `hyprctl configerrors`. Actual menu checks confirmed that canceling preserves focus and maximization, searching `cc-switch` and confirming selects it, and searching `Chatgpt` and confirming selects it and restores maximization.
 
 To undo, remove this module load (or the three directly added picker-binding lines) from `bindings.lua` and reload. Omarchy's default Alt+Tab / Shift+Alt+Tab cycling will return. Once no other references remain, the picker script and bindings fragment can be removed.
+
+## Optional: keep the pointer in place
+
+[`hypr/cursor-no-warp.lua`](hypr/cursor-no-warp.lua) disables automatic pointer warps on focus changes and sets `warp_on_change_workspace` and `warp_on_toggle_special` to `0`. Install this minimal override from the repository root while preserving existing appearance settings:
+
+```bash
+omarchy_hypr_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
+omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
+mkdir -p "$omarchy_hypr_dir"
+for omarchy_target in "$omarchy_hypr_dir/cursor-no-warp.lua" \
+    "$omarchy_hypr_dir/looknfeel.lua"; do
+    if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
+        cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
+    fi
+done
+install -m 644 -- configs/omarchy/hypr/cursor-no-warp.lua \
+    "$omarchy_hypr_dir/cursor-no-warp.lua"
+```
+
+Add this line once at the end of the existing `hypr/looknfeel.lua`:
+
+```lua
+require("hypr.cursor-no-warp")
+```
+
+If the same inline `cursor` settings are already present, replace that block with this module load instead of adding duplicates. Run `hyprctl reload` and `hyprctl configerrors`; no application or system restart is needed. Check that selecting another window, changing workspaces, and showing/hiding a special workspace leave the pointer where it was placed.
+
+To undo, remove this module load from `looknfeel.lua` and reload. If personal cursor settings existed before installation, restore those settings from the backup. Once unreferenced, `cursor-no-warp.lua` can be removed. Do not replace the whole appearance configuration with this fragment.
 
 ## Undo the window fixes
 

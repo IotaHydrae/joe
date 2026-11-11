@@ -12,6 +12,7 @@
 | `hypr/hyprland-snippet.lua` | 上述三个模块在主配置中各自的加载位置 |
 | `bin/omarchy-window-picker` | 复用 Omarchy 菜单，按应用名或标题搜索、点击选择已有窗口 |
 | `hypr/window-picker-bindings.lua` | 将 Alt+Tab / Shift+Alt+Tab 改为窗口选择列表 |
+| `hypr/cursor-no-warp.lua` | 切换窗口、工作区及特殊工作区时保持鼠标位置 |
 | `hypr/monitors.example.lua` | 本机 eDP-1 的 125% 缩放与 `GDK_SCALE=1` 示例，需按硬件调整 |
 | `applications/chatgpt.desktop` | 使用原生 Wayland 启动 ChatGPT Desktop |
 
@@ -100,6 +101,34 @@ require("hypr.window-picker-bindings")
 若已有本存档的三行窗口选择器绑定，改为上面的模块加载即可，不要同时保留两份。运行 `hyprctl reload` 和 `hyprctl configerrors` 后生效。已实际验证取消菜单保持原焦点和最大化状态、搜索 `cc-switch` 后确认切换、搜索 `Chatgpt` 后确认切换并恢复最大化。
 
 撤销时从 `bindings.lua` 删除这行加载（或直接添加的三行选择器绑定），再重载配置，Omarchy 默认的 Alt+Tab / Shift+Alt+Tab 循环切换就会恢复。确认没有其它引用后，可删除选择器脚本和绑定片段。
+
+## 可选：切换时保持鼠标位置
+
+[`hypr/cursor-no-warp.lua`](hypr/cursor-no-warp.lua) 禁用切换焦点时的自动鼠标跳转，并将 `warp_on_change_workspace` 和 `warp_on_toggle_special` 设为 `0`。从仓库根目录安装最小覆盖模块，保留现有外观配置：
+
+```bash
+omarchy_hypr_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
+omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
+mkdir -p "$omarchy_hypr_dir"
+for omarchy_target in "$omarchy_hypr_dir/cursor-no-warp.lua" \
+    "$omarchy_hypr_dir/looknfeel.lua"; do
+    if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
+        cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
+    fi
+done
+install -m 644 -- configs/omarchy/hypr/cursor-no-warp.lua \
+    "$omarchy_hypr_dir/cursor-no-warp.lua"
+```
+
+在现有 `hypr/looknfeel.lua` 末尾添加一次：
+
+```lua
+require("hypr.cursor-no-warp")
+```
+
+若已有相同的内联 `cursor` 设置，将该设置块换成上面的加载语句即可，不要重复添加。运行 `hyprctl reload` 和 `hyprctl configerrors`；无需重开应用或重启系统。检查选择其它窗口、切换工作区及显示/隐藏特殊工作区时，鼠标是否仍停留在原位置。
+
+撤销时删除 `looknfeel.lua` 中的这行加载，然后重载配置。若安装前已有个人鼠标设置，从备份恢复对应设置；确认不再引用后，可删除 `cursor-no-warp.lua`。不要用本片段覆盖整份外观配置。
 
 ## 撤销窗口修正
 
