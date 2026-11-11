@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "user.window-picker",
+  "name": "Window switcher",
+  "version": "1.0.0",
+  "description": "Hold Alt and press Tab to select a window; release Alt to switch",
+  "kinds": [
+    "menu"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "menu": "WindowSwitcher.qml"
+  }
+}

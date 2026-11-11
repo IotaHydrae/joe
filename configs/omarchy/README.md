@@ -10,8 +10,9 @@
 | `hypr/input-method-popups.lua` | 普通小窗口打开时保留其它窗口的最大化状态，并排除 Fcitx 的 X11 候选窗口 |
 | `hypr/maximized-stacking.lua` | 保留各窗口的最大化/全屏状态和后台大尺寸，独立恢复各自正常尺寸 |
 | `hypr/hyprland-snippet.lua` | 上述三个模块在主配置中各自的加载位置 |
-| `bin/omarchy-window-picker` | 复用 Omarchy 菜单，按应用名或标题搜索、点击选择已有窗口 |
-| `hypr/window-picker-bindings.lua` | 将 Alt+Tab / Shift+Alt+Tab 改为窗口选择列表 |
+| `bin/omarchy-window-picker` | 提供窗口列表、JSON 数据和按地址聚焦，保留独立搜索菜单入口 |
+| `hypr/window-picker-bindings.lua` | Alt+Tab 快速切回最近窗口，按住时循环选择、松开 Alt 确认 |
+| `plugins/user.window-picker/` | 复用 Omarchy 菜单组件显示按住 Alt 时的延迟窗口列表 |
 | `hypr/cursor-no-warp.lua` | 切换窗口、工作区及特殊工作区时保持鼠标位置 |
 | `hypr/monitors.example.lua` | 本机 eDP-1 的 125% 缩放与 `GDK_SCALE=1` 示例，需按硬件调整 |
 | `applications/chatgpt.desktop` | 使用原生 Wayland 启动 ChatGPT Desktop |
@@ -69,19 +70,22 @@ Hyprland 在同一工作区仍只给前台窗口原生内部最大化/全屏状�
 
 最新验证使用飞书、CC Switch、ChatGPT 和 Chromium，在全部最大化及最大化/全屏混合两组场景中通过 22 项检查：多轮聚焦、配置重载和逐一还原时，其它窗口的矩形与状态 tag 均不变。另通过 5 项针对性检查，覆盖应用自身的 Wayland 最大化/还原请求、小窗口同时覆盖两个展开窗口、显式还原被遮挡且未激活的原生最大化窗口、重新聚焦后恢复原尺寸，以及同一事件循环中的替换/还原竞态。
 
-## 可选：Alt+Tab 窗口选择列表
+## 可选：Alt+Tab 窗口切换器
 
-选择器复用 Omarchy 自带菜单，不需要新增依赖。**Alt+Tab** 和 **Shift+Alt+Tab** 都会打开可搜索、可点击的窗口列表，替换原来的前后循环切换。列表按最近使用顺序排列，当前窗口放在后面；输入应用名或窗口标题即可筛选，点击条目或按 **Enter** 确认。按 **Esc** 会先清空已有搜索，再按 **Esc** 取消；取消不改变窗口焦点。这是显式选择列表，松开 Alt 不会自动确认。
+短按 **Alt+Tab** 会切回最近使用的上一个窗口。按住 Alt 超过 **150 ms** 会显示窗口列表；继续按 **Tab** 选下一项，**Shift+Tab** 选上一项，松开 **Alt** 确认切换。列表按最近使用顺序排列，当前窗口放在后面。该快捷键用于按住 Alt 循环、松开确认。需要按应用名或标题搜索时，单独运行无参数的 `omarchy-window-picker`，无需按住 Alt：在搜索菜单中按 **Enter** 或点击条目选择，**Esc** 先清空已有搜索，再按 **Esc** 取消。取消不改变当前窗口焦点。
 
-在仓库根目录执行，先备份已有同名文件，再安装脚本和独立绑定片段：
+切换器使用独立的 `user.window-picker` 插件复用 Omarchy 菜单组件，不替换正常系统菜单，也不需要安装新的软件依赖。从仓库根目录备份并安装脚本、Lua 绑定模块和插件目录：
 
 ```bash
+omarchy_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
 omarchy_bin_dir="$HOME/.local/bin"
-omarchy_hypr_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
+omarchy_hypr_dir="$omarchy_config_dir/hypr"
+omarchy_plugin_dir="$omarchy_config_dir/omarchy/plugins/user.window-picker"
 omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
-mkdir -p "$omarchy_bin_dir" "$omarchy_hypr_dir"
+mkdir -p "$omarchy_bin_dir" "$omarchy_hypr_dir" "$(dirname -- "$omarchy_plugin_dir")"
 for omarchy_target in "$omarchy_bin_dir/omarchy-window-picker" \
-    "$omarchy_hypr_dir/window-picker-bindings.lua" "$omarchy_hypr_dir/bindings.lua"; do
+    "$omarchy_hypr_dir/window-picker-bindings.lua" "$omarchy_hypr_dir/bindings.lua" \
+    "$omarchy_plugin_dir"; do
     if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
         cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
     fi
@@ -90,6 +94,16 @@ install -m 755 -- configs/omarchy/bin/omarchy-window-picker \
     "$omarchy_bin_dir/omarchy-window-picker"
 install -m 644 -- configs/omarchy/hypr/window-picker-bindings.lua \
     "$omarchy_hypr_dir/window-picker-bindings.lua"
+mkdir -p "$omarchy_plugin_dir"
+cp -a -- configs/omarchy/plugins/user.window-picker/. "$omarchy_plugin_dir/"
+omarchy-shell shell rescanPlugins
+omarchy plugin list
+```
+
+等待插件列表出现 `user.window-picker`；若尚未出现，稍候重新运行 `omarchy plugin list`。确认已发现后启用：
+
+```bash
+omarchy plugin enable user.window-picker
 ```
 
 在现有 `hypr/bindings.lua` 末尾添加下面一行，仅保留一次，并保留其它个人绑定：
@@ -98,9 +112,11 @@ install -m 644 -- configs/omarchy/hypr/window-picker-bindings.lua \
 require("hypr.window-picker-bindings")
 ```
 
-若已有本存档的三行窗口选择器绑定，改为上面的模块加载即可，不要同时保留两份。运行 `hyprctl reload` 和 `hyprctl configerrors` 后生效。已实际验证取消菜单保持原焦点和最大化状态、搜索 `cc-switch` 后确认切换、搜索 `Chatgpt` 后确认切换并恢复最大化。
+若仍有旧版直接调用脚本的三行绑定（`local window_picker` 及两条 `o.rebind`），删除那三行后再加载此模块，避免重复绑定。运行 `hyprctl reload` 和 `hyprctl configerrors` 后生效。
 
-撤销时从 `bindings.lua` 删除这行加载（或直接添加的三行选择器绑定），再重载配置，Omarchy 默认的 Alt+Tab / Shift+Alt+Tab 循环切换就会恢复。确认没有其它引用后，可删除选择器脚本和绑定片段。
+脚本仍支持 `omarchy-window-picker --list` 查看窗口列表；`--json` 输出插件使用的窗口数据，`--focus ADDRESS` 聚焦指定窗口地址。直接运行 `omarchy-window-picker` 仍会打开独立搜索菜单。
+
+撤销时从 `bindings.lua` 删除该模块加载及残留旧版三行绑定，运行 `omarchy plugin disable user.window-picker`，再执行 `hyprctl reload` 和 `hyprctl configerrors`。Omarchy 默认的 Alt+Tab / Shift+Alt+Tab 循环切换会恢复。确认没有其它引用后，可删除脚本、Lua 模块及 `~/.config/omarchy/plugins/user.window-picker` 目录。
 
 ## 可选：切换时保持鼠标位置
 

@@ -10,8 +10,9 @@ These files preserve window fixes for Omarchy floating workspaces and a ChatGPT 
 | `hypr/input-method-popups.lua` | Preserve existing maximized windows when a small window opens, and exclude Fcitx X11 candidate windows |
 | `hypr/maximized-stacking.lua` | Retain each window's maximize/fullscreen choice and expanded background geometry, with independent normal-size restore |
 | `hypr/hyprland-snippet.lua` | Show each of the three modules' positions in the main configuration |
-| `bin/omarchy-window-picker` | Reuse Omarchy's menu to search existing windows by application name or title, then click to select |
-| `hypr/window-picker-bindings.lua` | Replace Alt+Tab / Shift+Alt+Tab cycling with the window list |
+| `bin/omarchy-window-picker` | Provide window lists, JSON data, and focus by address; retain a standalone search menu |
+| `hypr/window-picker-bindings.lua` | Quickly return to the recent window, cycle while Alt is held, and confirm on release |
+| `plugins/user.window-picker/` | Reuse Omarchy's menu component for a delayed window list while Alt is held |
 | `hypr/cursor-no-warp.lua` | Keep the pointer in place when switching windows, workspaces, and special workspaces |
 | `hypr/monitors.example.lua` | Hardware-specific example: eDP-1 at 125% and `GDK_SCALE=1` |
 | `applications/chatgpt.desktop` | Launch ChatGPT Desktop through native Wayland |
@@ -69,19 +70,22 @@ Hyprland still grants only the foreground window a native internal maximized/ful
 
 Latest validation with Feishu, CC Switch, ChatGPT, and Chromium passed 22 checks across two setups: all windows maximized, and mixed maximization/fullscreen. Repeated focus changes, configuration reloads, and restoring windows individually left every other window's rectangle and state tags unchanged. Five additional checks covered application-originated Wayland maximize/restore requests, a small window covering two expanded windows, explicitly restoring an obscured inactive native-maximized window, normal-size restoration after refocusing, and replacement/restore races within the same event-loop turn.
 
-## Optional: Alt+Tab window list
+## Optional: Alt+Tab window switcher
 
-The picker reuses Omarchy's built-in menu and requires no additional dependencies. Both **Alt+Tab** and **Shift+Alt+Tab** open a searchable, clickable window list, replacing forward/backward cycling. Windows are ordered by recent use, with the current window placed last. Type an application name or window title to filter, then click an item or press **Enter** to confirm. **Esc** first clears an existing query; press **Esc** again to cancel. Cancellation keeps the current window focused. This is an explicit selection list: releasing Alt does not confirm a choice.
+A quick **Alt+Tab** returns to the previously used window. Hold Alt for more than **150 ms** to show the window list; press **Tab** again to select the next item or **Shift+Tab** for the previous item, then release **Alt** to confirm. Windows are ordered by recent use, with the current window placed last. This shortcut uses held-Alt cycling and release-to-confirm. For application-name/title search, run `omarchy-window-picker` separately without arguments or holding Alt: use **Enter** or click an item to confirm in that search menu. **Esc** first clears an existing query; press **Esc** again to cancel. Cancellation keeps the current window focused.
 
-From the repository root, back up existing files and install the script and separate bindings fragment:
+The separate `user.window-picker` plugin reuses Omarchy's menu component without replacing the normal system menu or requiring additional software dependencies. From the repository root, back up existing files and install the helper script, Lua bindings module, and plugin directory:
 
 ```bash
+omarchy_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
 omarchy_bin_dir="$HOME/.local/bin"
-omarchy_hypr_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
+omarchy_hypr_dir="$omarchy_config_dir/hypr"
+omarchy_plugin_dir="$omarchy_config_dir/omarchy/plugins/user.window-picker"
 omarchy_backup_stamp=$(date +%Y%m%d%H%M%S%N)
-mkdir -p "$omarchy_bin_dir" "$omarchy_hypr_dir"
+mkdir -p "$omarchy_bin_dir" "$omarchy_hypr_dir" "$(dirname -- "$omarchy_plugin_dir")"
 for omarchy_target in "$omarchy_bin_dir/omarchy-window-picker" \
-    "$omarchy_hypr_dir/window-picker-bindings.lua" "$omarchy_hypr_dir/bindings.lua"; do
+    "$omarchy_hypr_dir/window-picker-bindings.lua" "$omarchy_hypr_dir/bindings.lua" \
+    "$omarchy_plugin_dir"; do
     if [[ -e "$omarchy_target" || -L "$omarchy_target" ]]; then
         cp -a -- "$omarchy_target" "$omarchy_target.bak.$omarchy_backup_stamp"
     fi
@@ -90,6 +94,16 @@ install -m 755 -- configs/omarchy/bin/omarchy-window-picker \
     "$omarchy_bin_dir/omarchy-window-picker"
 install -m 644 -- configs/omarchy/hypr/window-picker-bindings.lua \
     "$omarchy_hypr_dir/window-picker-bindings.lua"
+mkdir -p "$omarchy_plugin_dir"
+cp -a -- configs/omarchy/plugins/user.window-picker/. "$omarchy_plugin_dir/"
+omarchy-shell shell rescanPlugins
+omarchy plugin list
+```
+
+Wait until `user.window-picker` appears in the plugin list. If it has not appeared, wait briefly and run `omarchy plugin list` again. Enable it only after discovery:
+
+```bash
+omarchy plugin enable user.window-picker
 ```
 
 Add this line once at the end of the existing `hypr/bindings.lua`, keeping other personal bindings:
@@ -98,9 +112,11 @@ Add this line once at the end of the existing `hypr/bindings.lua`, keeping other
 require("hypr.window-picker-bindings")
 ```
 
-If the three picker-binding lines from this archive are already present directly, replace them with the module load above rather than retaining both. Run `hyprctl reload` and `hyprctl configerrors`. Actual menu checks confirmed that canceling preserves focus and maximization, searching `cc-switch` and confirming selects it, and searching `Chatgpt` and confirming selects it and restores maximization.
+If the old three direct-script binding lines remain (`local window_picker` and two `o.rebind` calls), remove them before loading this module to avoid duplicate bindings. Run `hyprctl reload` and `hyprctl configerrors` to apply.
 
-To undo, remove this module load (or the three directly added picker-binding lines) from `bindings.lua` and reload. Omarchy's default Alt+Tab / Shift+Alt+Tab cycling will return. Once no other references remain, the picker script and bindings fragment can be removed.
+The helper still supports `omarchy-window-picker --list` for a window list. `--json` outputs the plugin's window data, and `--focus ADDRESS` focuses a specified window address. Running `omarchy-window-picker` without arguments still opens the standalone search menu.
+
+To undo, remove the module load and any old three-line direct bindings from `bindings.lua`, run `omarchy plugin disable user.window-picker`, then run `hyprctl reload` and `hyprctl configerrors`. Omarchy's default Alt+Tab / Shift+Alt+Tab cycling will return. Once unreferenced, the script, Lua module, and `~/.config/omarchy/plugins/user.window-picker` directory can be removed.
 
 ## Optional: keep the pointer in place
 
