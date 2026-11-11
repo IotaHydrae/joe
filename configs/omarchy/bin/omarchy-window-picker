@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Select an existing window by application name or title using Omarchy's menu.
+set -euo pipefail
+
+case "${1:-}" in
+    --list) picker_list_only=1 ;;
+    "") picker_list_only=0 ;;
+    -h|--help)
+        printf 'Usage: omarchy-window-picker [--list]\n'
+        exit 0
+        ;;
+    *)
+        printf 'Unknown argument: %s\n' "$1" >&2
+        exit 2
+        ;;
+esac
+if (( $# > 1 )); then
+    printf 'Usage: omarchy-window-picker [--list]\n' >&2
+    exit 2
+fi
+
+if (( ! picker_list_only )); then
+    picker_runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    if [[ ! -d "$picker_runtime_dir" || ! -O "$picker_runtime_dir" || -L "$picker_runtime_dir" ]]; then
+        printf 'A private user runtime directory is required.\n' >&2
+        exit 1
+    fi
+    exec {picker_lock_fd}>"$picker_runtime_dir/omarchy-window-picker.lock"
+    flock -n "$picker_lock_fd" || exit 0
+fi
+
+picker_clients=$(hyprctl -j clients)
+picker_active=$(hyprctl -j activewindow | jq -r '.address // ""')
+picker_windows=$(jq -c --arg active "$picker_active" '
+    # Fullwidth punctuation prevents rich-text interpretation in menu widgets.
+    # Flatten control characters so a title cannot create extra menu rows.
+    def safe_text:
+        tostring
+        | gsub("[\u0000-\u001f\u007f-\u009f\u2028\u2029]"; " ")
+        | gsub("[\u202a-\u202e\u2066-\u2069]"; "")
+        | gsub("<"; "＜") | gsub(">"; "＞") | gsub("&"; "＆")
+        | gsub(" +"; " ") | sub("^ +"; "") | sub(" +$"; "");
+    def normal_workspace:
+        (.workspace.id // 0) > 0
+        or ((.workspace.name // "") != ""
+            and ((.workspace.name // "") | startswith("special:") | not));
+    def minimized: (.workspace.name // "") == "special:minimized";
+    [ .[]
+      | select(.mapped == true)
+      | select((.address // "") | test("^0x[0-9a-fA-F]+$"))
+      | select(.title != "Fcitx5 Input Window")
+      | select(normal_workspace or minimized)
+    ]
+    | sort_by([
+        .address == $active,
+        (if (.focusHistoryID // -1) >= 0 then .focusHistoryID else 2147483647 end),
+        .address
+      ])
+    | .[:500]
+    | to_entries
+    | map(
+        .key as $index | .value as $window
+        | ($window | [ .class, .initialClass, "窗口" ]
+            | map(select(type == "string" and length > 0)) | first
+            | safe_text | .[:120]) as $app
+        | (($window.title // "") | safe_text | .[:240]) as $title
+        | (($window.workspace.name // ($window.workspace.id | tostring))
+            | safe_text | .[:80]) as $workspace
+        | "\($index + 1). \($app)" as $label
+        | (if ($window | minimized) then "已最小化"
+            else "工作区 \($workspace)" end) as $location
+        | (if $title == "" then $location else "\($title) · \($location)" end) as $detail
+        | {
+            address: $window.address,
+            value: ($label + "\t" + $detail),
+            option: ("▣\t" + $label + "\t" + $detail)
+          }
+      )
+' <<<"$picker_clients")
+
+if (( picker_list_only )); then
+    jq -r '.[].option' <<<"$picker_windows"
+    exit 0
+fi
+
+mapfile -t picker_options < <(jq -r '.[].option' <<<"$picker_windows")
+(( ${#picker_options[@]} > 0 )) || exit 0
+
+if picker_choice=$(omarchy menu select '切换窗口：搜索名称或标题' \
+        "${picker_options[@]}" -- --width 640 --maxheight 620); then
+    :
+else
+    picker_result=$?
+    # Closing the menu is an ordinary cancellation, with no focus change.
+    (( picker_result == 1 )) && exit 0
+    exit "$picker_result"
+fi
+
+picker_address=$(jq -r --arg choice "$picker_choice" \
+    'first(.[] | select(.value == $choice) | .address) // empty' <<<"$picker_windows")
+[[ $picker_address =~ ^0x[0-9a-fA-F]+$ ]] || exit 0
+
+# Recheck the chosen address: it may have closed or moved while the menu was up.
+picker_window=$(hyprctl -j clients | jq -c --arg address "$picker_address" \
+    'first(.[] | select(.address == $address and .mapped == true)) // empty')
+[[ -n $picker_window ]] || exit 0
+if [[ $(jq -r '.workspace.name // ""' <<<"$picker_window") == 'special:minimized' ]]; then
+    picker_workspace=$(hyprctl -j activeworkspace | jq -r '.id // empty')
+    if [[ ! $picker_workspace =~ ^[1-9][0-9]*$ ]]; then
+        picker_workspace=$(jq -r '[ (.tags // [])[]
+            | select(test("^omarchy-minimized-from-[1-9][0-9]*$"))
+            | sub("^omarchy-minimized-from-"; "") ] | first // empty' <<<"$picker_window")
+    fi
+    [[ $picker_workspace =~ ^[1-9][0-9]*$ ]] || exit 0
+    hyprctl dispatch "hl.dsp.window.move({ workspace = \"$picker_workspace\", follow = false, window = \"address:$picker_address\" })" >/dev/null
+fi
+
+# Only the validated compositor address reaches Lua; labels remain display data.
+hyprctl dispatch "hl.dsp.focus({ window = \"address:$picker_address\" })" >/dev/null
+hyprctl dispatch "hl.dsp.window.bring_to_top({ window = \"address:$picker_address\" })" >/dev/null
