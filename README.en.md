@@ -210,6 +210,10 @@ The repair also updates `~/.local/bin/joe-ghostty`: each window starts a separat
 ./install.sh config export           # Export this machine's config
 ```
 
+### Omarchy Desktop Configuration
+
+The [Omarchy configuration archive and manual restore guide](configs/omarchy/README.en.md) includes floating-workspace maximize and input-candidate fixes, a native Wayland launcher for ChatGPT Desktop, and an optional monitor scaling example. Validated on Omarchy 4.5.0 / Hyprland 0.56.2 with Lua configuration; apply selectively by hand. General configuration import/export and Shell configuration copying do not install these files.
+
 ## Options
 
 ### Shell Options

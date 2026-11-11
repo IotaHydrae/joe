@@ -212,6 +212,10 @@ Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名�
 ./install.sh config export           # 导出本机配置到仓库
 ```
 
+### Omarchy 桌面配置
+
+[Omarchy 配置存档与手动恢复说明](configs/omarchy/README.md)包含浮动工作区的最大化与输入候选窗口修正、ChatGPT Desktop 原生 Wayland 启动入口，以及可选的显示器缩放示例。已在 Omarchy 4.5.0 / Hyprland 0.56.2 的 Lua 配置上验证；按需手动应用，不纳入通用配置导入/导出或 Shell 配置复制。
+
 ## 选项说明
 
 ### Shell 选项
