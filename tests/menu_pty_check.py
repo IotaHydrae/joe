@@ -20,6 +20,7 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAIN_PROMPT = "选择 [1-12/q]: "
+SHELL_PROMPT = "选择 Shell [1-2/b]: "
 ENT_PROMPT = "选择操作 [1-2/b]: "
 TOOLS_PROMPT = "选择操作 [1-16/b]: "
 APPS_PROMPT = "选择操作 [1-7/b]: "
@@ -45,7 +46,7 @@ LIST_OUTPUT = """可用 MCP 服务器:
 """
 INSTALL_MARKERS = (
     "[INFO]", "[PROGRESS]", "Installing", "正在安装", "将安装以下组件",
-    "TOOLS_INSTALL|", "MCP_INSTALL|", "FONTS_INSTALL|", "SHELL_INSTALL|",
+    "TOOLS_INSTALL|", "MCP_INSTALL|", "FONTS_INSTALL|", "SHELL_INSTALL|", "BASH_INSTALL|",
 )
 
 
@@ -178,6 +179,15 @@ def main():
                 '#!/usr/bin/env bash\n'
                 'printf "SHELL_INSTALL|%s\\n" "$*"\n'
                 'printf "SHELL|%s\\n" "$*" >> "$CALL_LOG"\n'
+                'exit "${SHELL_EXIT:-0}"\n'
+            )
+        bash_stub = os.path.join(tmpdir, "bash.sh")
+        with open(bash_stub, "w", encoding="utf-8") as handle:
+            handle.write(
+                '#!/usr/bin/env bash\n'
+                'printf "BASH_INSTALL|%s\\n" "$*"\n'
+                'printf "BASH|%s\\n" "$*" >> "$CALL_LOG"\n'
+                'exit "${BASH_EXIT:-0}"\n'
             )
         npx_stub = os.path.join(fakebin, "npx")
         with open(npx_stub, "w", encoding="utf-8") as handle:
@@ -191,12 +201,22 @@ def main():
             os.environ, TERM="xterm-256color", LC_ALL="C.UTF-8", HOME=home,
             PATH=fakebin, NVM_DIR=os.path.join(home, ".nvm"),
             DEVTOOLS_SCRIPT=devtools_stub, MCP_SCRIPT=mcp_stub, FONTS_SCRIPT=fonts_stub,
-            SHELL_SCRIPT=shell_stub,
+            SHELL_SCRIPT=shell_stub, BASH_SCRIPT=bash_stub,
             MCP_NPX_BIN="npx", CALL_LOG=call_log, MCP_EXIT="0", LIST_FAIL="0",
         )
 
         with MenuSession(env) as session:
             require("Joe 开发环境配置" in session.text, "主菜单未渲染")
+            out = session.choose("1", SHELL_PROMPT)
+            require("Shell 配置" in out and "Zsh" in out and "Bash" in out, "Shell 子菜单缺少两个 Shell 选项")
+            require(all(tool in out for tool in ("Starship", "fzf", "zoxide", "bash-completion")), "Bash 菜单缺少 Omarchy 功能说明")
+            session.choose("", SHELL_PROMPT)
+            for invalid in ("0", "3", "zz"):
+                out = session.choose(invalid, SHELL_PROMPT)
+                require("请输入有效编号" in out, "Shell 菜单未拒绝非法编号")
+            session.choose("b", MAIN_PROMPT)
+            session.choose("1", SHELL_PROMPT)
+            session.choose("q", MAIN_PROMPT)
             for entry, title, prompt in (
                 ("2", "日常软件安装", APPS_PROMPT),
                 ("3", "开发工具安装", TOOLS_PROMPT),
@@ -240,8 +260,14 @@ def main():
         os.rmdir(os.path.join(home, ".pyenv"))
 
         with MenuSession(env) as session:
-            out = session.choose("1", MAIN_PROMPT)
+            session.choose("1", SHELL_PROMPT)
+            out = session.choose("1", SHELL_PROMPT)
             require("SHELL_INSTALL|\r\n" in out, "菜单 1 没有派发统一 Shell 安装路径")
+            require("Shell 配置" in out, "Zsh 安装后未留在 Shell 子菜单")
+            out = session.choose("2", SHELL_PROMPT)
+            require("BASH_INSTALL|\r\n" in out, "Bash 选项没有派发 Bash 安装路径")
+            require("Shell 配置" in out, "Bash 安装后未留在 Shell 子菜单")
+            session.choose("b", MAIN_PROMPT)
             session.choose("3", TOOLS_PROMPT)
             out = session.choose("2", TOOLS_PROMPT)
             require("TOOLS_INSTALL|--python" in out, "开发工具单项安装派发错误")
@@ -273,7 +299,7 @@ def main():
         with open(call_log, encoding="utf-8") as handle:
             calls = handle.read().splitlines()
         require(calls == [
-            "SHELL|",
+            "SHELL|", "BASH|",
             "TOOLS|--python", "TOOLS|--node --claude", "TOOLS|" + expected,
             "MCP|memory", "MCP|" + " ".join(MCP_IDS),
             "FONTS|jetbrains-mono", "FONTS|fsex302 jetbrains-mono",
@@ -285,6 +311,14 @@ def main():
             session.choose("b", MAIN_PROMPT)
             session.finish()
         require(os.path.getsize(call_log) == previous_calls, "直接浏览字体菜单触发安装")
+
+        for variable, choice in (("SHELL_EXIT", "1"), ("BASH_EXIT", "2")):
+            with MenuSession(dict(env, **{variable: "7"})) as session:
+                session.choose("1", SHELL_PROMPT)
+                out = plain(session.choose(choice, SHELL_PROMPT))
+                require("退出码 7" in out, "Shell 安装失败未提示退出码并返回子菜单")
+                session.choose("b", MAIN_PROMPT)
+                session.finish()
 
         with MenuSession(dict(env, MCP_EXIT="7")) as session:
             session.choose("5", MCP_PROMPT)
@@ -310,7 +344,7 @@ def main():
             require("读取 MCP 列表失败" in out, "MCP 列表加载失败未提示并返回主菜单")
             session.finish()
 
-    print("OK: 编号子菜单浏览/安装派发/返回/npx 门禁正常")
+    print("OK: Shell 选择/编号子菜单浏览/安装派发/返回/npx 门禁正常")
     return 0
 
 

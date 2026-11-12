@@ -118,6 +118,25 @@ install_menu() {
     done
 }
 
+shell_menu() {
+    local choice
+    while true; do
+        printf '\n── Shell 配置 ──\n'
+        printf '  1) Zsh   原有 Oh My Zsh / Powerlevel10k / 补全与高亮\n'
+        printf '  2) Bash  Omarchy 风格: Starship / fzf / zoxide / bash-completion\n'
+        printf '  b) 返回主菜单\n'
+        printf '选择 Shell [1-2/b]: '
+        IFS= read -r choice || return 0
+        case "$choice" in
+            1) run_action shell zsh ;;
+            2) run_action shell bash ;;
+            b|B|q|Q) return 0 ;;
+            '') continue ;;
+            *) printf '请输入有效编号或 b。\n' ;;
+        esac
+    done
+}
+
 apps_menu() {
     install_menu "日常软件安装" tools "${DAILY_IDS[@]}"
 }
@@ -173,7 +192,7 @@ main_menu() {
         printf '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
         printf '        Joe 开发环境配置\n'
         printf '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
-        printf '  1) 终端美化      zsh / 按需加载 / 补全与高亮\n'
+        printf '  1) Shell 配置    Zsh / Bash (Omarchy 风格)\n'
         printf '  2) 日常软件      浏览器 / 笔记 / 微信 / QQ / Rime输入法\n'
         printf '  3) 开发工具      Node/Python/AI CLI/编辑器\n'
         printf '  4) 休闲娱乐     游戏 / mod 工具 (占位)\n'
@@ -195,7 +214,7 @@ main_menu() {
 
         IFS= read -r choice || return 0
         case "$choice" in
-            1) run_action shell ;;
+            1) shell_menu ;;
             2) apps_menu ;;
             3) tools_menu ;;
             4) entertainment_menu ;;

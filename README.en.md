@@ -2,7 +2,7 @@
 
 > [中文](README.md) | **English**
 
-Automated development environment setup: terminal beautification (zsh + Oh My Zsh), development tools installation, and AI coding assistant integration.
+Automated development environment setup: Shell configuration (Zsh / Bash), development tools installation, and AI coding assistant integration.
 
 ## Quick Start
 
@@ -22,29 +22,43 @@ cd joe
 
 ## Main Features
 
-### 1. Terminal Beautification (Shell)
+### 1. Shell Configuration (Zsh / Bash)
+
+Main menu item 1 opens a submenu to choose Zsh or Bash. Use `b` to return; installation leaves the submenu open.
+
+Zsh retains its existing installation and configuration:
+
 - **zsh** + **Oh My Zsh** automatic installation and configuration
 - **powerlevel10k** theme (elegant command-line prompt)
 - **Common plugins**: auto-completion, syntax highlighting, fzf fuzzy search, etc.
 - **Auto-backup**: backs up original config before changes, keeps last 5
 
-Main menu item 1 and the `shell` command apply the same optimized zsh configuration. Fresh setups enable six OMZ plugins: `git sudo extract z history dirhistory`. The theme uses installed powerlevel10k or robbyrussell. Autosuggestions run asynchronously, syntax highlighting loads last, and fzf loads its existing completion and key-binding scripts directly. Node/Python use static PATH entries; version-manager integration loads when `nvm` / `pyenv` is first invoked. OMZ automatic update checks are disabled; use `./install.sh shell --update` to update explicitly.
+`shell zsh` applies the optimized zsh configuration; `shell` without a type and legacy options still use this flow. Fresh setups enable six OMZ plugins: `git sudo extract z history dirhistory`. The theme uses installed powerlevel10k or robbyrussell. Autosuggestions run asynchronously, syntax highlighting loads last, and fzf loads its existing completion and key-binding scripts directly. Node/Python use static PATH entries; version-manager integration loads when `nvm` / `pyenv` is first invoked. OMZ automatic update checks are disabled; use `./install.sh shell zsh --update` to update explicitly.
 
 Existing aliases, custom PATH entries, proxy settings, and plugin choices are preserved. Personal settings live in the user block of `.zshrc` or in `~/.zshrc.local`. Use `--configure-only` to apply the configuration offline. Changed files are backed up as `.zshrc.bak.<timestamp>`, keeping the latest five; identical contents are left untouched.
 
 ```bash
-./install.sh shell                              # Full installation with optimized config
+./install.sh shell zsh                          # Original Zsh installation (shell still works)
 ./install.sh shell --dry-run                    # Preview operations
 ./install.sh shell --configure-only             # Update zsh config offline only
 ./install.sh shell --configure-only --dry-run   # Preview config migration
 ./install.sh shell --no-fonts                   # Skip fonts
 ```
 
+Bash uses the [Omarchy-style preset](configs/omarchy/bash/README.en.md): Starship prompt and Git status, fzf history/file search, zoxide `z` / `zi` navigation, and bash-completion. It supports Mint/Ubuntu and Arch integration paths without requiring a full Omarchy installation. Assets go to `${XDG_CONFIG_HOME:-~/.config}/joe/bash`; one managed source block in the existing `.bashrc` preserves personal content. Changed files are backed up, and repeated runs do not add duplicate blocks. The login shell stays as it is unless `--set-default` is supplied.
+
+```bash
+./install.sh shell bash                         # Install four dependencies and configure Bash
+./install.sh shell bash --dry-run               # Preview operations
+./install.sh shell bash --configure-only        # Deploy config offline with dependencies preinstalled
+./install.sh shell bash --set-default           # Install and set Bash as the login shell
+```
+
 ### Font Installation (Fonts)
 
 Main menu item 7 (fonts), or `./install.sh fonts`, opens a numbered submenu with Fixedsys Excelsior (FSEX302) and JetBrains Mono, installed status, individual or all-font installation, and `b` to return to the main menu. After installation, the current submenu stays open.
 
-Fonts are installed from the repository into `~/.local/share/fonts`, work offline, and require no sudo. JetBrains Mono 2.304 includes regular, bold, italic, and bold italic styles with its [SIL OFL license](fonts/jetbrains-mono/OFL.txt). The `shell` command installs Fixedsys Excelsior by default; JetBrains Mono is available separately from the fonts menu.
+Fonts are installed from the repository into `~/.local/share/fonts`, work offline, and require no sudo. JetBrains Mono 2.304 includes regular, bold, italic, and bold italic styles with its [SIL OFL license](fonts/jetbrains-mono/OFL.txt). `shell zsh` installs Fixedsys Excelsior by default; JetBrains Mono is available separately from the fonts menu. The Bash preset does not install fonts; a Nerd Font is recommended for Starship icons.
 
 ```bash
 ./install.sh fonts list                           # List fonts and installed status
@@ -214,9 +228,11 @@ The repair also updates `~/.local/bin/joe-ghostty`: each window starts a separat
 
 The [Omarchy configuration archive and manual restore guide](configs/omarchy/README.en.md) includes floating-workspace maximize and input-candidate fixes, a native Wayland launcher for ChatGPT Desktop, and an optional monitor scaling example. Validated on Omarchy 4.5.0 / Hyprland 0.56.2 with Lua configuration; apply selectively by hand. General configuration import/export and Shell configuration copying do not install these files.
 
+The same directory also holds a [Bash preset](configs/omarchy/bash/README.en.md), installed separately with `shell bash` without applying desktop configuration.
+
 ## Options
 
-### Shell Options
+### Zsh Options (`shell` / `shell zsh`)
 ```bash
 --dry-run              # Simulate run without actual changes
 --configure-only       # Update zsh config offline only; no packages, downloads, default-shell changes, or fonts/.config copies
@@ -228,6 +244,15 @@ The [Omarchy configuration archive and manual restore guide](configs/omarchy/REA
 --clean-backups        # Clean old backups (keep last 5)
 -u, --update           # Update installed components
 ```
+
+### Bash Options (`shell bash`)
+
+| Option | Purpose |
+|---|---|
+| `--dry-run` | Preview dependencies and configuration without changing files |
+| `--configure-only` | Deploy configuration offline without installing dependencies or changing the login shell; supports `--dry-run` |
+| `--set-default` | Set Bash as the login shell after installation; cannot be combined with `--configure-only` |
+| `--help` | Show Bash installer help |
 
 ### Fonts Options
 
@@ -346,7 +371,8 @@ joe/
 │   ├── commands/           # tools/mcp/skills/fonts action adapters
 │   ├── lib/                # Distro / Node / zsh migration / dependencies and font catalog
 │   ├── ui/                 # TUI components
-│   ├── install_shell.sh    # Shell environment installation
+│   ├── install_shell.sh    # Original Zsh environment installation
+│   ├── install_bash.sh     # Omarchy-style Bash installation
 │   ├── install_fonts.sh    # User font installation
 │   ├── install_devtools.sh # Development tools installation
 │   ├── install_mcp_servers.sh  # MCP installation
@@ -381,7 +407,8 @@ tar czf joe.tar.gz joe/
 # On offline machine
 tar xzf joe.tar.gz
 cd joe
-./install.sh shell  # Basic features work offline
+./install.sh shell zsh --configure-only  # Update Zsh configuration offline
+./install.sh shell bash --configure-only # Deploy Bash config offline (dependencies preinstalled)
 ```
 
 ### Contributing

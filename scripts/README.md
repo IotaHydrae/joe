@@ -4,7 +4,8 @@
 
 | 子命令 | 实现文件 |
 |---|---|
-| `shell` | `install_shell.sh` |
+| `shell` / `shell zsh` | `install_shell.sh`（原有 Zsh 流程） |
+| `shell bash` | `install_bash.sh`（Omarchy 风格 Bash） |
 | `fonts` | `commands/fonts.sh` → `install_fonts.sh`；清单位于 `lib/fonts.sh` |
 | `devtools` | `install_devtools.sh` |
 | `mcp` | `install_mcp_servers.sh` |
@@ -22,12 +23,15 @@
 ./install.sh skills --category kernel-dev --tui
 ./install.sh shell --dry-run
 ./install.sh shell --configure-only --dry-run
+./install.sh shell bash --configure-only --dry-run
 ./install.sh fonts install --dry-run --all
 ```
 
-主菜单第 1 项与 `shell` 共用 `templates/zshrc.zsh` 和 `lib/zsh.sh`，`configs/zshrc` 同步保存可移植模板。新配置使用六个 OMZ 插件、单一主题、异步自动建议和最后加载的语法高亮；fzf 直接加载已有脚本，Node/Python 使用固定 PATH，`nvm` / `pyenv` 首次调用时再初始化。OMZ 不自动检查更新，使用 `shell --update` 显式更新。
+主菜单第 1 项先选择 Zsh 或 Bash，空输入不安装，`b` / `q` 返回主菜单。Zsh 与 `shell` / `shell zsh` 共用原来的 `templates/zshrc.zsh` 和 `lib/zsh.sh`，`configs/zshrc` 同步保存可移植模板。新配置使用六个 OMZ 插件、单一主题、异步自动建议和最后加载的语法高亮；fzf 直接加载已有脚本，Node/Python 使用固定 PATH，`nvm` / `pyenv` 首次调用时再初始化。OMZ 不自动检查更新，使用 `shell zsh --update` 显式更新。
 
 `shell --configure-only` 仅离线迁移 zsh 配置，可叠加 `--dry-run`；不会安装软件、下载、切换默认 shell 或复制字体/.config。迁移保留已有插件选择以及用户区块中的别名、自定义 PATH 和代理设置，也支持 `~/.zshrc.local`。改写前生成 `.zshrc.bak.<timestamp>` 备份并保留最近 5 份，内容相同时不重复写入。新配置默认插件为 `git sudo extract z history dirhistory`；`--no-default-plugins` 时仅启用 `git`。
+
+`shell bash` 安装 Starship、fzf、zoxide、bash-completion，并将 `configs/omarchy/bash/` 的预设部署到 `${XDG_CONFIG_HOME:-$HOME/.config}/joe/bash`。在原 `.bashrc` 中维护单一加载区块，保留个人内容并备份改动。支持 `--dry-run`、离线 `--configure-only` 和显式切换登录 Shell 的 `--set-default`；后两项不能同用。默认不切换登录 Shell，不复制桌面配置或字体。详见 [Bash 预设说明](../configs/omarchy/bash/README.md)。
 
 开发工具、MCP 和 skills 默认不勾选任何项；非交互安装须明确安装项或 `--all`。日常软件（Brave 浏览器、ChatGPT Desktop、微信、QQ、Rime 输入法）不包含在 `--all` 或 `quick-start --yes` 中，可在主菜单第 2 项「日常软件」选择安装，或通过 `./install.sh tools install <id>` / `./install.sh devtools --<id>` 单独安装。
 

@@ -4,6 +4,8 @@
 
 这些配置保存了 Omarchy 浮动工作区的窗口修正和 ChatGPT Desktop 缩放修正。已在 **Omarchy 4.5.0 / Hyprland 0.56.2（Lua 配置）** 验证，供手动按需恢复；Joe 的通用配置导入/导出和 Shell 配置复制不会安装它们，也不会自动安装软件包。
 
+另附可独立安装的 [Bash 预设](bash/README.md)，使用 Starship、fzf、zoxide 和 bash-completion。主菜单第 1 项 → Bash，或 `./install.sh shell bash` 安装；它不应用下表的桌面配置。
+
 | 文件 | 用途 |
 |---|---|
 | `hypr/native-window-controls.lua` | 允许软件自带的窗口按钮请求最大化，精确跳过 Omarchy 默认的全局最大化抑制规则 |

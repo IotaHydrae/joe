@@ -4,6 +4,8 @@
 
 These files preserve window fixes for Omarchy floating workspaces and a ChatGPT Desktop scaling fix. They were validated on **Omarchy 4.5.0 / Hyprland 0.56.2 with Lua configuration**. Restore only the parts you need manually: Joe's general configuration import/export and Shell configuration copying do not install these files, and no packages are installed automatically.
 
+A separately installable [Bash preset](bash/README.en.md) provides Starship, fzf, zoxide, and bash-completion. Choose main menu item 1 → Bash, or run `./install.sh shell bash`; this does not apply the desktop configuration below.
+
 | File | Purpose |
 |---|---|
 | `hypr/native-window-controls.lua` | Allow application titlebars to request maximization by skipping only Omarchy's stock blanket maximize-suppression rule |

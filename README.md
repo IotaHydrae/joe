@@ -2,7 +2,7 @@
 
 > **中文** | [English](README.en.md)
 
-自动化配置开发环境的工具集：终端美化（zsh + Oh My Zsh）、开发工具安装、AI 编程助手集成。
+自动化配置开发环境的工具集：Shell 配置（Zsh / Bash）、开发工具安装、AI 编程助手集成。
 
 ## 快速开始
 
@@ -29,30 +29,44 @@ cd joe
 
 ## 主要功能
 
-### 1. 终端美化（Shell）
+### 1. Shell 配置（Zsh / Bash）
+
+主菜单第 1 项进入子菜单，选择 Zsh 或 Bash，`b` 返回；安装完成后留在子菜单。
+
+Zsh 沿用原来的安装与配置：
+
 - **zsh** + **Oh My Zsh** 自动安装配置
 - **powerlevel10k** 主题（优雅的命令行提示符）
 - **常用插件**：自动补全、语法高亮、fzf 模糊搜索等
 - **Ghostty 配置**：包含 `term = xterm-256color` 修复常见问题
 - **自动备份**：修改前备份原配置，保留最近 5 个
 
-主菜单第 1 项和 `shell` 命令使用同一套优化后的 zsh 配置：新配置只启用 `git sudo extract z history dirhistory` 六个 OMZ 插件；主题使用已安装的 powerlevel10k 或 robbyrussell。自动建议异步运行，语法高亮最后加载，fzf 直接加载已有的补全与快捷键脚本。Node/Python 通过固定 PATH 可用，首次调用 `nvm` / `pyenv` 时再初始化版本管理器。OMZ 自动更新检查关闭，可用 `./install.sh shell --update` 显式更新。
+`shell zsh` 使用优化后的 zsh 配置，省略类型的 `shell` 和旧参数仍走此流程：新配置只启用 `git sudo extract z history dirhistory` 六个 OMZ 插件；主题使用已安装的 powerlevel10k 或 robbyrussell。自动建议异步运行，语法高亮最后加载，fzf 直接加载已有的补全与快捷键脚本。Node/Python 通过固定 PATH 可用，首次调用 `nvm` / `pyenv` 时再初始化版本管理器。OMZ 自动更新检查关闭，可用 `./install.sh shell zsh --update` 显式更新。
 
 已有的别名、自定义 PATH、代理设置和插件选择会保留；个人配置集中在 `.zshrc` 的用户区块，也可放入 `~/.zshrc.local`。`--configure-only` 可离线应用配置，修改前备份为 `.zshrc.bak.<timestamp>`，保留最近 5 份；内容相同时不改写文件。
 
 ```bash
-./install.sh shell                              # 完整安装并应用优化配置
+./install.sh shell zsh                          # 原有 Zsh 完整安装 (兼容 shell)
 ./install.sh shell --dry-run                    # 预览操作
 ./install.sh shell --configure-only             # 仅离线更新 zsh 配置
 ./install.sh shell --configure-only --dry-run   # 预览配置迁移
 ./install.sh shell --no-fonts                   # 跳过字体
 ```
 
+Bash 使用 [Omarchy 风格配置](configs/omarchy/bash/README.md)：Starship 提示符与 Git 状态、fzf 历史命令/文件搜索、zoxide 的 `z` / `zi` 跳转和 bash-completion 参数补全。兼容 Mint/Ubuntu 和 Arch 的加载路径，不依赖完整 Omarchy。配置部署到 `${XDG_CONFIG_HOME:-~/.config}/joe/bash`，在原 `.bashrc` 中只维护一段加载入口；保留个人内容，修改前备份，重复运行不重复添加。默认登录 Shell 保持现状，需要切换时加 `--set-default`。
+
+```bash
+./install.sh shell bash                         # 安装四项依赖并部署 Bash 配置
+./install.sh shell bash --dry-run               # 预览操作
+./install.sh shell bash --configure-only        # 已安装依赖时离线部署配置
+./install.sh shell bash --set-default           # 安装并将登录 Shell 设为 Bash
+```
+
 ### 字体安装（Fonts）
 
 主菜单第 7 项「字体安装」或 `./install.sh fonts` 打开编号子菜单：选择 Fixedsys Excelsior（FSEX302）或 JetBrains Mono，查看已安装状态，也可全部安装，`b` 返回主菜单。安装完成后留在当前子菜单。
 
-字体从仓库安装到 `~/.local/share/fonts`，可离线使用，无需 sudo。JetBrains Mono 2.304 包含常规、粗体、斜体和粗斜体，附带 [SIL OFL 许可证](fonts/jetbrains-mono/OFL.txt)。`shell` 默认安装 Fixedsys Excelsior；JetBrains Mono 可从字体菜单单独安装。
+字体从仓库安装到 `~/.local/share/fonts`，可离线使用，无需 sudo。JetBrains Mono 2.304 包含常规、粗体、斜体和粗斜体，附带 [SIL OFL 许可证](fonts/jetbrains-mono/OFL.txt)。`shell zsh` 默认安装 Fixedsys Excelsior；JetBrains Mono 可从字体菜单单独安装。Bash 预设不安装字体，Starship 图标建议使用 Nerd Font。
 
 ```bash
 ./install.sh fonts list                           # 查看字体及安装状态
@@ -216,9 +230,11 @@ Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名�
 
 [Omarchy 配置存档与手动恢复说明](configs/omarchy/README.md)包含浮动工作区的最大化与输入候选窗口修正、ChatGPT Desktop 原生 Wayland 启动入口，以及可选的显示器缩放示例。已在 Omarchy 4.5.0 / Hyprland 0.56.2 的 Lua 配置上验证；按需手动应用，不纳入通用配置导入/导出或 Shell 配置复制。
 
+同目录另存 [Bash 预设](configs/omarchy/bash/README.md)，由 `shell bash` 单独安装，不会应用桌面配置。
+
 ## 选项说明
 
-### Shell 选项
+### Zsh 选项（`shell` / `shell zsh`）
 ```bash
 --dry-run              # 模拟运行，不实际修改
 --configure-only       # 仅离线更新 zsh 配置，不安装软件、下载、切换默认 shell 或复制字体/.config
@@ -230,6 +246,15 @@ Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名�
 --clean-backups        # 清理旧备份（保留最近 5 个）
 -u, --update           # 更新已安装组件
 ```
+
+### Bash 选项（`shell bash`）
+
+| 参数 | 用途 |
+|---|---|
+| `--dry-run` | 预览依赖与配置操作，不修改文件 |
+| `--configure-only` | 离线部署配置，不安装依赖或切换登录 Shell；可与 `--dry-run` 同用 |
+| `--set-default` | 安装后将登录 Shell 设为 Bash；不可与 `--configure-only` 同用 |
+| `--help` | 查看 Bash 安装器帮助 |
 
 ### Fonts 选项
 
@@ -348,7 +373,8 @@ joe/
 │   ├── commands/           # tools/mcp/skills/fonts 动作转换层
 │   ├── lib/                # 发行版 / Node / zsh 迁移 / 依赖与字体清单
 │   ├── ui/                 # TUI 组件
-│   ├── install_shell.sh    # Shell 环境安装
+│   ├── install_shell.sh    # 原有 Zsh 环境安装
+│   ├── install_bash.sh     # Omarchy 风格 Bash 安装
 │   ├── install_fonts.sh    # 用户字体安装
 │   ├── install_devtools.sh # 开发工具安装
 │   ├── install_mcp_servers.sh  # MCP 安装
@@ -383,7 +409,8 @@ tar czf joe.tar.gz joe/
 # 在离线机器上
 tar xzf joe.tar.gz
 cd joe
-./install.sh shell  # 基础功能可离线
+./install.sh shell zsh --configure-only  # 离线更新 Zsh 配置
+./install.sh shell bash --configure-only # 离线部署 Bash 配置 (依赖需预装)
 ```
 
 ### 贡献

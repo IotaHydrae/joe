@@ -103,6 +103,49 @@ test_version() {
     fi
 }
 
+test_shell_routes() {
+    test_info "测试 Shell 类型路由与旧参数兼容"
+    make_tmp -d
+    local box="$TMP_PATH" out rc route
+    cat >"$box/zsh.sh" <<'STUB'
+#!/usr/bin/env bash
+printf 'ZSH'
+printf '|%s' "$@"
+printf '\n'
+STUB
+    cat >"$box/bash.sh" <<'STUB'
+#!/usr/bin/env bash
+printf 'BASH'
+printf '|%s' "$@"
+printf '\n'
+STUB
+    local -a args
+    for route in legacy implicit zsh bash; do
+        case "$route" in
+            legacy) args=(--configure-only --dry-run) ;;
+            implicit) args=(shell --configure-only --dry-run) ;;
+            zsh) args=(shell zsh --configure-only --dry-run) ;;
+            bash) args=(shell bash --configure-only --dry-run) ;;
+        esac
+        rc=0
+        out=$(SHELL_SCRIPT="$box/zsh.sh" BASH_SCRIPT="$box/bash.sh" timeout 5 bash install.sh "${args[@]}" 2>&1) || rc=$?
+        local expected='ZSH|--configure-only|--dry-run'
+        [[ $route != bash ]] || expected='BASH|--configure-only|--dry-run'
+        if [[ $rc -eq 0 && $out == "$expected" ]]; then
+            test_pass "Shell 路由 $route 精确转发参数"
+        else
+            test_fail "Shell 路由 $route (rc=$rc): $out"
+        fi
+    done
+    rc=0
+    out=$(SHELL_SCRIPT="$box/zsh.sh" BASH_SCRIPT="$box/bash.sh" timeout 5 bash install.sh shell fish 2>&1) || rc=$?
+    if [[ $rc -ne 0 && $out == *"未知 Shell 类型: fish"* && $out != *'ZSH|'* && $out != *'BASH|'* ]]; then
+        test_pass "未知 Shell 类型不启动安装器"
+    else
+        test_fail "未知 Shell 类型未拒绝 (rc=$rc): $out"
+    fi
+}
+
 test_tools_list() {
     test_info "测试 tools list 命令"
 
@@ -1206,6 +1249,17 @@ test_zsh_configuration() {
     fi
 }
 
+test_bash_configuration() {
+    test_info "测试 Omarchy 风格 Bash 配置"
+    local out rc=0
+    out=$(timeout 60 bash tests/bash_config_check.sh 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]]; then
+        test_pass "Bash 配置部署、依赖、保留个人设置、幂等与 dry-run"
+    else
+        test_fail "Bash 配置回归失败 (rc=$rc): $out"
+    fi
+}
+
 test_ghostty_fontconfig() {
     test_info "测试 Ghostty Fixedsys 字体优先级修复"
     local out rc=0
@@ -1273,6 +1327,7 @@ printf "\n"
 
 test_help
 test_version
+test_shell_routes
 test_tools_list
 test_dependency_resolution
 test_backward_compatibility
@@ -1301,6 +1356,7 @@ test_vendor_download_resume
 test_predictable_temp_paths
 test_fonts_installation
 test_zsh_configuration
+test_bash_configuration
 test_ghostty_fontconfig
 test_ghostty_launcher
 test_rime_installation

@@ -23,7 +23,8 @@ usage() {
 主命令
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  shell              安装 zsh + Oh My Zsh + Powerlevel10k
+  shell [zsh|bash]   Shell 配置 (省略类型时沿用 Zsh)
+    zsh              原有 zsh + Oh My Zsh + Powerlevel10k
       --dry-run          预览操作
       --no-fonts         跳过字体安装
       --no-config        跳过 .config 复制
@@ -32,6 +33,10 @@ usage() {
       --no-default-plugins  不启用默认 OMZ 插件
       --configure-only  仅优化 zsh 配置 (保留个人设置, 不安装软件)
       --clean-backups    清理旧备份 (保留最近 5 个)
+    bash             Omarchy 风格 Bash (Starship / fzf / zoxide / bash-completion)
+      --dry-run          预览操作
+      --configure-only   仅离线部署 Bash 配置, 不安装软件
+      --set-default      另将登录 Shell 设为 Bash (不可与 --configure-only 同用)
 
   fonts              字体安装 (Fixedsys Excelsior / JetBrains Mono)
       <无参数>           进入字体编号菜单
@@ -86,7 +91,8 @@ usage() {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   ./install.sh                          # 主菜单
-  ./install.sh shell                    # 安装 shell 环境
+  ./install.sh shell zsh                # 安装原有 Zsh 环境 (兼容 shell)
+  ./install.sh shell bash               # 安装 Omarchy 风格 Bash 环境
   ./install.sh fonts                    # 字体安装菜单
   ./install.sh fonts install jetbrains-mono  # 单独安装 JetBrains Mono
   ./install.sh tools                    # 进入工具选择 TUI
@@ -232,8 +238,19 @@ route_command() {
             ;;
 
         shell)
-            # Shell 环境安装
+            # 无类型参数时保留原有 Zsh 路由, 旧选项原样转发。
             local script="${SHELL_SCRIPT:-$SCRIPTS_DIR/install_shell.sh}"
+            case "${COMMAND_ARGS[0]:-}" in
+                zsh)
+                    COMMAND_ARGS=("${COMMAND_ARGS[@]:1}")
+                    ;;
+                bash)
+                    script="${BASH_SCRIPT:-$SCRIPTS_DIR/install_bash.sh}"
+                    COMMAND_ARGS=("${COMMAND_ARGS[@]:1}")
+                    ;;
+                ''|-*) ;;
+                *) die "未知 Shell 类型: ${COMMAND_ARGS[0]} (请选择 zsh 或 bash)" ;;
+            esac
             [ -f "$script" ] || die "脚本不存在: $script"
             exec bash "$script" "${COMMAND_ARGS[@]}"
             ;;
