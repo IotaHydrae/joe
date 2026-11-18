@@ -269,20 +269,20 @@ commands/<domain>.sh      # 执行具体逻辑
 
 ### 中期
 
-1. **安装逻辑模块化**
-   - 每个组件独立模块
-   - 统一安装接口
-   - 便于测试和维护
+1. **安装逻辑模块化** — ✅ 已完成（2026-11 复核）
+   - 22 个组件实现位于 `scripts/components/<id>.sh`，统一接口 `component_<id>_install`
+   - `install_devtools.sh` 负责前置检查、共享助手与按 `COMPONENT_ORDER` 派发
+   - CLI 套件断言 id 表、模块与派发一致，模块之间无交叉调用
 
-2. **Update 命令改进**
-   - 版本检测
-   - 选择性更新
-   - 更新日志
+2. **Update 命令改进** — ✅ 已完成（2026-11 复核）
+   - 选择性更新：`./install.sh update --only <id,...>`（未知名直接拒绝）
+   - 版本检测：cc-switch 等按官方版本判断是否需要更新；成功项在更新日志中记录更新后版本
+   - 更新日志：每轮追加到 `${XDG_STATE_HOME:-~/.local/state}/joe/update.log`（`JOE_UPDATE_LOG` 覆盖、`--dry-run` 不写）
+   - 选项：`--dry-run` / `--quiet` / `--system`
 
-3. **Status 命令完善**
-   - 全局状态总览
-   - 健康检查
-   - 推荐操作
+3. **Status 命令完善** — 部分完成
+   - 全局状态总览：`./install.sh status [--short]`（工具 / MCP / 技能计数）
+   - 健康检查与推荐操作：由 `./install.sh doctor` 承担（status 保持轻量，不做逐项探测）
 
 ### 长期
 

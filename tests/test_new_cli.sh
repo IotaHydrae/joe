@@ -928,18 +928,20 @@ test_update_log() {
         test_fail "跳过项日志缺失: $(sed 's/^/  /' "$log" 2>/dev/null | tail -6)"
     fi
 
-    # 桩 git 成功时成功项记 updated; 退出码来自桩 git (return 0)
+    # 桩 git 成功 + 桩 node --version 时成功项记 updated 且带版本
     mkdir -p "$box/bin"
     printf '#!/usr/bin/env bash\ncase "$*" in *pull*) exit 0 ;; *) exit 1 ;; esac\n' > "$box/bin/git"
     chmod +x "$box/bin/git"
+    printf '#!/usr/bin/env bash\nprintf "v22.14.0\\n"\n' > "$box/bin/node"
+    chmod +x "$box/bin/node"
     mkdir -p "$home/.nvm/.git"
     : > "$log"
     out=$(HOME="$home" XDG_STATE_HOME="$box/state" PATH="$box/bin:$PATH" \
         timeout 30 bash scripts/update-all.sh --only node </dev/null 2>&1) || true
-    if grep -qF '| updated | nvm' "$log"; then
-        test_pass "更新日志记录成功项"
+    if grep -qF '| updated | nvm | → 22.14.0' "$log"; then
+        test_pass "更新日志记录成功项与更新后版本"
     else
-        test_fail "成功项日志缺失: $(sed 's/^/  /' "$log" 2>/dev/null | tail -6)"
+        test_fail "成功项/版本日志缺失: $(sed 's/^/  /' "$log" 2>/dev/null | tail -6)"
     fi
 
     # dry-run 不写日志

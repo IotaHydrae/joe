@@ -1,5 +1,14 @@
 # Joe 更新日志
 
+## [Unreleased]
+
+### 新增
+- `shell` 子菜单：`shell zsh` 沿用原流程，`shell bash` 部署 Omarchy 风格 Bash 预设（Starship / fzf / zoxide / bash-completion），支持 `--configure-only`、`--set-default` 与 `--dry-run`。
+- `update`（`update-all.sh`）持久化更新日志：每轮把逐项结果追加到 `${XDG_STATE_HOME:-~/.local/state}/joe/update.log`，成功项带更新后版本；`JOE_UPDATE_LOG` 覆盖路径、`--dry-run` 不写、flock 防并发交错。
+
+### 修复
+- 主菜单「休闲娱乐」移除过期的「(占位)」标注，现为 Steam 与游戏工具。
+
 ## [2.0.0] - 2026-10-21
 
 ### 🎉 重大重构

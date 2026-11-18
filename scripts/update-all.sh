@@ -16,8 +16,9 @@
 #   - 单项失败不影响其余项, 最后统一汇总
 #   - 退出码: 0 = 全部成功, 1 = 有失败项
 # 更新日志: 每轮运行追加到 ${XDG_STATE_HOME:-~/.local/state}/joe/update.log,
-#   记录 “时间 | 状态 | 项目 [| 说明]” (状态: run/updated/skipped/timeout/failed)。
-#   JOE_UPDATE_LOG 可覆盖日志文件路径; --dry-run 不写日志。
+#   记录 “时间 | 状态 | 项目 [| 说明]” (状态: run/updated/skipped/timeout/failed);
+#   成功项在说明中带更新后版本 (get_version 支持的组件)。JOE_UPDATE_LOG 可覆盖
+#   日志文件路径; --dry-run 不写日志。
 # =============================================================================
 
 set -uo pipefail
@@ -120,6 +121,9 @@ section() {
 # shellcheck source=lib_node.sh
 . "$SCRIPT_DIR/lib_node.sh"
 load_node
+# deps.sh 的 get_version 提供受支持组件的版本探测 (node/python/claude/codex/...)
+# shellcheck source=lib/deps.sh
+. "$SCRIPT_DIR/lib/deps.sh"
 export PYENV_ROOT="${PYENV_ROOT:-$HOME/.pyenv}"
 export PATH="$HOME/.grok/bin:$HOME/.mimocode/bin:$HOME/.local/bin:$PYENV_ROOT/bin:$PYENV_ROOT/shims:$PATH"
 
@@ -169,7 +173,10 @@ update_item() {
     fi
     if [ $rc -eq 0 ]; then
         OK=$((OK + 1))
-        log_update updated "$name"
+        local new_version=""
+        # 成功项记录更新后版本 (get_version 不支持的键值为空, 仅记状态)
+        new_version="$(get_version "$key" 2>/dev/null || true)"
+        log_update updated "$name" "${new_version:+→ $new_version}"
         $QUIET || printf '%s\n' "$(c_g '已更新')"
     elif [ $rc -eq 124 ]; then
         FAILED=$((FAILED + 1))
