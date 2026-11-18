@@ -966,6 +966,48 @@ test_update_log() {
     rm -rf "$box"
 }
 
+test_doctor() {
+    test_info "测试 doctor 体检命令 (json/quiet/help)"
+
+    local out rc h lines json_fail
+    rc=0
+    out=$(timeout 30 bash scripts/doctor.sh --help </dev/null 2>&1) || rc=$?
+    if [[ $rc -eq 0 && $out == *"joe doctor"* && $out == *"--json"* ]]; then
+        test_pass "doctor --help 展示用法"
+    else
+        test_fail "doctor --help 不符 (rc=$rc)"
+    fi
+
+    h="$(mktemp -d)"
+    rc=0
+    out=$(HOME="$h" timeout 180 bash scripts/doctor.sh --json </dev/null 2>&1) || rc=$?
+    lines=$(printf '%s\n' "$out" | grep -c . || true)
+    if json_fail=$(python3 -c 'import json,sys
+j = json.load(sys.stdin); print(j["fail"])' <<< "$out" 2>/dev/null) \
+        && [[ $json_fail =~ ^[0-9]+$ ]]; then
+        # --json 只输出单行 JSON; fail 计数与退出码一致 (任意环境都成立)
+        if [[ $lines -eq 1 ]] \
+            && { { [ "$json_fail" -eq 0 ] && [ "$rc" -eq 0 ]; } \
+              || { [ "$json_fail" -gt 0 ] && [ "$rc" -ne 0 ]; }; }; then
+            test_pass "doctor --json 单行 JSON 且 fail 计数与退出码一致"
+        else
+            test_fail "doctor --json 结构或退出码不符 (fail=$json_fail rc=$rc lines=$lines)"
+        fi
+    else
+        test_fail "doctor --json 不是合法单行 JSON: $(printf '%s' "$out" | head -c 200)"
+    fi
+
+    # quiet: 只保留汇总头, 不再输出各分区头
+    out=$(HOME="$h" timeout 180 bash scripts/doctor.sh --quiet </dev/null 2>&1) || true
+    if [[ $out == *"── 汇总 ──"* && $out != *"── 系统信息与兼容性 ──"* && $out != *"── 基础工具 ──"* ]]; then
+        test_pass "doctor --quiet 只保留汇总不打印分区头"
+    else
+        test_fail "doctor --quiet 分区抑制不符"
+    fi
+
+    rm -rf "$h"
+}
+
 test_mcp_config_write() {
     test_info "测试 MCP 配置写入"
 
@@ -1406,6 +1448,7 @@ test_devtools_dispatch
 test_project_skills
 test_update_only
 test_update_log
+test_doctor
 test_mcp_config_write
 test_game_component_helpers
 test_daily_app_packages

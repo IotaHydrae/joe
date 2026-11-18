@@ -5,7 +5,11 @@
 # 由 doctor.sh 在定义好 QUIET/JSON/PASS/... 全局量并 source log.sh 之后 source。
 # =============================================================================
 
-section() { $QUIET || printf '\n%s\n' "$(c_b "── $* ──")"; }
+# JSON 模式只输出最后的 JSON 行; quiet 模式隐藏分区头（record 已处理条目行）
+section() {
+    $JSON && return 0
+    $QUIET || printf '\n%s\n' "$(c_b "── $* ──")"
+}
 
 # 记录结果: ok|fail|warn|skip  <名称>  <详情>
 record() {
