@@ -195,7 +195,7 @@ main_menu() {
         printf '  1) Shell 配置    Zsh / Bash (Omarchy 风格)\n'
         printf '  2) 日常软件      浏览器 / 笔记 / 微信 / QQ / Rime输入法\n'
         printf '  3) 开发工具      Node/Python/AI CLI/编辑器\n'
-        printf '  4) 休闲娱乐     游戏 / mod 工具 (占位)\n'
+        printf '  4) 休闲娱乐     Steam 与游戏工具\n'
         printf '\n'
         printf '  5) MCP 服务器    代码智能/文件系统/浏览器\n'
         printf '  6) 代理技能      技能组与分类选择\n'

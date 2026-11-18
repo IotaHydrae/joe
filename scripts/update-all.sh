@@ -15,6 +15,9 @@
 # 说明:
 #   - 单项失败不影响其余项, 最后统一汇总
 #   - 退出码: 0 = 全部成功, 1 = 有失败项
+# 更新日志: 每轮运行追加到 ${XDG_STATE_HOME:-~/.local/state}/joe/update.log,
+#   记录 “时间 | 状态 | 项目 [| 说明]” (状态: run/updated/skipped/timeout/failed)。
+#   JOE_UPDATE_LOG 可覆盖日志文件路径; --dry-run 不写日志。
 # =============================================================================
 
 set -uo pipefail
@@ -86,6 +89,25 @@ fi
 
 OK=0; SKIP=0; FAILED=0; DRY=0; FAILED_ITEMS=()
 
+# 更新日志路径与写入函数; flock 防并发交错, 任何记录失败都不影响本次更新。
+UPDATE_LOG="${JOE_UPDATE_LOG:-${XDG_STATE_HOME:-$HOME/.local/state}/joe/update.log}"
+
+log_update() {
+    local status="$1" name="$2" detail="${3:-}"
+    $DRY_RUN && return 0
+    [ -n "$UPDATE_LOG" ] || return 0
+    mkdir -p -- "$(dirname -- "$UPDATE_LOG")" 2>/dev/null || return 0
+    local line
+    line="$(date '+%F %T') | ${status} | ${name}${detail:+ | ${detail}}"
+    (
+        if command -v flock >/dev/null 2>&1; then
+            exec 9>>"$UPDATE_LOG" 2>/dev/null || return 0
+            flock 9 2>/dev/null || return 0
+        fi
+        printf '%s\n' "$line" >>"$UPDATE_LOG" 2>/dev/null
+    ) || true
+}
+
 section() {
     # --only 时只列实际执行的条目, 不打印可能为空的分组标题
     if $QUIET || [ -n "$ONLY" ]; then
@@ -147,14 +169,17 @@ update_item() {
     fi
     if [ $rc -eq 0 ]; then
         OK=$((OK + 1))
+        log_update updated "$name"
         $QUIET || printf '%s\n' "$(c_g '已更新')"
     elif [ $rc -eq 124 ]; then
         FAILED=$((FAILED + 1))
         FAILED_ITEMS+=("$name (超时 ${UPDATE_TIMEOUT:-300}s)")
+        log_update timeout "$name" "${UPDATE_TIMEOUT:-300}s"
         $QUIET || printf '%s\n' "$(c_y "超时 ${UPDATE_TIMEOUT:-300}s")"
     else
         FAILED=$((FAILED + 1))
         FAILED_ITEMS+=("$name")
+        log_update failed "$name"
         $QUIET || printf '%s\n' "$(c_r '失败')"
         [ -n "$out" ] && printf '%s\n' "$out" | tail -3 | sed 's/^/      /'
     fi
@@ -165,12 +190,18 @@ skip_item() {
     local key="$1" name="$2"
     want_item "$key" || return 0
     SKIP=$((SKIP + 1))
+    log_update skipped "$name" "${3:-未安装}"
     $QUIET || printf '  %s %-26s %s\n' "$(c_d '·')" "$name" "$(c_d "${3:-未安装}")"
 }
 
 printf '%s\n' "$(c_b 'joe 统一更新')"
 [ -n "$ONLY" ] && printf '%s\n' "$(c_d "只更新: $ONLY")"
 $DRY_RUN && printf '%s\n' "$(c_y '(dry-run 模式, 不会真正执行)')"
+if $WITH_SYSTEM; then
+    log_update run start "${ONLY:-全部} +system"
+else
+    log_update run start "${ONLY:-全部}"
+fi
 
 # ---------------------------------------------------------------------------
 # 1. joe 仓库
@@ -364,9 +395,11 @@ fi
 # ---------------------------------------------------------------------------
 # 汇总
 # ---------------------------------------------------------------------------
+log_update run finish "OK=$OK SKIP=$SKIP FAILED=$FAILED"
 printf '\n%s\n' "$(c_b '── 汇总 ──')"
 printf '  %s 成功   %s 跳过   %s 失败\n' "$(c_g "$OK")" "$(c_d "$SKIP")" "$(c_r "$FAILED")"
 [ "$DRY" -gt 0 ] && printf '  %s\n' "$(c_y "dry-run: $DRY 项将执行")"
+! $QUIET && printf '  更新日志: %s\n' "$UPDATE_LOG"
 if [ "$FAILED" -gt 0 ]; then
     printf '\n%s\n' "$(c_r '失败项:')"
     for i in "${FAILED_ITEMS[@]}"; do printf '  • %s\n' "$i"; done

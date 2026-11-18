@@ -116,6 +116,11 @@ WeChat and QQ packages support resumable downloads: connection failures are retr
 a self-update path (Zed, VS Code, Ghostty, Brave) are rejected with the matching
 `tools install <id>` command instead of being silently skipped.
 
+Each `./install.sh update` run appends a per-item result (updated / skipped /
+timeout / failed) to `${XDG_STATE_HOME:-~/.local/state}/joe/update.log` as
+`time | status | item`. Set `JOE_UPDATE_LOG` to override the path; `--dry-run`
+writes nothing.
+
 ### 3. MCP Servers
 Install Model Context Protocol servers for AI coding assistants:
 

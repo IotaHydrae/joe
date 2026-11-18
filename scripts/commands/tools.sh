@@ -217,8 +217,8 @@ cmd_install() {
     done
     printf "\n"
 
-    # 调用旧的安装脚本（临时方案）
-    # TODO: 逐步迁移每个组件的安装逻辑到独立模块
+    # 组件实现已移入 scripts/components/<id>.sh, 由 install_devtools.sh 统一定位
+    # 并负责前置检查、共享助手与派发; 2.0 层转发旧标志, 与菜单/旧命令共用一条路径。
     if [[ -n ${DEVTOOLS_SCRIPT:-} ]]; then
         local -a old_flags=()
         for comp in "${to_install[@]}"; do

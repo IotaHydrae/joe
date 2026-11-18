@@ -42,7 +42,7 @@ declare -A COMPONENT_DEPS=(
 # 日常软件列表 (主菜单日常软件项管理, 不作为开发工具列出)
 DAILY_IDS=(brave chatgpt wechat qq rime obsidian)
 
-# 休闲娱乐列表 (主菜单休闲娱乐项管理, 内联游戏 / mod 工具; 不参与开发工具 --all)
+# 休闲娱乐列表 (主菜单休闲娱乐项管理, 如 Steam 游戏; 不参与开发工具 --all)
 ENTERTAINMENT_IDS=(steam)
 
 # 组件分组定义 (仅包含开发工具)

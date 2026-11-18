@@ -909,6 +909,61 @@ STUB
     fi
 }
 
+test_update_log() {
+    test_info "测试 update-all 持久化更新日志"
+
+    local box home log out
+    box=$(mktemp -d)
+    home="$box/home"
+    mkdir -p "$home"
+    log="$box/state/joe/update.log"
+
+    # 未装条目记 skipped; 运行有 start/done 标记 (node 缺 .nvm/.git 时走 skip 分支)
+    out=$(HOME="$home" XDG_STATE_HOME="$box/state" \
+        timeout 30 bash scripts/update-all.sh --only node </dev/null 2>&1) || true
+    if [[ -f $log ]] && grep -qF '| skipped | nvm' "$log" \
+        && grep -qF '| run | start' "$log" && grep -qF '| run | finish' "$log"; then
+        test_pass "更新日志记录跳过项与运行起止"
+    else
+        test_fail "跳过项日志缺失: $(sed 's/^/  /' "$log" 2>/dev/null | tail -6)"
+    fi
+
+    # 桩 git 成功时成功项记 updated; 退出码来自桩 git (return 0)
+    mkdir -p "$box/bin"
+    printf '#!/usr/bin/env bash\ncase "$*" in *pull*) exit 0 ;; *) exit 1 ;; esac\n' > "$box/bin/git"
+    chmod +x "$box/bin/git"
+    mkdir -p "$home/.nvm/.git"
+    : > "$log"
+    out=$(HOME="$home" XDG_STATE_HOME="$box/state" PATH="$box/bin:$PATH" \
+        timeout 30 bash scripts/update-all.sh --only node </dev/null 2>&1) || true
+    if grep -qF '| updated | nvm' "$log"; then
+        test_pass "更新日志记录成功项"
+    else
+        test_fail "成功项日志缺失: $(sed 's/^/  /' "$log" 2>/dev/null | tail -6)"
+    fi
+
+    # dry-run 不写日志
+    : > "$log"
+    out=$(HOME="$home" XDG_STATE_HOME="$box/state" PATH="$box/bin:$PATH" \
+        timeout 30 bash scripts/update-all.sh --only node --dry-run </dev/null 2>&1) || true
+    if [ ! -s "$log" ]; then
+        test_pass "dry-run 不写更新日志"
+    else
+        test_fail "dry-run 仍写入日志: $(cat "$log")"
+    fi
+
+    # XDG_STATE_HOME 缺省时落到 $HOME/.local/state/joe/update.log
+    out=$(HOME="$home" PATH="$box/bin:$PATH" \
+        timeout 30 bash scripts/update-all.sh --only node </dev/null 2>&1) || true
+    if [ -f "$home/.local/state/joe/update.log" ]; then
+        test_pass "缺省日志路径位于 ~/.local/state/joe/update.log"
+    else
+        test_fail "缺省日志路径不符: $(find "$home" -name update.log 2>/dev/null)"
+    fi
+
+    rm -rf "$box"
+}
+
 test_mcp_config_write() {
     test_info "测试 MCP 配置写入"
 
@@ -1348,6 +1403,7 @@ test_ghostty_backup_convention
 test_devtools_dispatch
 test_project_skills
 test_update_only
+test_update_log
 test_mcp_config_write
 test_game_component_helpers
 test_daily_app_packages

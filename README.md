@@ -219,12 +219,14 @@ Linux QQ 会从官网读取安装包地址，并在下载前调用官方签名�
 ./install.sh doctor --quiet          # 只显示问题
 
 # 更新
-./install.sh update                  # 更新已安装组件
+./install.sh update                  # 更新已安装组件（每轮记录更新日志）
 
 # 配置同步
 ./install.sh config list             # 查看配置映射
 ./install.sh config export           # 导出本机配置到仓库
 ```
+
+每次 `./install.sh update` 会把逐项结果（成功 / 跳过 / 超时 / 失败）追加到 `${XDG_STATE_HOME:-~/.local/state}/joe/update.log`，格式为 `时间 | 状态 | 项目`，方便事后核对各工具的更新时间。`JOE_UPDATE_LOG` 可覆盖日志路径；`--dry-run` 不写日志。
 
 ### Omarchy 桌面配置
 
