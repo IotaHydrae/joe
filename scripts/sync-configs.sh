@@ -198,11 +198,14 @@ do_export() {
             continue
         fi
         local out redacted
-        out="$(sanitize_stream "$mode" "$src" 2>/tmp/.joe_redact)"
-        redacted="$(sed -n 's/^REDACTED=//p' /tmp/.joe_redact | tail -1)"
-        rm -f /tmp/.joe_redact
+        # 不能用可预测的 /tmp/<name>: 其他本地用户可预置或符号链接 (AGENTS.md)。
+        # mktemp 私有文件 + EXIT trap, 中断时也能清掉。
+        CURRENT_TMP="$(mktemp)" || { printf '  %s %-22s %s\n' "$(c_r '✗')" "$name" "$(c_r '无法创建临时文件')"; continue; }
+        out="$(sanitize_stream "$mode" "$src" 2>"$CURRENT_TMP")" || true
+        redacted="$(sed -n 's/^REDACTED=//p' "$CURRENT_TMP" | tail -1)"
+        rm -f -- "$CURRENT_TMP"; CURRENT_TMP=""
         [ "$redacted" = "0" ] && redacted=0
-        total=$((total + redacted))
+        total=$((total + ${redacted:-0}))
 
         if [ "$out" = "__PARSE_ERROR__" ]; then
             printf '  %s %-22s %s\n' "$(c_r '✗')" "$name" "$(c_r '解析失败, 已跳过')"
@@ -322,6 +325,13 @@ do_diff() {
         fi
     done < <(map_entries)
 }
+
+# 导出临时文件注册与清理; 中断/报错时也能回收
+CURRENT_TMP=""
+cleanup_current_tmp() {
+    [ -n "$CURRENT_TMP" ] && rm -f -- "$CURRENT_TMP"
+}
+trap cleanup_current_tmp EXIT
 
 case "$MODE" in
     list)   do_list ;;

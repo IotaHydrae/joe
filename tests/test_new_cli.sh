@@ -1008,6 +1008,72 @@ j = json.load(sys.stdin); print(j["fail"])' <<< "$out" 2>/dev/null) \
     rm -rf "$h"
 }
 
+test_config_sync() {
+    test_info "测试 config 导出/导入与脱敏"
+
+    local box home rc out
+    box=$(mktemp -d)
+    home="$box/home"
+    mkdir -p "$home/.codex" "$box/scripts/lib"
+    # 隔离脚本: REPO_ROOT 落到 box, configs/ 指向 box/configs, 不碰仓库
+    cp scripts/sync-configs.sh "$box/scripts/"
+    cp scripts/lib/log.sh "$box/scripts/lib/"
+
+    # 本机配置: 含 token 的 .zshrc 与带隐私字段的 .claude.json
+    printf 'export GITHUB_TOKEN=ghp_0123456789abcdef\n' > "$home/.zshrc"
+    printf '{"mcpServers":{"filesystem":{"command":"npx"}},"userID":"u-99","machineID":"m-1"}' > "$home/.claude.json"
+
+    # export --check: 只报告擦除数, 不写文件
+    rc=0
+    out=$(HOME="$home" BACKUP_ROOT="$box/bak" timeout 30 bash "$box/scripts/sync-configs.sh" export --check 2>&1) || rc=$?
+    if [[ $rc -eq 0 && $out == *"会擦除"* && ! -f "$box/configs/zshrc" ]]; then
+        test_pass "config export --check 不写文件只报告脱敏数"
+    else
+        test_fail "export --check 不符 (rc=$rc): $(printf '%s' "$out" | head -c 200)"
+    fi
+
+    # export: 写库, token 擦除, claude.json 只保留 mcpServers
+    rc=0
+    out=$(HOME="$home" BACKUP_ROOT="$box/bak" timeout 30 bash "$box/scripts/sync-configs.sh" export 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]] \
+        && grep -q REDACTED "$box/configs/zshrc" && ! grep -q ghp_ "$box/configs/zshrc" \
+        && python3 -c 'import json,sys
+d=json.load(open(sys.argv[1])); assert "mcpServers" in d; assert "userID" not in d and "machineID" not in d' \
+            "$box/configs/claude-mcp.json"; then
+        test_pass "config export 脱敏 token 并剥离 claude 隐私字段"
+    else
+        test_fail "export 脱敏不符 (rc=$rc): $(printf '%s' "$out" | head -c 200)"
+    fi
+
+    # 预置 /tmp/.joe_redact 符号链接: 旧实现会穿过链接覆盖 canary
+    printf 'CANARY' > "$box/canary"
+    rm -f /tmp/.joe_redact
+    ln -s "$box/canary" /tmp/.joe_redact
+    HOME="$home" BACKUP_ROOT="$box/bak" timeout 30 bash "$box/scripts/sync-configs.sh" export >/dev/null 2>&1 || true
+    if [ "$(cat "$box/canary" 2>/dev/null)" = "CANARY" ]; then
+        test_pass "export 不写入可预测 /tmp/.joe_redact"
+    else
+        test_fail "export 穿过了 /tmp/.joe_redact 符号链接"
+    fi
+    rm -f /tmp/.joe_redact
+
+    # import: 原文件备份 + 恢复; claude 合并 mcpServers 且保留本机字段
+    : > "$home/.zshrc"
+    rc=0
+    out=$(HOME="$home" BACKUP_ROOT="$box/bak" timeout 30 bash "$box/scripts/sync-configs.sh" import 2>&1) || rc=$?
+    if [[ $rc -eq 0 ]] && grep -q REDACTED "$home/.zshrc" \
+        && find "$box/bak" -name '.zshrc' | grep -q . \
+        && python3 -c 'import json,sys
+d=json.load(open(sys.argv[1])); assert d["mcpServers"]["filesystem"]["command"]=="npx"; assert d.get("userID")=="u-99"' \
+            "$home/.claude.json"; then
+        test_pass "config import 备份并恢复, claude 合并保留本机字段"
+    else
+        test_fail "import 不符 (rc=$rc): $(printf '%s' "$out" | head -c 200)"
+    fi
+
+    rm -rf "$box"
+}
+
 test_mcp_config_write() {
     test_info "测试 MCP 配置写入"
 
@@ -1449,6 +1515,7 @@ test_project_skills
 test_update_only
 test_update_log
 test_doctor
+test_config_sync
 test_mcp_config_write
 test_game_component_helpers
 test_daily_app_packages
